@@ -582,8 +582,8 @@ export default function App() {
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-              <span className="text-indigo-600 dark:text-indigo-400 italic">Khmer Teacher Pro</span>
-              <span className="text-xs px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-full">EduSpin</span>
+              <span className="text-indigo-600 dark:text-indigo-400">Teacher EduSpin</span>
+              <span className="text-xs px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-full">Edu_Pro</span>
             </h1>
             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none flex items-center gap-2 flex-wrap">
               <span>{teacher ? `សាលារៀន៖ ${teacher.schoolName}` : 'ប្រព័ន្ធសិក្សាអន្តរកម្មសម្រាប់គ្រូបង្រៀន'}</span>

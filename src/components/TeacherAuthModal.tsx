@@ -18,6 +18,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
   // Login fields
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
+  const [showLoginPassword, setShowLoginPassword] = useState(false);
   
   // Register fields
   const [regName, setRegName] = useState('');
@@ -25,6 +26,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
   const [regSubject, setRegSubject] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
+  const [showRegPassword, setShowRegPassword] = useState(false);
   
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -34,6 +36,8 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
     setErrorMsg('');
     setSuccessMsg('');
     setIsLoading(false);
+    setShowLoginPassword(false);
+    setShowRegPassword(false);
   }, [isLoginView]);
 
   const handleLogin = async (e: React.FormEvent) => {
@@ -174,7 +178,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
                     {isLoginView ? 'ចូលប្រើប្រាស់គណនីគ្រូ' : 'បង្កើតគណនេយ្យគ្រូបង្រៀន'}
                   </h2>
                   <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">
-                    Khmer Teacher Pro Auth
+                    Teacher EduSpin Auth
                   </p>
                 </div>
               </div>
@@ -230,13 +234,21 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
                     <div className="relative">
                       <Key className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                       <input
-                        type="password"
+                        type={showLoginPassword ? "text" : "password"}
                         value={loginPassword}
                         onChange={(e) => setLoginPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                        className="w-full pl-10 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                         required
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3.5 top-2 hover:bg-slate-100 p-1 rounded-lg transition-transform text-xl select-none active:scale-90"
+                        title={showLoginPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
+                      >
+                        {showLoginPassword ? '🙈' : '🙉'}
+                      </button>
                     </div>
                   </div>
 
@@ -343,16 +355,24 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
                       លេខសម្ងាត់សម្រាប់ឡុកអ៊ីន *
                     </label>
                     <div className="relative">
-                      <Key className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <Key className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
                       <input
-                        type="password"
+                        type={showRegPassword ? "text" : "password"}
                         value={regPassword}
                         onChange={(e) => setRegPassword(e.target.value)}
                         placeholder="យ៉ាងតិច ៤ តួអក្សរ"
-                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                        className="w-full pl-10 pr-12 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                         required
                         minLength={4}
                       />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3.5 top-1.5 hover:bg-slate-100 p-1 rounded-lg transition-transform text-xl select-none active:scale-90"
+                        title={showRegPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
+                      >
+                        {showRegPassword ? '🙈' : '🙉'}
+                      </button>
                     </div>
                   </div>
 
