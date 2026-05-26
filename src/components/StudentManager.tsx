@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle } from 'lucide-react';
+import { Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
 
@@ -10,6 +10,7 @@ interface StudentManagerProps {
   onAddStudentDetail: (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
   onRemoveStudent: (id: string) => void;
   onBulkAddStudents: (namesText: string) => void;
+  onUpdateStudentDetail?: (id: string, fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
 }
 
 export default function StudentManager({
@@ -18,7 +19,8 @@ export default function StudentManager({
   activeClassId,
   onAddStudentDetail,
   onRemoveStudent,
-  onBulkAddStudents
+  onBulkAddStudents,
+  onUpdateStudentDetail
 }: StudentManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClassId, setFilterClassId] = useState<string>('all');
@@ -29,6 +31,13 @@ export default function StudentManager({
   const [newGender, setNewGender] = useState<'ប្រុស' | 'ស្រី'>('ប្រុស');
   const [newStatus, setNewStatus] = useState<'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'>('សកម្ម');
   const [newClassId, setNewClassId] = useState<string>(activeClassId);
+
+  // Editing student states
+  const [editingStudent, setEditingStudent] = useState<Student | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editGender, setEditGender] = useState<'ប្រុស' | 'ស្រី'>('ប្រុស');
+  const [editStatus, setEditStatus] = useState<'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'>('សកម្ម');
+  const [editClassId, setEditClassId] = useState('');
 
   // Bulk add toggle
   const [showBulkForm, setShowBulkForm] = useState(false);
@@ -326,17 +335,32 @@ export default function StudentManager({
                   </div>
                 </div>
 
-                <button
-                  onClick={() => {
-                    if (window.confirm(`តើអ្នកចង់លុបឈ្មោះសិស្ស «${student.name}» ពីបញ្ជីរៀនមែនទេ?`)) {
-                      onRemoveStudent(student.id);
-                    }
-                  }}
-                  className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200"
-                  title="លុបឈ្មោះសិស្ស"
-                >
-                  <Trash2 className="w-4.5 h-4.5" />
-                </button>
+                <div className="flex items-center gap-1">
+                  <button
+                    onClick={() => {
+                      setEditingStudent(student);
+                      setEditName(student.name);
+                      setEditGender(student.gender || 'ប្រុស');
+                      setEditStatus(student.status || 'សកម្ម');
+                      setEditClassId(student.classId || activeClassId);
+                    }}
+                    className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-505/10 rounded-xl cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200"
+                    title="កែប្រែព័ត៌មាន"
+                  >
+                    <Pencil className="w-4.5 h-4.5" />
+                  </button>
+                  <button
+                    onClick={() => {
+                      if (window.confirm(`តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបឈ្មោះសិស្ស «${student.name}» នេះចោលមែនទេ?`)) {
+                        onRemoveStudent(student.id);
+                      }
+                    }}
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200"
+                    title="លុបឈ្មោះសិស្ស"
+                  >
+                    <Trash2 className="w-4.5 h-4.5" />
+                  </button>
+                </div>
               </div>
             );
           })
@@ -394,6 +418,120 @@ export default function StudentManager({
           </div>
         </div>
       </div>
+
+      {/* Edit Student Modal Overlay */}
+      {editingStudent && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
+          <div 
+            className="absolute inset-0 bg-slate-900/40 backdrop-blur-sm"
+            onClick={() => setEditingStudent(null)}
+          />
+          {/* Form Content */}
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (editName.trim() && onUpdateStudentDetail) {
+                onUpdateStudentDetail(editingStudent.id, {
+                  name: editName.trim(),
+                  gender: editGender,
+                  status: editStatus,
+                  classId: editClassId
+                });
+                setEditingStudent(null);
+              }
+            }}
+            className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-805 rounded-3xl shadow-2xl relative z-10 p-6 space-y-5 animate-in zoom-in-95 duration-200 text-left"
+          >
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
+              <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                <Pencil className="w-5 h-5 text-indigo-500" />
+                <span>កែប្រែព័ត៌មានសិស្ស</span>
+              </h3>
+              <button 
+                type="button"
+                onClick={() => setEditingStudent(null)}
+                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 text-lg font-bold p-1 rounded-lg"
+              >
+                ✕
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {/* Name field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">ឈ្មោះសិស្ស(ខ្មែរ)</label>
+                <input
+                  type="text"
+                  required
+                  placeholder="សុខ រីបុល..."
+                  value={editName}
+                  onChange={(e) => setEditName(e.target.value)}
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-850 dark:text-slate-100 text-sm font-semibold focus:outline-none focus:ring-4 focus:ring-indigo-500/15 focus:border-indigo-500 w-full"
+                />
+              </div>
+
+              {/* Gender field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">ភេទ</label>
+                <select
+                  value={editGender}
+                  onChange={(e) => setEditGender(e.target.value as 'ប្រុស' | 'ស្រី')}
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-805 dark:text-slate-200 text-sm font-bold cursor-pointer focus:outline-none focus:border-indigo-500 w-full"
+                >
+                  <option value="ប្រុស">ប្រុស</option>
+                  <option value="ស្រី">ស្រី</option>
+                </select>
+              </div>
+
+              {/* Status field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">កម្រិតសិក្សា</label>
+                <select
+                  value={editStatus}
+                  onChange={(e) => setEditStatus(e.target.value as any)}
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-805 dark:text-slate-200 text-sm font-bold cursor-pointer focus:outline-none focus:border-indigo-500 w-full"
+                >
+                  <option value="ឆ្នើម">ឆ្នើម (Outstanding)</option>
+                  <option value="សកម្ម">សកម្ម (Active)</option>
+                  <option value="កំពុងរីកចម្រើន">កំពុងរីកចម្រើន (Improving)</option>
+                  <option value="គួរឲ្យបារម្ភ">គួរឲ្យបារម្ភ (Needs Attention)</option>
+                </select>
+              </div>
+
+              {/* Class field */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-xs font-extrabold text-slate-500 dark:text-slate-400 uppercase">ថ្នាក់</label>
+                <select
+                  value={editClassId}
+                  onChange={(e) => setEditClassId(e.target.value)}
+                  className="px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-2xl bg-slate-50 dark:bg-slate-950 text-slate-805 dark:text-slate-200 text-sm font-bold cursor-pointer focus:outline-none focus:border-indigo-500 w-full"
+                >
+                  {classes.map(c => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            <div className="flex justify-end gap-2.5 pb-1 border-t border-slate-100 dark:border-slate-800 pt-4">
+              <button
+                type="button"
+                onClick={() => setEditingStudent(null)}
+                className="px-5 py-2.5 hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-350 rounded-2xl text-xs font-bold transition-all"
+              >
+                បោះបង់
+              </button>
+              <button
+                type="submit"
+                className="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all shadow-md active:scale-95"
+              >
+                រក្សាទុក
+              </button>
+            </div>
+          </form>
+        </div>
+      )}
     </div>
   );
 }

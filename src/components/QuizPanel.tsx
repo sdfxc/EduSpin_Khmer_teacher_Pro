@@ -88,7 +88,7 @@ export default function QuizPanel({
 
   if (activeCard) {
     return (
-      <div className="flex-1 flex flex-col p-8 bg-transparent relative transition-colors duration-300">
+      <div className="flex-1 flex flex-col p-8 bg-transparent relative transition-colors duration-300 overflow-y-auto custom-scrollbar">
         <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col">
           {/* Question Header */}
           <div className="flex items-center justify-between mb-8">

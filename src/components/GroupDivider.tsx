@@ -7,10 +7,14 @@ interface GroupDividerProps {
   activeClassName: string;
 }
 
+interface GroupMember extends Student {
+  assignedRole?: 'ប្រធាន' | 'អនុប្រធាន' | 'សមាជិក';
+}
+
 interface Group {
   id: number;
   name: string;
-  members: Student[];
+  members: GroupMember[];
 }
 
 export default function GroupDivider({ students, activeClassName }: GroupDividerProps) {
@@ -28,27 +32,197 @@ export default function GroupDivider({ students, activeClassName }: GroupDivider
   const splitGroups = () => {
     if (students.length === 0) return;
 
-    // Create a copy and shuffle students randomly (Fisher-Yates)
-    const shuffled = [...students];
-    for (let i = shuffled.length - 1; i > 0; i--) {
-      const j = Math.floor(Math.random() * (i + 1));
-      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-    }
-
-    // Distribute into G groups
     const G = Math.min(numGroups, students.length);
-    const result: Group[] = Array.from({ length: G }, (_, idx) => ({
+
+    // 1. Categorize students by active status for proportional distribution
+    const outstanding: Student[] = [];
+    const active: Student[] = [];
+    const improving: Student[] = [];
+    const attention: Student[] = [];
+
+    students.forEach(s => {
+      if (s.status === 'ឆ្នើម') {
+        outstanding.push(s);
+      } else if (s.status === 'សកម្ម') {
+        active.push(s);
+      } else if (s.status === 'គួរឲ្យបារម្ភ') {
+        attention.push(s);
+      } else {
+        // 'កំពុងរីកចម្រើន' or undefined/null/empty status gets classified under improving
+        improving.push(s);
+      }
+    });
+
+    // Helper function to weave genders alternatingly (ប្រុស, ស្រី) to balance male and female distribution
+    const weaveGenders = (arr: Student[]): Student[] => {
+      const boys = arr.filter(s => s.gender === 'ប្រុស');
+      const girls = arr.filter(s => s.gender === 'ស្រី');
+      const others = arr.filter(s => s.gender !== 'ប្រុស' && s.gender !== 'ស្រី');
+
+      // Shuffle pools first to ensure fair random selection
+      const shuffle = (list: Student[]) => {
+        for (let i = list.length - 1; i > 0; i--) {
+          const j = Math.floor(Math.random() * (i + 1));
+          [list[i], list[j]] = [list[j], list[i]];
+        }
+      };
+
+      shuffle(boys);
+      shuffle(girls);
+      shuffle(others);
+
+      const weaved: Student[] = [];
+      let bIdx = 0;
+      let gIdx = 0;
+
+      // Start with whichever gender has more students left to maximize alternating success
+      let preferBoy = boys.length >= girls.length;
+
+      while (bIdx < boys.length || gIdx < girls.length) {
+        if (preferBoy) {
+          if (bIdx < boys.length) {
+            weaved.push(boys[bIdx++]);
+          }
+          preferBoy = false;
+        } else {
+          if (gIdx < girls.length) {
+            weaved.push(girls[gIdx++]);
+          }
+          preferBoy = true;
+        }
+
+        // Keep alternating if possible, or deplete remaining
+        if (bIdx >= boys.length && gIdx < girls.length) {
+          preferBoy = false;
+        } else if (gIdx >= girls.length && bIdx < boys.length) {
+          preferBoy = true;
+        }
+      }
+
+      return [...weaved, ...others];
+    };
+
+    const weavedOutstanding = weaveGenders(outstanding);
+    const weavedActive = weaveGenders(active);
+    const weavedImproving = weaveGenders(improving);
+    const weavedAttention = weaveGenders(attention);
+
+    // Create G initial groups
+    const resultGroups: Group[] = Array.from({ length: G }, (_, idx) => ({
       id: idx + 1,
       name: `ក្រុមទី${idx + 1}`,
       members: []
     }));
 
-    shuffled.forEach((student, index) => {
-      const groupIdx = index % G;
-      result[groupIdx].members.push(student);
+    // 3. Proportional round-robin distribution category by category
+    // This distributes Outstanding, Active, Improving, and Needs Attention as evenly as possible, with alternating genders
+    weavedOutstanding.forEach((student, idx) => {
+      resultGroups[idx % G].members.push({ ...student });
     });
 
-    setGroups(result);
+    weavedActive.forEach((student, idx) => {
+      resultGroups[idx % G].members.push({ ...student });
+    });
+
+    weavedImproving.forEach((student, idx) => {
+      resultGroups[idx % G].members.push({ ...student });
+    });
+
+    weavedAttention.forEach((student, idx) => {
+      resultGroups[idx % G].members.push({ ...student });
+    });
+
+    // 4. Assign roles and sort/alternate inside each group
+    resultGroups.forEach(group => {
+      const gOutstanding = group.members.filter(m => m.status === 'ឆ្នើម');
+      const gActive = group.members.filter(m => m.status === 'សកម្ម');
+      const gImproving = group.members.filter(m => m.status === 'កំពុងរីកចម្រើន' || !m.status);
+      const gAttention = group.members.filter(m => m.status === 'គួរឲ្យបារម្ភ');
+
+      // Outstanding get 'ប្រធាន' (President/Leader)
+      gOutstanding.forEach(m => {
+        m.assignedRole = 'ប្រធាន';
+      });
+
+      // Exactly ONE randomly chosen Active student per group gets 'អនុប្រធាន' (Vice President)
+      if (gActive.length > 0) {
+        const vpIndex = Math.floor(Math.random() * gActive.length);
+        gActive.forEach((m, idx) => {
+          if (idx === vpIndex) {
+            m.assignedRole = 'អនុប្រធាន';
+          } else {
+            m.assignedRole = 'សមាជិក';
+          }
+        });
+      }
+
+      // Improving get 'សមាជិក' (Member)
+      gImproving.forEach(m => {
+        m.assignedRole = 'សមាជិក';
+      });
+
+      // Attention get 'សមាជិក' (Member)
+      gAttention.forEach(m => {
+        m.assignedRole = 'សមាជិក';
+      });
+
+      const leaders = group.members.filter(m => m.assignedRole === 'ប្រធាន');
+      const vices = group.members.filter(m => m.assignedRole === 'អនុប្រធាន');
+      const ordinary = group.members.filter(m => m.assignedRole === 'សមាជិក');
+
+      // Weave the remaining ordinary members by gender so they visually alternate (ប្រុស -> ស្រី -> ប្រុស...)
+      const ordinaryBoys = ordinary.filter(m => m.gender === 'ប្រុស');
+      const ordinaryGirls = ordinary.filter(m => m.gender === 'ស្រី');
+      const ordinaryOthers = ordinary.filter(m => m.gender !== 'ប្រុស' && m.gender !== 'ស្រី');
+
+      const sortedOrdinary: GroupMember[] = [];
+      let obIdx = 0;
+      let ogIdx = 0;
+
+      // Align starting gender with preceding vice/leader to maintain sequential flow
+      const lastLeaderGender = vices.length > 0
+        ? vices[vices.length - 1].gender
+        : (leaders.length > 0 ? leaders[leaders.length - 1].gender : null);
+
+      let preferBoy = true;
+      if (lastLeaderGender === 'ប្រុស') {
+        preferBoy = false;
+      } else if (lastLeaderGender === 'ស្រី') {
+        preferBoy = true;
+      } else {
+        preferBoy = ordinaryBoys.length >= ordinaryGirls.length;
+      }
+
+      while (obIdx < ordinaryBoys.length || ogIdx < ordinaryGirls.length) {
+        if (preferBoy) {
+          if (obIdx < ordinaryBoys.length) {
+            sortedOrdinary.push(ordinaryBoys[obIdx++]);
+          }
+          preferBoy = false;
+        } else {
+          if (ogIdx < ordinaryGirls.length) {
+            sortedOrdinary.push(ordinaryGirls[ogIdx++]);
+          }
+          preferBoy = true;
+        }
+
+        if (obIdx >= ordinaryBoys.length && ogIdx < ordinaryGirls.length) {
+          preferBoy = false;
+        } else if (ogIdx >= ordinaryGirls.length && obIdx < ordinaryBoys.length) {
+          preferBoy = true;
+        }
+      }
+
+      // Reassemble so Leader is absolute top, followed by Vice Leader, then beautifully weaved ordinary members
+      group.members = [
+        ...leaders,
+        ...vices,
+        ...sortedOrdinary,
+        ...ordinaryOthers
+      ];
+    });
+
+    setGroups(resultGroups);
   };
 
   return (
@@ -116,10 +290,36 @@ export default function GroupDivider({ students, activeClassName }: GroupDivider
                 {group.members.map((member) => (
                   <div
                     key={member.id}
-                    className="flex items-center gap-2.5 p-2 bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 rounded-xl text-slate-750 dark:text-slate-300 text-sm font-semibold"
+                    className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/40 border border-slate-100 dark:border-slate-800/60 rounded-xl text-slate-750 dark:text-slate-350 text-xs font-semibold"
                   >
-                    <span className="text-lg">{member.emoji || "👤"}</span>
-                    <span className="truncate">{member.name}</span>
+                    <div className="flex items-center gap-2 truncate">
+                      <span className="text-base shrink-0 select-none">
+                        {member.emoji || (member.gender === 'ស្រី' ? '👧' : '👦')}
+                      </span>
+                      <span className="truncate dark:text-slate-200 text-[13.5px] font-bold flex items-center gap-1.5" title={member.name}>
+                        <span className="truncate">{member.name}</span>
+                        {member.gender && (
+                          <span className={`text-[10px] font-black shrink-0 ${member.gender === 'ប្រុស' ? 'text-blue-500' : 'text-pink-500'}`} title={member.gender}>
+                            {member.gender === 'ប្រុស' ? '♂' : '♀'}
+                          </span>
+                        )}
+                        {member.assignedRole === 'ប្រធាន' && (
+                          <span className="text-[10.5px] bg-emerald-50 dark:bg-emerald-950/45 text-emerald-600 dark:text-emerald-400 font-extrabold px-1.5 py-0.5 rounded-md leading-none shrink-0 select-none">
+                            ប្រធាន
+                          </span>
+                        )}
+                        {member.assignedRole === 'អនុប្រធាន' && (
+                          <span className="text-[10.5px] bg-indigo-50 dark:bg-indigo-950/45 text-indigo-650 dark:text-indigo-400 font-bold px-1.5 py-0.5 rounded-md leading-none shrink-0 select-none">
+                            អនុប្រធាន
+                          </span>
+                        )}
+                        {member.assignedRole === 'សមាជិក' && (
+                          <span className="text-[10.5px] bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 font-medium px-1.5 py-0.5 rounded-md leading-none shrink-0 select-none">
+                            សមាជិក
+                          </span>
+                        )}
+                      </span>
+                    </div>
                   </div>
                 ))}
               </div>

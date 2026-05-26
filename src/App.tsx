@@ -190,6 +190,34 @@ export default function App() {
     }
   }, [activeClassId]);
 
+  const updateStudentDetail = useCallback((id: string, fields: Partial<Student>) => {
+    setStudents(prev => {
+      const studentToUpdate = prev.find(s => s.id === id);
+      if (!studentToUpdate) return prev;
+      
+      const newClassId = fields.classId || studentToUpdate.classId || activeClassId;
+      const oldClassId = studentToUpdate.classId || activeClassId;
+      
+      if (newClassId !== oldClassId) {
+        // Move to another class
+        const filtered = prev.filter(s => s.id !== id);
+        const targetKey = `students_class_${newClassId}`;
+        const targetRaw = localStorage.getItem(targetKey);
+        const targetList = targetRaw ? JSON.parse(targetRaw) : [];
+        
+        // Remove from target list if already exists (anti-duplication)
+        const cleanedList = targetList.filter((s: any) => s.id !== id);
+        cleanedList.push({ ...studentToUpdate, ...fields });
+        localStorage.setItem(targetKey, JSON.stringify(cleanedList));
+        
+        alert(`បានផ្លាស់ប្ដូរថ្នាក់សិស្ស «${fields.name || studentToUpdate.name}» ទៅកាន់ថ្នាក់ផ្សេងជោគជ័យ!`);
+        return filtered;
+      } else {
+        return prev.map(s => s.id === id ? { ...s, ...fields } : s);
+      }
+    });
+  }, [activeClassId]);
+
   const removeStudent = useCallback((id: string) => {
     setStudents(prev => prev.filter(s => s.id !== id));
     if (selectedStudentId === id) setSelectedStudentId(null);
@@ -544,6 +572,7 @@ export default function App() {
               activeClassId={activeClassId}
               onAddStudentDetail={addStudentDetail}
               onRemoveStudent={removeStudent}
+              onUpdateStudentDetail={updateStudentDetail}
               onBulkAddStudents={(text) => {
                 const names = text.split('\n').filter(n => n.trim());
                 names.forEach(name => addStudent(name.trim()));
