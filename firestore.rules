@@ -1,0 +1,61 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    
+    // Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+    
+    // Primitive definition helpers
+    function incoming() {
+      return request.resource.data;
+    }
+    
+    function existing() {
+      return resource.data;
+    }
+    
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+    
+    // Validation helper for Teacher
+    function isValidTeacher(data) {
+      return data.keys().hasAll(['id', 'name', 'schoolName', 'username', 'password'])
+        && data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.schoolName is string && data.schoolName.size() <= 150
+        && data.username is string && data.username.size() <= 50
+        && data.password is string && data.password.size() <= 100;
+    }
+    
+    // Validation helper for Class
+    function isValidClass(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100;
+    }
+    
+    // Validation helper for Student
+    function isValidStudent(data) {
+      return data.id is string && data.id.size() <= 128
+        && data.name is string && data.name.size() <= 100
+        && data.score is number;
+    }
+
+    match /teachers/{teacherId} {
+      allow create: if isValidTeacher(incoming());
+      allow get: if true;
+      allow update: if isValidTeacher(incoming()) && existing().password == incoming().password;
+      allow delete: if existing() != null;
+      
+      match /classes/{classId} {
+        allow read, write: if true;
+      }
+      
+      match /classes/{classId}/students/{studentId} {
+        allow read, write: if true;
+      }
+    }
+  }
+}

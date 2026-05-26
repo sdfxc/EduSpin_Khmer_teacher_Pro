@@ -1,7 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle } from 'lucide-react';
+import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle, Loader2 } from 'lucide-react';
 import { TeacherAccount } from '../types';
+import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 
 interface TeacherAuthModalProps {
   isOpen: boolean;
@@ -11,6 +13,7 @@ interface TeacherAuthModalProps {
 
 export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: TeacherAuthModalProps) {
   const [isLoginView, setIsLoginView] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   
   // Login fields
   const [loginUsername, setLoginUsername] = useState('');
@@ -30,86 +33,114 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
   useEffect(() => {
     setErrorMsg('');
     setSuccessMsg('');
+    setIsLoading(false);
   }, [isLoginView]);
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsLoading(true);
     
     if (!loginUsername.trim() || !loginPassword.trim()) {
       setErrorMsg('សូមបំពេញឈ្មោះគណនី និងលេខសម្ងាត់ឱ្យបានត្រឹមត្រូវ។');
+      setIsLoading(false);
       return;
     }
 
-    const savedAccountsRaw = localStorage.getItem('teacher_accounts_list');
-    const accounts: TeacherAccount[] = savedAccountsRaw ? JSON.parse(savedAccountsRaw) : [];
+    const cleanUsername = loginUsername.trim().toLowerCase();
 
-    const found = accounts.find(
-      (a) => a.username.toLowerCase() === loginUsername.trim().toLowerCase() && a.password === loginPassword
-    );
+    try {
+      // 1. Fetch teacher from cloud Firestore
+      const teacherDocRef = doc(db, 'teachers', cleanUsername);
+      const teacherSnap = await getDoc(teacherDocRef);
 
-    if (found) {
-      localStorage.setItem('logged_in_teacher', JSON.stringify(found));
-      onLoginSuccess(found);
-      setSuccessMsg('ការចូលប្រើប្រាស់ជោគជ័យ!');
-      setTimeout(() => {
-        onClose();
-        // Clear forms
-        setLoginUsername('');
-        setLoginPassword('');
-      }, 1000);
-    } else {
-      setErrorMsg('ឈ្មោះគណនី ឬលេខសម្ងាត់មិនត្រឹមត្រូវឡើយ។ សូមព្យាយាមម្ដងទៀត!');
+      if (!teacherSnap.exists()) {
+        setErrorMsg('រកមិនឃើញគណនីនេះក្នុងប្រព័ន្ធឡើយ។ សូមពិនិត្យឈ្មោះម្តងទៀត!');
+        setIsLoading(false);
+        return;
+      }
+
+      const found = teacherSnap.data() as TeacherAccount;
+
+      // 2. Validate password
+      if (found.password === loginPassword) {
+        localStorage.setItem('logged_in_teacher', JSON.stringify(found));
+        onLoginSuccess(found);
+        setSuccessMsg('ការចូលប្រើប្រាស់ជោគជ័យ និងបានទាញយកទិន្នន័យពី Cloud!');
+        setTimeout(() => {
+          onClose();
+          // Clear forms
+          setLoginUsername('');
+          setLoginPassword('');
+          setIsLoading(false);
+        }, 1200);
+      } else {
+        setErrorMsg('លេខសម្ងាត់មិនត្រឹមត្រូវឡើយ។ សូមព្យាយាមម្ដងទៀត!');
+        setIsLoading(false);
+      }
+    } catch (err) {
+      setErrorMsg('មានបញ្ហាភ្ជាប់ទៅកាន់ Cloud internet ។');
+      setIsLoading(false);
+      handleFirestoreError(err, OperationType.GET, `teachers/${cleanUsername}`);
     }
   };
 
-  const handleRegister = (e: React.FormEvent) => {
+  const handleRegister = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
+    setIsLoading(true);
     
     if (!regName.trim() || !regSchool.trim() || !regUsername.trim() || !regPassword.trim()) {
       setErrorMsg('សូមបំពេញព័ត៌មានកាតព្វកិច្ច (*) ទាំងអស់ឱ្យបានត្រឹមត្រូវ។');
+      setIsLoading(false);
       return;
     }
 
-    const savedAccountsRaw = localStorage.getItem('teacher_accounts_list');
-    const accounts: TeacherAccount[] = savedAccountsRaw ? JSON.parse(savedAccountsRaw) : [];
+    const cleanUsername = regUsername.trim().toLowerCase();
 
-    // Check pre-existing username
-    const usernameExists = accounts.some(
-      (a) => a.username.toLowerCase() === regUsername.trim().toLowerCase()
-    );
+    try {
+      // 1. Check if username exists on Firestore cloud
+      const teacherDocRef = doc(db, 'teachers', cleanUsername);
+      const teacherSnap = await getDoc(teacherDocRef);
 
-    if (usernameExists) {
-      setErrorMsg('ឈ្មោះគណនីនេះមានរួចហើយ។ សូមជ្រើសរើសឈ្មោះគណនីផ្សេង!');
-      return;
+      if (teacherSnap.exists()) {
+        setErrorMsg('ឈ្មោះគណនីនេះមានរួចហើយនៅលើ Cloud។ សូមជ្រើសរើសឈ្មោះគណនីផ្សេង!');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Create new teacher entity
+      const newTeacher: TeacherAccount = {
+        id: cleanUsername, // Use lowercase username as the cloud ID
+        name: regName.trim(),
+        schoolName: regSchool.trim(),
+        subjects: regSubject.trim(),
+        username: regUsername.trim(),
+        password: regPassword
+      };
+
+      // 3. Write to Firestore cloud
+      await setDoc(teacherDocRef, newTeacher);
+
+      localStorage.setItem('logged_in_teacher', JSON.stringify(newTeacher));
+      onLoginSuccess(newTeacher);
+      setSuccessMsg('បង្កើតគណនេយ្យគ្រូបង្រៀននៅលើ Cloud និងចូលប្រើប្រាស់ជោគជ័យ!');
+      
+      setTimeout(() => {
+        onClose();
+        // Clear forms
+        setRegName('');
+        setRegSchool('');
+        setRegSubject('');
+        setRegUsername('');
+        setRegPassword('');
+        setIsLoading(false);
+      }, 1500);
+    } catch (err) {
+      setErrorMsg('ការចុះឈ្មោះបរាជ័យ សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត។');
+      setIsLoading(false);
+      handleFirestoreError(err, OperationType.CREATE, `teachers/${cleanUsername}`);
     }
-
-    const newTeacher: TeacherAccount = {
-      id: `t-${Date.now()}`,
-      name: regName.trim(),
-      schoolName: regSchool.trim(),
-      subjects: regSubject.trim(),
-      username: regUsername.trim(),
-      password: regPassword
-    };
-
-    const updated = [...accounts, newTeacher];
-    localStorage.setItem('teacher_accounts_list', JSON.stringify(updated));
-    localStorage.setItem('logged_in_teacher', JSON.stringify(newTeacher));
-    
-    onLoginSuccess(newTeacher);
-    setSuccessMsg('បង្កើតគណនេយ្យគ្រូបង្រៀនបានជោគជ័យ និងចូលប្រើប្រាស់រួចរាល់!');
-    
-    setTimeout(() => {
-      onClose();
-      // Clear forms
-      setRegName('');
-      setRegSchool('');
-      setRegSubject('');
-      setRegUsername('');
-      setRegPassword('');
-    }, 1500);
   };
 
   return (
@@ -211,10 +242,15 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
 
                   <button
                     type="submit"
-                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50"
                   >
-                    <LogIn className="w-4 h-4" />
-                    ចូលប្រើប្រាស់ឥឡូវនេះ
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LogIn className="w-4 h-4" />
+                    )}
+                    {isLoading ? 'កំពុងភ្ជាប់ទៅប្រព័ន្ធ...' : 'ចូលប្រើប្រាស់ឥឡូវនេះ'}
                   </button>
 
                   <div className="text-center mt-6">
@@ -322,10 +358,15 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
 
                   <button
                     type="submit"
-                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 active:scale-95 mt-2"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 active:scale-95 mt-2 disabled:opacity-50"
                   >
-                    <UserPlus className="w-4 h-4" />
-                    ចុះឈ្មោះគ្រូ និងចូលប្រើ
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <UserPlus className="w-4 h-4" />
+                    )}
+                    {isLoading ? 'កំពុងបង្កើតគណនីរក្សាទុក...' : 'ចុះឈ្មោះគ្រូ និងចូលប្រើ'}
                   </button>
 
                   <div className="text-center mt-4">
@@ -345,7 +386,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
             </div>
             
             <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center text-[11px] text-slate-400">
-              រក្សាទុកដោយមានសុវត្ថិភាពខ្ពស់ក្នុងកម្មវិធីរុករករបស់អ្នក (Local Storage)
+              រក្សាទុកដោយមានសុវត្ថិភាពខ្ពស់នៅលើ Cloud Internet សម្រាប់គ្រប់ឧបករណ៍ទាំងអស់
             </div>
           </motion.div>
         </div>
