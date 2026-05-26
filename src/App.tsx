@@ -573,9 +573,18 @@ export default function App() {
               onAddStudentDetail={addStudentDetail}
               onRemoveStudent={removeStudent}
               onUpdateStudentDetail={updateStudentDetail}
-              onBulkAddStudents={(text) => {
-                const names = text.split('\n').filter(n => n.trim());
-                names.forEach(name => addStudent(name.trim()));
+              onBulkAddStudents={(list) => {
+                const randomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+                const newStudents: Student[] = list.map(item => ({
+                  id: `s-${Date.now()}-${Math.random()}`,
+                  name: item.name,
+                  score: 0,
+                  emoji: randomEmoji(),
+                  gender: item.gender,
+                  status: item.status,
+                  classId: activeClassId
+                }));
+                setStudents(prev => [...prev, ...newStudents]);
               }}
             />
           </div>
