@@ -837,6 +837,8 @@ export default function App() {
             <GroupDivider
               students={students}
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+              activeClassId={activeClassId || ''}
+              teacher={teacher}
             />
           </div>
         )}
