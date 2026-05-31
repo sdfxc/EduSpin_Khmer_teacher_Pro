@@ -32,6 +32,17 @@ app.post("/api/generate-questions", async (req, res) => {
   const prompt = `Based on the following lesson text, generate ${count || 25} multiple-choice questions for students in Khmer language. 
 Each question should be high-quality and have exactly 4 options.
 The language of the output questions and options must be in Khmer language, matching the theme.
+
+CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
+If the questions involve math, physics, or chemistry:
+- Use standard notations for formulas so they can be processed and rendered beautifully:
+  - Exponents (powers): write using "^" (e.g., "x^2", "10^{-5}", "y^{2x}").
+  - Subscripts (indices or molecular numbers): write using "_" (e.g., "H_2O", "CO_2", "x_i", "C_nH_{2n+2}"). Note: common formulas like "H2O", "CO2", "H2SO4" can also just be written directly without underscores and will be auto-subscripted.
+  - Fractions: write using LaTeX style "\\frac{numerator}{denominator}" (e.g., "\\frac{s}{t}", "\\frac{1}{2}").
+  - Square roots: write using "\\sqrt{expression}" (e.g., "\\sqrt{16}", "\\sqrt{x}").
+  - Chemical reaction arrows: write using "->" or "-->" or "\\rightarrow" (e.g., "2H_2 + O_2 -> 2H_2O").
+  - Mathematics symbols: use LaTeX style formatting: "\\pm" for ±, "\\times" for ×, "\\div" for ÷, "\\le" for ≤, "\\ge" for ≥, "\\pi" for π, "\\Delta" for Δ, "\\alpha" for α, "\\beta" for β, "\\theta" for θ.
+
 Provide the response in JSON format.
 
 Lesson Text:

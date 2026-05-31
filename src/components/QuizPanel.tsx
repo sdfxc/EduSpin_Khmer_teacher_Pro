@@ -1,8 +1,9 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown } from 'lucide-react';
+import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Question, QuizCard, Student, QuizRoom, QuizChapter } from '../types';
+import FormulaRenderer, { renderFormulaToHtml } from './FormulaRenderer';
 
 interface QuizPanelProps {
   cards: QuizCard[];
@@ -39,6 +40,13 @@ export default function QuizPanel({
   onRenameChapter,
   onDeleteChapter
 }: QuizPanelProps) {
+  const activeRoom = chapters.reduce<QuizRoom | null>((found, ch) => {
+    if (found) return found;
+    return ch.rooms?.find(r => r.id === activeRoomId) || null;
+  }, null);
+
+  const activeChapter = chapters.find(ch => ch.rooms?.some(r => r.id === activeRoomId));
+
   const [timeLeft, setTimeLeft] = useState(20);
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [correctIndex, setCorrectIndex] = useState<number>(0);
@@ -60,6 +68,266 @@ export default function QuizPanel({
   const [isCreatingChapter, setIsCreatingChapter] = useState(false);
   const [newChapterName, setNewChapterName] = useState('');
   const [openChapterDropdownId, setOpenChapterDropdownId] = useState<string | null>(null);
+
+  // Export & Print state
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [examCenter, setExamCenter] = useState('.....................................................');
+  const [roomNumber, setRoomNumber] = useState('..................');
+  const [subjectName, setSubjectName] = useState('');
+  const [deskNumber, setDeskNumber] = useState('..................');
+  
+  const [examName, setExamName] = useState('...................................');
+  const [gradeNumber, setGradeNumber] = useState('..................');
+  const [examSession, setExamSession] = useState('......../......../........');
+  const [durationTime, setDurationTime] = useState('................ នាទី');
+  const [totalScore, setTotalScore] = useState('...... ពិន្ទុ');
+  
+  const [logoText1, setLogoText1] = useState('សាលារៀនសុវណ្ណភូមិ');
+  const [logoText2, setLogoText2] = useState('ទីតាំងផ្សារដីហុយ');
+  
+  const [customLogo, setCustomLogo] = useState<string | null>(() => {
+    if (typeof window !== 'undefined') {
+      return localStorage.getItem('teacher_custom_logo') || null;
+    }
+    return null;
+  });
+  
+  const [optionsLayout, setOptionsLayout] = useState<'inline' | 'stacked'>('inline');
+  const [optionStyle, setOptionStyle] = useState<'khmer' | 'latin'>('khmer');
+  const [highlightKey, setHighlightKey] = useState(false);
+  const [imgSrc, setImgSrc] = useState('/Sovannphomi.png');
+  const [imageFailed, setImageFailed] = useState(false);
+
+  useEffect(() => {
+    if (activeRoom) {
+      setSubjectName(activeRoom.name);
+    } else {
+      setSubjectName('...................................');
+    }
+  }, [activeRoomId, activeRoom]);
+
+  const SovannaphumiLogoSVG = () => (
+    <svg viewBox="0 0 120 120" className="w-16 h-16 pointer-events-none mx-auto" xmlns="http://www.w3.org/2000/svg">
+      <circle cx="60" cy="60" r="56" fill="#1e40af" stroke="#f59e0b" strokeWidth="2.5" />
+      <circle cx="60" cy="60" r="46" fill="#dc2626" stroke="#f59e0b" strokeWidth="1.5" />
+      <circle cx="60" cy="60" r="34" fill="#0284c7" stroke="#f59e0b" strokeWidth="1" />
+      <path d="M 45,55 L 60,40 L 75,55 L 75,70 C 75,75 60,82 60,82 C 60,82 45,75 45,70 Z" fill="#eab308" stroke="#ffffff" strokeWidth="1" />
+      <path d="M 48,58 C 52,56 58,56 60,60 C 62,56 68,56 72,58 M 48,64 C 52,62 58,62 60,66 C 62,62 68,62 72,64" stroke="#101827" strokeWidth="1" fill="none" />
+      <circle cx="60" cy="60" r="24" fill="none" stroke="#f59e0b" strokeWidth="1" strokeDasharray="3,1.5" />
+    </svg>
+  );
+
+  const getOptionPrefix = (index: number) => {
+    if (optionStyle === 'khmer') {
+      const khmerPrefixes = ['ក', 'ខ', 'គ', 'ឃ', 'ង'];
+      return khmerPrefixes[index] || String.fromCharCode(65 + index);
+    }
+    return String.fromCharCode(65 + index);
+  };
+
+  const triggerPrint = () => {
+    window.print();
+  };
+
+  const exportToWord = () => {
+    const questionCards = cards.filter(c => c.question) as (QuizCard & { question: Question })[];
+    
+    let questionsHtml = '';
+    questionCards.forEach((card, qIdx) => {
+      let optionsHtml = '';
+      if (optionsLayout === 'inline') {
+        optionsHtml = `
+          <table class="options-table">
+            <tr>
+              <td class="option-cell ${highlightKey && card.question.correctIndex === 0 ? 'correct-highlight' : ''}">
+                ${getOptionPrefix(0)}. ${renderFormulaToHtml(card.question.options[0] || '')}
+              </td>
+              <td class="option-cell ${highlightKey && card.question.correctIndex === 1 ? 'correct-highlight' : ''}">
+                ${getOptionPrefix(1)}. ${renderFormulaToHtml(card.question.options[1] || '')}
+              </td>
+            </tr>
+            <tr>
+              <td class="option-cell ${highlightKey && card.question.correctIndex === 2 ? 'correct-highlight' : ''}">
+                ${getOptionPrefix(2)}. ${renderFormulaToHtml(card.question.options[2] || '')}
+              </td>
+              <td class="option-cell ${highlightKey && card.question.correctIndex === 3 ? 'correct-highlight' : ''}">
+                ${getOptionPrefix(3)}. ${renderFormulaToHtml(card.question.options[3] || '')}
+              </td>
+            </tr>
+          </table>
+        `;
+      } else {
+        optionsHtml = `
+          <table class="options-table">
+            ${card.question.options.map((opt, oIdx) => `
+              <tr>
+                <td class="option-cell ${highlightKey && card.question.correctIndex === oIdx ? 'correct-highlight' : ''}" style="width: 100%;">
+                  ${getOptionPrefix(oIdx)}. ${renderFormulaToHtml(opt)}
+                </td>
+              </tr>
+            `).join('')}
+          </table>
+        `;
+      }
+      
+      questionsHtml += `
+        <div class="question-block">
+          <div class="question-text font-bold">សំណួរទី ${qIdx + 1}៖ ${renderFormulaToHtml(card.question.text)}</div>
+          ${optionsHtml}
+        </div>
+      `;
+    });
+
+    const docHtml = `
+    <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+    <head>
+      <meta charset="utf-8">
+      <title>វិញ្ញាសาប្រឡង</title>
+      <!--[if gte mso 9]>
+      <xml>
+        <w:WordDocument>
+          <w:View>Print</w:View>
+          <w:Zoom>100</w:Zoom>
+          <w:DoNotOptimizeForBrowser/>
+        </w:WordDocument>
+      </xml>
+      <![endif]-->
+      <style>
+        @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&display=swap');
+        body {
+          font-family: 'Battambang', 'Khmer OS Battambang', 'Arial', sans-serif;
+          line-height: 1.5;
+          padding: 20px;
+        }
+        .header-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-bottom: 5px;
+        }
+        .header-cell {
+          vertical-align: top;
+          padding: 4px;
+        }
+        .center-text {
+          text-align: center;
+        }
+        .bold-text {
+          font-weight: bold;
+        }
+        .school-title {
+          font-family: 'Khmer OS Muol Light', 'Battambang', sans-serif;
+          font-weight: bold;
+          font-size: 11pt;
+          margin-top: 4px;
+        }
+        .divider {
+          border-bottom: 3px double #000000;
+          margin-top: 10px;
+          margin-bottom: 20px;
+          height: 1px;
+        }
+        .exam-title-container {
+          text-align: center;
+          margin-bottom: 20px;
+        }
+        .exam-title {
+          font-weight: bold;
+          font-size: 13pt;
+          text-decoration: underline;
+        }
+        .question-block {
+          margin-bottom: 16px;
+          page-break-inside: avoid;
+        }
+        .question-text {
+          font-weight: bold;
+          margin-bottom: 6px;
+          font-size: 10.5pt;
+        }
+        .options-table {
+          width: 100%;
+          border-collapse: collapse;
+          margin-left: 15px;
+        }
+        .option-cell {
+          padding: 3px;
+          vertical-align: top;
+          font-size: 10pt;
+        }
+        .correct-highlight {
+          color: #059669;
+          font-weight: bold;
+          background-color: #ecfdf5;
+        }
+      </style>
+    </head>
+    <body>
+      <table class="header-table">
+        <tr>
+          <td class="header-cell" style="width: 32%;">
+            <div>មណ្ឌលប្រឡង៖ <span class="bold-text">${examCenter}</span></div>
+            <div style="margin-top: 6px;">លេខបន្ទប់៖ <span class="bold-text">${roomNumber}</span></div>
+            <div style="margin-top: 6px;">វិញ្ញាសា៖ <span class="bold-text">${subjectName}</span></div>
+            <div style="margin-top: 6px;">លេខតុ៖ <span class="bold-text">${deskNumber}</span></div>
+          </td>
+          <td class="header-cell center-text" style="width: 32%;">
+            <div style="height: 60px; text-align: center;">
+              ${customLogo ? `
+                <img src="${customLogo}" width="45" height="45" style="object-fit: contain; max-height: 45px; max-width: 100px; display: inline-block;" />
+              ` : `
+                <div style="display: inline-block; width: 45px; height: 45px; border-radius: 50%; border: 3px solid #1e40af; background-color: #0284c7; color: white; text-align: center; line-height: 40px; font-weight: bold; font-size: 8pt;">
+                  SPS
+                </div>
+              `}
+            </div>
+            <div class="school-title">${logoText1}</div>
+            <div style="font-size: 9pt; margin-top: 2px;">${logoText2}</div>
+          </td>
+          <td class="header-cell" style="width: 24%; text-align: left; padding-left: 10px;">
+            <div>ប្រឡង៖ <span class="bold-text">${examName}</span></div>
+            <div style="margin-top: 6px;">ថ្នាក់ទី៖ <span class="bold-text">${gradeNumber}</span></div>
+            <div style="margin-top: 6px;">សម័យប្រឡង៖ <span class="bold-text">${examSession}</span></div>
+            <div style="margin-top: 6px;">រយៈពេល៖ <span class="bold-text">${durationTime}</span> <span style="font-size: 9pt;">(${totalScore})</span></div>
+          </td>
+          <td class="header-cell" style="width: 12%; text-align: center; vertical-align: middle;">
+            <div style="border: 3px double #000000; border-radius: 20px; width: 64px; height: 50px; text-align: center; display: inline-block; padding-top: 3px;">
+              <div style="font-size: 8pt; font-weight: bold;">ពិន្ទុ</div>
+              <div style="font-size: 6.5pt; color: #555555; margin-top: -3px;">Score</div>
+              <div style="border-top: 1px dashed #000000; margin-top: 11px; width: 44px; margin-left: auto; margin-right: auto;"></div>
+            </div>
+          </td>
+        </tr>
+      </table>
+      
+      <div class="divider"></div>
+      
+      <div class="exam-title-container">
+        <div class="exam-title">សន្លឹកកិច្ចការវិញ្ញាសា</div>
+        <div style="font-size: 10pt; font-weight: bold; margin-top: 5px; color: #1e293b;">
+          សេចក្តីណែនាំ៖ ចូរគូសរង្វង់លើចម្លើយត្រឹមត្រូវតែមួយគត់
+        </div>
+        <div style="font-size: 7.5pt; color: #7f1d1d; margin-top: 6px; font-weight: normal; font-style: italic;">
+          (បម្រាម៖ បេក្ខជនណាមើលសំណៅឯកសារ ចម្លងគ្នា មើលគ្នា មិនធ្វើតាមបទបញ្ជាផ្ទៃក្នុងអនុរក្សនឹងត្រូវបានពិន្ទុសូន្យ។)
+        </div>
+      </div>
+
+      <div class="questions-container">
+        ${questionsHtml}
+      </div>
+    </body>
+    </html>
+    `;
+
+    const blob = new Blob(['\ufeff' + docHtml], { type: 'application/msword;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `វិញ្ញាសា_${activeRoom ? activeRoom.name : 'ប្រឡង'}.doc`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const startRenameChapter = (chapter: QuizChapter) => {
     setEditingChapterId(chapter.id);
@@ -230,7 +498,7 @@ export default function QuizPanel({
               <HelpCircle className="absolute -top-12 -right-12 w-48 h-48 text-indigo-500/5 rotate-12" />
               <span className="text-xs uppercase font-black tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">សំណួរលេខ {activeCard.number}</span>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-950 text-center leading-relaxed relative z-10 max-w-2xl">
-                {activeCard.question?.text}
+                <FormulaRenderer text={activeCard.question?.text || ''} />
               </h2>
             </div>
 
@@ -265,7 +533,7 @@ export default function QuizPanel({
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-slate-800 dark:text-slate-200'
                     }`}>
-                      {option}
+                      <FormulaRenderer text={option} />
                     </span>
                   </div>
                 </button>
@@ -328,13 +596,6 @@ export default function QuizPanel({
     );
   }
 
-  const activeRoom = chapters.reduce<QuizRoom | null>((found, ch) => {
-    if (found) return found;
-    return ch.rooms?.find(r => r.id === activeRoomId) || null;
-  }, null);
-
-  const activeChapter = chapters.find(ch => ch.rooms?.some(r => r.id === activeRoomId));
-
   const totalCount = cards.length;
   const remainingCount = cards.filter(c => !c.isRevealed).length;
 
@@ -366,6 +627,16 @@ export default function QuizPanel({
             </div>
 
             <div className="flex items-center gap-2 shrink-0">
+              {cards.filter(c => c.question).length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(true)}
+                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-755 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95 transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>នាំចេញវិញ្ញាសា (PDF/Word)</span>
+                </button>
+              )}
               <button
                 type="button"
                 onClick={enterManageMode}
@@ -585,7 +856,7 @@ export default function QuizPanel({
                     <div className="flex items-center gap-2 flex-1 mr-2">
                       <Folder className="w-4.5 h-4.5 text-amber-500 shrink-0" />
                       {editingChapterId === chapter.id ? (
-                        <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
+                        <div className="flex items-center gap-1.5 w-full bg-slate-50 dark:bg-slate-950 p-1 rounded-lg border border-indigo-400" onClick={(e) => e.stopPropagation()}>
                           <input
                             type="text"
                             value={tempChapterName}
@@ -595,35 +866,38 @@ export default function QuizPanel({
                               if (e.key === 'Escape') setEditingChapterId(null);
                             }}
                             autoFocus
-                            className="px-2 py-0.5 text-xs bg-white dark:bg-slate-900 border border-indigo-500 rounded focus:outline-none text-slate-800 dark:text-slate-100 font-bold w-full"
+                            className="px-2 py-1 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-900 dark:text-slate-50 font-bold w-full"
                           />
                           <button
                             type="button"
                             onClick={() => saveChapterRenameLocal(chapter.id)}
-                            className="p-1 transform active:scale-95 text-green-600 hover:bg-green-50 dark:hover:bg-green-950/20 rounded transition-all cursor-pointer"
+                            className="p-1 transform active:scale-95 text-green-600 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-900 rounded-md transition-all cursor-pointer shrink-0"
+                            title="រក្សាទុក"
                           >
-                            <Check className="w-3.5 h-3.5" />
+                            <Check className="w-4 h-4" />
                           </button>
                           <button
                             type="button"
                             onClick={() => setEditingChapterId(null)}
-                            className="p-1 transform active:scale-95 text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded transition-all cursor-pointer"
+                            className="p-1 transform active:scale-95 text-slate-500 bg-slate-100 dark:bg-slate-850 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-md transition-all cursor-pointer shrink-0"
+                            title="បោះបង់"
                           >
-                            <X className="w-3.5 h-3.5" />
+                            <X className="w-4 h-4" />
                           </button>
                         </div>
                       ) : (
-                        <div className="flex items-center gap-2 group flex-1">
+                        <div className="flex items-center gap-2 flex-1 min-w-0">
                           <span className="text-xs font-black text-slate-800 dark:text-slate-200 tracking-wide truncate">
                             {chapter.name}
                           </span>
                           <button
                             type="button"
                             onClick={() => startRenameChapter(chapter)}
-                            className="p-1 text-slate-400 hover:text-indigo-500 rounded-md hover:bg-slate-100 dark:hover:bg-slate-800 opacity-0 group-hover:opacity-100 transition-all cursor-pointer shrink-0"
+                            className="p-1 px-2 flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/45 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-100 dark:border-indigo-900/40 hover:border-indigo-200 transition-all cursor-pointer shrink-0"
                             title="ប្ដូរឈ្មោះជំពូក"
                           >
-                            <Edit3 className="w-3.5 h-3.5" />
+                            <Edit3 className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
+                            <span>ប្ដូរឈ្មោះ</span>
                           </button>
                         </div>
                       )}
@@ -693,10 +967,12 @@ export default function QuizPanel({
                                         setOpenChapterDropdownId(null);
                                       }
                                     }}
-                                    className={`group/room relative flex items-center justify-between px-3 py-2 rounded-lg transition-all text-xs font-bold select-none cursor-pointer ${
-                                      isActive
-                                        ? 'bg-indigo-600 text-white shadow-sm'
-                                        : 'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
+                                    className={`group/room relative flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all text-xs font-bold select-none cursor-pointer ${
+                                      editingRoomId === room.id
+                                        ? 'bg-slate-50 dark:bg-slate-900 border border-indigo-400/80 shadow-inner'
+                                        : isActive
+                                          ? 'bg-indigo-600 text-white shadow-sm'
+                                          : 'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
                                     }`}
                                   >
                                     <div className="flex items-center gap-2 flex-grow pr-3 truncate" onClick={(e) => {
@@ -704,7 +980,7 @@ export default function QuizPanel({
                                         e.stopPropagation();
                                       }
                                     }}>
-                                      <BookOpen className={`w-3.5 h-3.5 shrink-0 ${isActive ? 'text-indigo-200' : 'text-slate-400'}`} />
+                                      <BookOpen className={`w-3.5 h-3.5 shrink-0 ${isActive && editingRoomId !== room.id ? 'text-indigo-200' : 'text-slate-400'}`} />
                                       
                                       {editingRoomId === room.id ? (
                                         <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
@@ -721,21 +997,23 @@ export default function QuizPanel({
                                               }
                                             }}
                                             autoFocus
-                                            className="px-2 py-0.5 text-[11px] bg-white dark:bg-slate-900 border border-indigo-400 rounded focus:outline-none text-slate-800 dark:text-slate-100 font-bold w-full"
+                                            className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-350 dark:border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-950 dark:text-slate-50 font-bold w-full"
                                           />
                                           <button
                                             type="button"
                                             onClick={() => saveRoomRenameLocal(room.id)}
-                                            className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-950/20 rounded transition-all cursor-pointer"
+                                            className="p-1 transform active:scale-95 text-green-600 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-900 rounded-md transition-all cursor-pointer shrink-0"
+                                            title="រក្សាទុក"
                                           >
-                                            <Check className="w-3 h-3" />
+                                            <Check className="w-3.5 h-3.5" />
                                           </button>
                                           <button
                                             type="button"
                                             onClick={() => setEditingRoomId(null)}
-                                            className="p-1 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded transition-all cursor-pointer"
+                                            className="p-1 transform active:scale-95 text-slate-500 bg-slate-200/50 dark:bg-slate-800 hover:bg-slate-200 dark:hover:bg-slate-750 text-slate-400 hover:text-slate-650 rounded-md transition-all cursor-pointer shrink-0"
+                                            title="បោះបង់"
                                           >
-                                            <X className="w-3 h-3" />
+                                            <X className="w-3.5 h-3.5" />
                                           </button>
                                         </div>
                                       ) : (
@@ -748,23 +1026,24 @@ export default function QuizPanel({
                                       )}
                                     </div>
 
-                                    {/* Actions for Room (only if not renaming) */}
+                                    {/* Actions for Room (only if not renaming and always visible so user can easily rename) */}
                                     {editingRoomId !== room.id && (
-                                      <div className="flex items-center gap-1 opacity-100 sm:opacity-0 sm:group-hover/room:opacity-100 transition-opacity" onClick={(e) => e.stopPropagation()}>
+                                      <div className="flex items-center gap-1 opacity-100 shrink-0 select-none" onClick={(e) => e.stopPropagation()}>
                                         <button
                                           type="button"
                                           onClick={(e) => {
                                             e.stopPropagation();
                                             startRenameRoom(room);
                                           }}
-                                          className={`p-1 rounded transition-colors cursor-pointer ${
+                                          className={`p-1.5 px-2 flex items-center justify-center gap-1 rounded-lg transition-all cursor-pointer font-bold text-[10px] ${
                                             isActive
-                                              ? 'hover:bg-indigo-700 text-indigo-200 hover:text-white'
-                                              : 'hover:bg-slate-200 dark:hover:bg-slate-800 text-slate-400 hover:text-indigo-500'
+                                              ? 'bg-indigo-700 text-indigo-50 hover:bg-indigo-800 hover:text-white border border-indigo-500'
+                                              : 'bg-indigo-50/70 border border-indigo-100 text-indigo-650 hover:bg-indigo-100 hover:text-indigo-800 dark:bg-indigo-950/45 dark:border-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-900/50'
                                           }`}
                                           title="ប្ដូរឈ្មោះមេរៀន"
                                         >
-                                          <Edit3 className="w-3 h-3" />
+                                          <Edit3 className="w-2.5 h-2.5 shrink-0" />
+                                          <span>ប្ដូរឈ្មោះ</span>
                                         </button>
                                         
                                         {chapters.reduce((total, ch) => total + ch.rooms.length, 0) > 1 && (
@@ -774,9 +1053,9 @@ export default function QuizPanel({
                                               e.stopPropagation();
                                               onDeleteRoom(room.id);
                                             }}
-                                            className={`p-1 rounded transition-colors cursor-pointer ${
+                                            className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                               isActive
-                                                ? 'hover:bg-rose-700 text-indigo-400 hover:text-white'
+                                                ? 'hover:bg-rose-700 text-indigo-300 hover:text-white'
                                                 : 'hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-500'
                                             }`}
                                             title="លុបឈ្មោះមេរៀន"
@@ -851,6 +1130,582 @@ export default function QuizPanel({
           </div>
         </div>
       )}
+
+      {/* Export & Print Preview Modal */}
+      <AnimatePresence>
+        {isExportModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs overflow-y-auto no-print">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-6xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-emerald-600 text-white rounded-xl flex items-center justify-center shadow-lg shadow-emerald-500/25">
+                    <Printer className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-slate-800 dark:text-white">នាំចេញនិងបោះពុម្ពវិញ្ញាសាប្រឡង</h3>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500">បង្កើតសន្លឹកកិច្ចការជាទម្រង់ PDF សម្រាប់ព្រីន ឬ Word .doc សម្រាប់យកទៅកែសម្រួល</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsExportModalOpen(false)}
+                  className="p-1 px-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer font-bold text-xs flex items-center gap-1 border border-transparent hover:border-slate-200 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                  <span>បិទ</span>
+                </button>
+              </div>
+
+              {/* Modal Content - Two splits */}
+              <div className="flex-1 overflow-y-auto custom-scrollbar p-6 grid grid-cols-1 lg:grid-cols-12 gap-6 bg-slate-50/50 dark:bg-slate-950/20">
+                
+                {/* Left controls panel */}
+                <div className="lg:col-span-5 flex flex-col gap-5">
+                  <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                    <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <Settings className="w-4 h-4 text-indigo-500" />
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">ព័ត៌មានក្បាលសន្លឹក (Header Settings)</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3.5">
+                      {/* Left col fields */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-black uppercase text-indigo-600 dark:text-indigo-400">ផ្នែកខាងឆ្វេង</span>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">មណ្ឌលប្រឡង</label>
+                          <input
+                            type="text"
+                            value={examCenter}
+                            onChange={(e) => setExamCenter(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">លេខបន្ទប់</label>
+                          <input
+                            type="text"
+                            value={roomNumber}
+                            onChange={(e) => setRoomNumber(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">វិញ្ញាសា</label>
+                          <input
+                            type="text"
+                            value={subjectName}
+                            onChange={(e) => setSubjectName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">លេខតុ</label>
+                          <input
+                            type="text"
+                            value={deskNumber}
+                            onChange={(e) => setDeskNumber(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-805 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Right col fields */}
+                      <div className="space-y-3">
+                        <span className="text-[10px] font-black uppercase text-emerald-600 dark:text-emerald-400">ផ្នែកខាងស្ដាំ</span>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">ប្រឡង</label>
+                          <input
+                            type="text"
+                            value={examName}
+                            onChange={(e) => setExamName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-808 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">ថ្នាក់ទី</label>
+                          <input
+                            type="text"
+                            value={gradeNumber}
+                            onChange={(e) => setGradeNumber(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-808 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">សម័យប្រឡង</label>
+                          <input
+                            type="text"
+                            value={examSession}
+                            onChange={(e) => setExamSession(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-808 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">រយៈពេល & ពិន្ទុ</label>
+                          <div className="flex gap-1.5">
+                            <input
+                              type="text"
+                              value={durationTime}
+                              onChange={(e) => setDurationTime(e.target.value)}
+                              placeholder="រយៈពេល"
+                              className="w-1/2 px-2 py-1 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-202 dark:border-slate-802 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                            />
+                            <input
+                              type="text"
+                              value={totalScore}
+                              onChange={(e) => setTotalScore(e.target.value)}
+                              placeholder="ពិន្ទុ"
+                              className="w-1/2 px-2 py-1 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-202 dark:border-slate-802 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Logo Config fields */}
+                    <div className="border-t border-slate-100 dark:border-slate-800 pt-3 space-y-3">
+                      <span className="text-[10px] font-black uppercase text-amber-600 dark:text-amber-400">ព័ត៌មានសាលារៀន & ឡូហ្គោ (School Info & Logo)</span>
+                      <div className="grid grid-cols-2 gap-3.5">
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">ឈ្មោះសាលា</label>
+                          <input
+                            type="text"
+                            value={logoText1}
+                            onChange={(e) => setLogoText1(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">សាខា/អក្សរជួរទីពីរ</label>
+                          <input
+                            type="text"
+                            value={logoText2}
+                            onChange={(e) => setLogoText2(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-805 dark:text-white"
+                          />
+                        </div>
+                      </div>
+
+                      {/* Logo File Selector and management block */}
+                      <div className="bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
+                        <label className="block text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">រូបសញ្ញាសាលារៀន (School Logo PNG/JPG)</label>
+                        <div className="flex items-center gap-3">
+                          {customLogo ? (
+                            <div className="relative w-12 h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center p-1 overflow-hidden group shrink-0">
+                              <img src={customLogo} alt="Custom School Logo Preview" className="w-full h-full object-contain" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCustomLogo(null);
+                                  localStorage.removeItem('teacher_custom_logo');
+                                }}
+                                className="absolute inset-0 bg-red-600/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[9px] font-bold"
+                                title="លុបឡូហ្គោចេញ"
+                              >
+                                លុបចេញ
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 text-[9px] font-black uppercase shrink-0">
+                              គ្មាន
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0">
+                            <input
+                              type="file"
+                              accept="image/png, image/jpeg, image/gif"
+                              id="custom-logo-uploader"
+                              className="hidden"
+                              onChange={(e) => {
+                                const file = e.target.files?.[0];
+                                if (file) {
+                                  const reader = new FileReader();
+                                  reader.onload = (event) => {
+                                    const base64 = event.target?.result as string;
+                                    setCustomLogo(base64);
+                                    localStorage.setItem('teacher_custom_logo', base64);
+                                  };
+                                  reader.readAsDataURL(file);
+                                }
+                              }}
+                            />
+                            <label
+                              htmlFor="custom-logo-uploader"
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 border border-indigo-150 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black rounded-lg cursor-pointer transition-all active:scale-95 uppercase tracking-wide"
+                            >
+                              📂 បញ្ចូល Logo (PNG)
+                            </label>
+                            <p className="text-[9px] text-slate-400 mt-1">ទោះបញ្ចូលក៏បាន អត់បញ្ចូលក៏បាន (ឡូហ្គោខុសៗគ្នាតាមគ្រូ)</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Layout & answer style configurations */}
+                  <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                    <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <Sparkles className="w-4 h-4 text-emerald-500" />
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">ជម្រើសទម្រង់សន្លឹកកិច្ចការ</span>
+                    </div>
+
+                    <div className="space-y-3.5 text-xs text-slate-700 dark:text-slate-300">
+                      {/* Option styles toggle */}
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold">ប្រភេទលេខចម្លើយ (Labels)៖</span>
+                        <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner">
+                          <button
+                            type="button"
+                            onClick={() => setOptionStyle('khmer')}
+                            className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              optionStyle === 'khmer'
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            ក, ខ, គ, ឃ
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOptionStyle('latin')}
+                            className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              optionStyle === 'latin'
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                            }`}
+                          >
+                            A, B, C, D
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Options breakdown toggle */}
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold">របៀបតម្រៀបចម្លើយ៖</span>
+                        <div className="flex bg-slate-100 dark:bg-slate-950 p-1 rounded-lg border border-slate-200 dark:border-slate-800 shadow-inner">
+                          <button
+                            type="button"
+                            onClick={() => setOptionsLayout('inline')}
+                            className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              optionsLayout === 'inline'
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            ជាជួរដេក (២ក្នុងមួយជួរ)
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setOptionsLayout('stacked')}
+                            className={`px-3 py-1 rounded-md font-bold transition-all cursor-pointer ${
+                              optionsLayout === 'stacked'
+                                ? 'bg-indigo-600 text-white shadow-sm'
+                                : 'text-slate-500 hover:text-slate-800'
+                            }`}
+                          >
+                            ចុះជួរថ្មី (១ក្នុងមួយជួរ)
+                          </button>
+                        </div>
+                      </div>
+
+                      {/* Highlight key for teachers checklist */}
+                      <label className="flex items-center gap-3.5 p-3 rounded-xl border border-dashed border-emerald-500/30 bg-emerald-500/5 hover:bg-emerald-500/10 cursor-pointer select-none transition-all w-full">
+                        <input
+                          type="checkbox"
+                          checked={highlightKey}
+                          onChange={(e) => setHighlightKey(e.target.checked)}
+                          className="w-4.5 h-4.5 text-emerald-650 bg-white dark:bg-slate-900 border-slate-300 rounded focus:ring-emerald-500 focus:ring-1 cursor-pointer"
+                        />
+                        <div className="flex-1">
+                          <div className="font-black text-emerald-800 dark:text-emerald-400">បង្ហាញគំរូចម្លើយ (Answer Key)</div>
+                          <div className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5">គូសចំណាំពណ៌បៃតងលើចម្លើយត្រឹមត្រូវ (សម្រាប់លោកគ្រូ អ្នកគ្រូកែ)</div>
+                        </div>
+                      </label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right page visual preview panel */}
+                <div className="lg:col-span-7 flex flex-col gap-3">
+                  <div className="flex items-center justify-between text-xs font-black text-slate-500">
+                    <span className="flex items-center gap-1.5">
+                      <Eye className="w-4 h-4 text-slate-450" />
+                      <span>ផ្ទាំងឯកសារមើលជាមុន (A4 Print Layout Preview)</span>
+                    </span>
+                    <span className="text-[10px] font-medium text-slate-400">សន្លឹកកិច្ចការនឹងព្រីនចេញទម្រង់ដូចគ្នាទាំងស្រុងនេះ</span>
+                  </div>
+
+                  {/* Standard A4 Styled Document Mock Card */}
+                  <div className="bg-white text-black p-8 rounded-2xl border border-slate-200 shadow-lg min-h-[500px] overflow-y-auto max-h-[60vh] custom-scrollbar text-[11px] sm:text-[12px] leading-relaxed select-text font-serif">
+                    {/* Live preview header columns identical to actual layout */}
+                    <div className="grid grid-cols-12 gap-1 pb-4">
+                      {/* Left Block */}
+                      <div className="col-span-4 flex flex-col gap-1.5 text-left font-black text-slate-950 font-sans leading-snug">
+                        <div className="truncate">មណ្ឌលប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examCenter || '.....'}</span></div>
+                        <div className="truncate">លេខបន្ទប់៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{roomNumber || '.....'}</span></div>
+                        <div className="truncate">វិញ្ញាសា៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{subjectName || '.....'}</span></div>
+                        <div className="truncate">លេខតុ៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{deskNumber || '.....'}</span></div>
+                      </div>
+
+                      {/* Middle Logo block */}
+                      <div className="col-span-4 flex flex-col items-center justify-start text-center">
+                        <div className="w-12 h-12 mb-1 flex items-center justify-center">
+                          {customLogo ? (
+                            <img
+                              src={customLogo}
+                              alt="Custom Logo"
+                              className="w-12 h-12 object-contain pointer-events-none mx-auto"
+                            />
+                          ) : imageFailed ? (
+                            <SovannaphumiLogoSVG />
+                          ) : (
+                            <img
+                              src={imgSrc}
+                              alt="Sovannphomi Logo"
+                              className="w-12 h-12 object-contain pointer-events-none mx-auto"
+                              onError={() => {
+                                if (imgSrc === '/Sovannphomi.png') {
+                                  setImgSrc('/sovannaphumi.png');
+                                } else {
+                                  setImageFailed(true);
+                                }
+                              }}
+                            />
+                          )}
+                        </div>
+                        <div className="font-black text-[9px] text-slate-900 leading-tight font-sans tracking-wide">{logoText1}</div>
+                        <div className="text-[8px] font-semibold text-slate-800 leading-tight tracking-tight mt-0.5">{logoText2}</div>
+                      </div>
+
+                      {/* Right Block */}
+                      <div className="col-span-4 flex items-start justify-between gap-1.5 text-left font-black text-slate-950 pl-2 leading-snug font-sans">
+                        <div className="flex-1 flex flex-col gap-1.5 min-w-0 font-sans">
+                          <div className="flex justify-between items-center w-full truncate">
+                            <span>ប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examName}</span></span>
+                            <span>ថ្នាក់ទី៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{gradeNumber}</span></span>
+                          </div>
+                          <div className="truncate">សម័យប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examSession}</span></div>
+                          <div className="truncate">រយៈពេល៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{durationTime}</span> <span className="font-black text-[9px]">({totalScore})</span></div>
+                        </div>
+
+                        {/* Score Oval Place */}
+                        <div className="border-double border-[3px] border-slate-900 rounded-[50%/50%] w-[62px] h-[48px] flex flex-col items-center justify-center shrink-0 self-center p-0.5" title="រង្វង់សម្រាប់ដាក់ពិន្ទុ">
+                          <span className="text-[7.5px] font-black text-slate-900 leading-none">ពិន្ទុ</span>
+                          <span className="text-[6.5px] font-bold text-slate-600 leading-none mt-0.5">Score</span>
+                          <div className="border-t border-dashed border-slate-700 w-[40px] mt-2"></div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Separator exact border double black line */}
+                    <div className="border-b-4 border-double border-black my-2"></div>
+
+                    {/* Visual Preview Header title */}
+                    <div className="text-center mb-4">
+                      <div className="font-black text-slate-900 uppercase tracking-wider text-[11px] sm:text-xs font-sans">
+                        សន្លឹកកិច្ចការវិញ្ញាសា
+                      </div>
+                      <div className="text-[10px] sm:text-[10.5px] font-black text-slate-700 dark:text-slate-300 mt-1">
+                        សេចក្តីណែនាំ៖ ចូរគូសរង្វង់លើចម្លើយត្រឹមត្រូវតែមួយគត់
+                      </div>
+                      <div className="text-[8.5px] sm:text-[9px] text-red-700 dark:text-red-400 font-medium leading-relaxed text-center italic mt-1.5 block">
+                        (បម្រាម៖ បេក្ខជនណាមើលសំណៅឯកសារ ចម្លងគ្នា មើលគ្នា មិនធ្វើតាមបទបញ្ជាផ្ទៃក្នុងអនុរក្សនឹងត្រូវបានពិន្ទុសូន្យ។)
+                      </div>
+                    </div>
+
+                    {/* Preview list of questions */}
+                    <div className="space-y-4 text-slate-905 mt-2 font-sans text-black">
+                      {cards.filter(c => c.question).map((card, qIdx) => (
+                        <div key={card.id}>
+                          <div className="font-bold text-slate-980 flex items-start gap-1">
+                            <span className="shrink-0 font-black">សំណួរទី {qIdx + 1}៖</span>
+                            <span><FormulaRenderer text={card.question?.text || ''} /></span>
+                          </div>
+                          
+                          <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                            {card.question?.options.map((opt, oIdx) => {
+                              const isCorrectIdx = oIdx === card.question?.correctIndex;
+                              return (
+                                <div 
+                                  key={oIdx} 
+                                  className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md text-[10px] ${
+                                    highlightKey && isCorrectIdx 
+                                      ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/40' 
+                                      : 'text-slate-700'
+                                  }`}
+                                >
+                                  <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
+                                  <span><FormulaRenderer text={opt} /></span>
+                                </div>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                      {cards.filter(c => c.question).length === 0 && (
+                        <div className="text-center py-8 italic text-slate-400">
+                          មិនទាន់បង្កើតសំណួរក្នុងមេរៀនសកម្មនេះនៅឡើយទេ
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Modal Actions Footer */}
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
+                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-405 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-900/30 pr-3 flex items-center gap-1.5">
+                  <Sparkles className="w-3.5 h-3.5" />
+                  <span>សំណួរសរុប៖ {cards.filter(c => c.question).length} សំណួរ</span>
+                </span>
+                
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(false)}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs border border-slate-200 dark:border-slate-750 transition-all cursor-pointer active:scale-95"
+                  >
+                    បោះបង់
+                  </button>
+                  
+                  <button
+                    type="button"
+                    onClick={exportToWord}
+                    disabled={cards.filter(c => c.question).length === 0}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs shadow-md shadow-blue-500/10 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    <span>ទាញយកជា Word (.doc)</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={triggerPrint}
+                    disabled={cards.filter(c => c.question).length === 0}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>បោះពុម្ព ឬរក្សាទុកជា PDF</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
+      {/* Hidden layout rendered only at print-time */}
+      <div className="hidden print:block printable-sheet bg-white text-black p-8 font-sans w-full max-w-4xl mx-auto min-h-screen text-[12px] sm:text-[13px] leading-relaxed select-text">
+        <div className="grid grid-cols-12 gap-2 w-full text-black">
+          {/* Left Column */}
+          <div className="col-span-4 flex flex-col justify-start text-left font-black gap-2 mt-2">
+            <div>មណ្ឌលប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examCenter}</span></div>
+            <div>លេខបន្ទប់៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{roomNumber}</span></div>
+            <div>វិញ្ញាសា៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{subjectName}</span></div>
+            <div>លេខតុ៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{deskNumber}</span></div>
+          </div>
+          
+          {/* Middle Column (Logo and school titles) */}
+          <div className="col-span-4 flex flex-col items-center text-center justify-start">
+            <div className="mb-2">
+              {customLogo ? (
+                <img 
+                  src={customLogo} 
+                  alt="Custom Logo" 
+                  className="w-16 h-16 object-contain pointer-events-none mx-auto"
+                />
+              ) : imageFailed ? (
+                <SovannaphumiLogoSVG />
+              ) : (
+                <img 
+                  src={imgSrc} 
+                  alt="Sovannphomi Logo" 
+                  className="w-16 h-16 object-contain pointer-events-none mx-auto"
+                  onError={() => {
+                    if (imgSrc === '/Sovannphomi.png') {
+                      setImgSrc('/sovannaphumi.png');
+                    } else {
+                      setImageFailed(true);
+                    }
+                  }}
+                />
+              )}
+            </div>
+            <div className="font-black text-xs text-slate-900 leading-tight tracking-wide font-sans">{logoText1}</div>
+            <div className="text-[10px] font-medium text-slate-800 leading-tight mt-0.5">{logoText2}</div>
+          </div>
+          
+          {/* Right Column */}
+          <div className="col-span-4 flex items-start justify-between gap-1.5 mt-[6px] pl-4">
+            <div className="flex-1 flex flex-col justify-start text-left font-black gap-2 min-w-0">
+              <div className="flex justify-between items-center w-full">
+                <span>ប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examName}</span></span>
+                <span>ថ្នាក់ទី៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{gradeNumber}</span></span>
+              </div>
+              <div className="truncate">សម័យប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examSession}</span></div>
+              <div className="truncate">រយៈពេល៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{durationTime}</span> <span className="font-medium">({totalScore})</span></div>
+            </div>
+
+            {/* Score Oval Place */}
+            <div className="border-double border-[3px] border-black rounded-[50%/50%] w-[66px] h-[50px] flex flex-col items-center justify-center shrink-0 self-center p-0.5" title="រង្វង់សម្រាប់ដាក់ពិន្ទុ">
+              <span className="text-[7.5px] font-black leading-none">ពិន្ទុ</span>
+              <span className="text-[6.5px] font-bold text-slate-700 leading-none mt-0.5">Score</span>
+              <div className="border-t border-dashed border-black w-[42px] mt-2"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Horizontal separator */}
+        <div className="border-b-4 border-double border-black my-4 w-full"></div>
+        
+        {/* Document Body */}
+        <div className="text-center mb-6">
+          <div className="font-black text-[13px] tracking-wider uppercase text-slate-900">
+            សន្លឹកកិច្ចការវិញ្ញាសា
+          </div>
+          <div className="text-[11.5px] font-black text-slate-800 mt-1.5">
+            សេចក្តីណែនាំ៖ ចូរគូសរង្វង់លើចម្លើយត្រឹមត្រូវតែមួយគត់
+          </div>
+          <div className="text-[9.5px] text-red-800 font-medium leading-relaxed text-center italic mt-2 block">
+            (បម្រាម៖ បេក្ខជនណាមើលសំណៅឯកសារ ចម្លងគ្នា មើលគ្នា មិនធ្វើតាមបទបញ្ជាផ្ទៃក្នុងអនុរក្សនឹងត្រូវបានពិន្ទុសូន្យ។)
+          </div>
+        </div>
+        
+        <div className="space-y-6 text-black mt-4">
+          {cards.filter(c => c.question).map((card, qIdx) => (
+            <div key={card.id} className="break-inside-avoid">
+              <div className="font-black text-slate-950 flex items-start gap-1">
+                <span className="shrink-0">សំណួរទី {qIdx + 1}៖</span>
+                <span className="leading-relaxed"><FormulaRenderer text={card.question?.text || ''} /></span>
+              </div>
+              
+              <div className={`mt-3 pl-4 ${optionsLayout === 'inline' ? 'grid grid-cols-2 gap-x-6 gap-y-2' : 'space-y-2'}`}>
+                {card.question?.options.map((opt, oIdx) => {
+                  const isCorrectIdx = oIdx === card.question?.correctIndex;
+                  return (
+                    <div 
+                      key={oIdx} 
+                      className={`flex items-start gap-2.5 py-1 px-2 rounded-md ${
+                        highlightKey && isCorrectIdx 
+                          ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/50' 
+                          : ''
+                      }`}
+                    >
+                      <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
+                      <span className="leading-relaxed"><FormulaRenderer text={opt} /></span>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
     </div>
   );
 }
