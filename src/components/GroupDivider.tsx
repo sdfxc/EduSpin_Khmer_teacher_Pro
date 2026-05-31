@@ -414,11 +414,11 @@ export default function GroupDivider({
             <Users className="w-6 h-6" />
           </div>
           <div>
-            <h2 className="text-xl font-extrabold text-slate-850 dark:text-white leading-tight">កំណត់ការបែងចែកក្រុមស្មើគ្នា</h2>
+            <h2 className="text-xl font-extrabold text-slate-800 dark:text-white leading-tight">កំណត់ការបែងចែកក្រុមស្មើគ្នា</h2>
             <p className="text-xs text-slate-500 dark:text-slate-400 mt-1 font-semibold flex items-center gap-2 flex-wrap">
-              <span>ថ្នាក់៖ <span className="text-indigo-650 dark:text-indigo-400 font-bold">{activeClassName}</span></span>
+              <span>ថ្នាក់៖ <span className="text-indigo-600 dark:text-indigo-400 font-bold">{activeClassName}</span></span>
               <span>•</span>
-              <span>សិស្សសរុប៖ <span className="text-indigo-650 dark:text-indigo-400 font-bold">{students.length} នាក់</span></span>
+              <span>សិស្សសរុប៖ <span className="text-indigo-600 dark:text-indigo-400 font-bold">{students.length} នាក់</span></span>
             </p>
           </div>
         </div>
@@ -439,15 +439,15 @@ export default function GroupDivider({
             <button
               onClick={handleDecrement}
               disabled={numGroups <= 2}
-              className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+              className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
             >
               <Minus className="w-4 h-4" />
             </button>
-            <span className="w-12 text-center text-lg font-black text-slate-850 dark:text-white font-mono">{numGroups}</span>
+            <span className="w-12 text-center text-lg font-black text-slate-800 dark:text-white font-mono">{numGroups}</span>
             <button
               onClick={handleIncrement}
               disabled={numGroups >= students.length}
-              className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
+              className="w-10 h-10 flex items-center justify-center text-slate-600 dark:text-slate-400 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 disabled:opacity-40 transition-all cursor-pointer"
             >
               <Plus className="w-4 h-4" />
             </button>
@@ -532,7 +532,7 @@ export default function GroupDivider({
                     />
                     <button
                       onClick={() => handleAddGroupScore(group.id)}
-                      className="p-1 min-w-[28px] h-7 bg-indigo-600 hover:bg-indigo-750 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95"
+                      className="p-1 min-w-[28px] h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95"
                       title="បញ្ចូលពិន្ទុពិសេស"
                     >
                       <Check className="w-3.5 h-3.5" />
@@ -550,7 +550,7 @@ export default function GroupDivider({
                   return (
                     <div
                       key={member.id}
-                      className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/60 rounded-2xl text-slate-750 dark:text-slate-300 transition-all hover:border-slate-200 dark:hover:border-slate-705"
+                      className="flex items-center justify-between p-2.5 bg-slate-50 dark:bg-slate-900/50 border border-slate-100 dark:border-slate-800/60 rounded-2xl text-slate-700 dark:text-slate-300 transition-all hover:border-slate-200 dark:hover:border-slate-700"
                     >
                       <div className="flex items-center gap-2 truncate">
                         <span className="text-base shrink-0 select-none">

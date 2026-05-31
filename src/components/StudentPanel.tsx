@@ -54,6 +54,7 @@ interface StudentPanelProps {
   onClearStudents: () => void;
   onSelectStudent: (student: Student) => void;
   selectedStudent: Student | null;
+  isDarkMode?: boolean;
 }
 
 export default function StudentPanel({ 
@@ -64,7 +65,8 @@ export default function StudentPanel({
   onRemoveStudent, 
   onClearStudents,
   onSelectStudent,
-  selectedStudent 
+  selectedStudent,
+  isDarkMode = false
 }: StudentPanelProps) {
   const [newName, setNewName] = useState('');
   const [isSpinning, setIsSpinning] = useState(false);
@@ -229,9 +231,17 @@ export default function StudentPanel({
   };
 
   return (
-    <div className="flex flex-col h-full bg-white dark:bg-[#111827] border-r border-[#e2e8f0] dark:border-slate-800 p-6 overflow-hidden transition-colors duration-300">
+    <div className={`flex flex-col h-full border-r p-6 overflow-hidden transition-colors duration-300 ${
+      isDarkMode 
+        ? 'bg-slate-900 border-slate-800 text-white' 
+        : 'bg-white border-[#e2e8f0] text-slate-800'
+    }`}>
       <div className="flex flex-col mb-6 gap-2">
-        <h2 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-blue-600 to-indigo-600 dark:from-indigo-400 dark:to-blue-400">
+        <h2 className={`text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r ${
+          isDarkMode 
+            ? 'from-indigo-400 to-cyan-400' 
+            : 'from-indigo-600 to-blue-600'
+        }`}>
           បញ្ជីឈ្មោះសិស្ស ({students.length})
         </h2>
         <div className="flex items-center justify-end gap-2 overflow-x-auto custom-scrollbar-hide flex-nowrap">
@@ -261,7 +271,9 @@ export default function StudentPanel({
           )}
         </div>
         <div className="flex justify-end">
-          <span className="text-[9px] font-bold text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded-full uppercase">
+          <span className={`text-[9px] font-bold px-2 py-0.5 rounded-full uppercase ${
+            isDarkMode ? 'text-slate-300 bg-slate-800' : 'text-slate-500 bg-slate-100'
+          }`}>
             នៅសល់ {students.length - pickedIds.length} នាក់
           </span>
         </div>
@@ -316,7 +328,7 @@ export default function StudentPanel({
               ease: "easeInOut"
             }
           }}
-          className="w-full py-5 bg-yellow-400 text-slate-905 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl hover:bg-yellow-350 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group relative overflow-hidden"
+          className="w-full py-5 bg-yellow-400 text-slate-900 rounded-3xl font-black text-lg flex items-center justify-center gap-3 shadow-xl hover:bg-yellow-300 transition-all active:scale-95 disabled:opacity-50 disabled:grayscale disabled:cursor-not-allowed group relative overflow-hidden"
         >
           <div className="absolute inset-0 bg-gradient-to-t from-black/5 to-transparent pointer-events-none" />
           <RotateCw className={`w-6 h-6 ${isSpinning ? 'animate-spin' : 'group-hover:rotate-180 transition-transform duration-500'}`} />
@@ -330,14 +342,24 @@ export default function StudentPanel({
               initial={{ scale: 0.8, opacity: 0 }}
               animate={{ scale: 1, opacity: 1 }}
               exit={{ scale: 0.8, opacity: 0 }}
-              className={`text-center p-5 bg-yellow-101 border-2 border-yellow-400 dark:bg-yellow-950/20 dark:border-yellow-600/30 rounded-2xl mb-4 shadow-lg ${isSpinning ? 'animate-pulse' : ''}`}
+              className={`text-center p-5 rounded-2xl mb-4 shadow-lg border-2 ${
+                isDarkMode 
+                  ? 'bg-slate-800/80 border-yellow-500/30' 
+                  : 'bg-yellow-50 border-yellow-400'
+              } ${isSpinning ? 'animate-pulse' : ''}`}
             >
-              <p className="text-slate-600 dark:text-slate-400 text-[10px] uppercase tracking-wider font-bold mb-1">អ្នកដែលត្រូវឆ្លើយគឺ</p>
-              <h3 className="text-3xl font-black text-red-650 dark:text-red-420 truncate px-2 mb-1 flex items-center justify-center gap-2">
+              <p className={`text-[10px] uppercase tracking-wider font-bold mb-1 ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-600'
+              }`}>អ្នកដែលត្រូវឆ្លើយគឺ</p>
+              <h3 className={`text-3xl font-black truncate px-2 mb-1 flex items-center justify-center gap-2 ${
+                isDarkMode ? 'text-yellow-400' : 'text-red-600'
+              }`}>
                 <span className="text-4xl">{selectedStudent.emoji}</span>
                 {selectedStudent.name}
               </h3>
-              <div className="flex items-center justify-center gap-1.5 text-red-700/60 dark:text-red-350/80 font-bold text-xs">
+              <div className={`flex items-center justify-center gap-1.5 font-bold text-xs ${
+                isDarkMode ? 'text-slate-300' : 'text-red-700/60'
+              }`}>
                 <Trophy className="w-4 h-4 text-yellow-500" />
                 <span>ទទួលបាន {selectedStudent.score} ពិន្ទុ</span>
               </div>
@@ -373,7 +395,7 @@ export default function StudentPanel({
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
-                    <p className={`font-semibold leading-none ${selectedStudent?.id === student.id ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-705 dark:text-slate-200'}`}>{student.name}</p>
+                    <p className={`font-semibold leading-none ${selectedStudent?.id === student.id ? 'text-indigo-900 dark:text-indigo-200' : 'text-slate-700 dark:text-slate-200'}`}>{student.name}</p>
                     {pickedIds.includes(student.id) && !isSpinning && selectedStudent?.id !== student.id && (
                       <span className="w-1.5 h-1.5 bg-slate-300 dark:bg-slate-600 rounded-full" />
                     )}
@@ -403,7 +425,7 @@ export default function StudentPanel({
           />
           <button
             type="submit"
-            className="p-2 bg-slate-900 dark:bg-indigo-600 text-white rounded-xl hover:bg-slate-800 dark:hover:bg-indigo-750 transition-all shadow-md active:scale-95 cursor-pointer"
+            className="p-2 bg-slate-900 dark:bg-indigo-600 text-white rounded-xl hover:bg-slate-800 dark:hover:bg-indigo-700 transition-all shadow-md active:scale-95 cursor-pointer"
           >
             <UserPlus className="w-5 h-5" />
           </button>

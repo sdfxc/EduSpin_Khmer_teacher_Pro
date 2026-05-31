@@ -1160,6 +1160,7 @@ export default function App() {
                 onAddStudent={addStudent}
                 showBulkInput={showWheelBulk}
                 setShowBulkInput={setShowWheelBulk}
+                isDarkMode={isDarkMode}
               />
             </section>
             
@@ -1173,6 +1174,7 @@ export default function App() {
                 onClearStudents={clearStudents}
                 onSelectStudent={(s) => setSelectedStudentId(s.id)}
                 selectedStudent={selectedStudent}
+                isDarkMode={isDarkMode}
               />
             </aside>
           </>
@@ -1190,8 +1192,12 @@ export default function App() {
                 onClearStudents={clearStudents}
                 onSelectStudent={(s) => setSelectedStudentId(s.id)}
                 selectedStudent={selectedStudent}
+                isDarkMode={isDarkMode}
               />
             </aside>
+
+            {/* Bright Orange line separator between student list and question board */}
+            <div className="w-[3px] bg-[#f97316] h-full hidden md:block shrink-0" />
 
             <section className={`flex-1 md:basis-3/5 h-full overflow-hidden flex flex-col ${
               isDarkMode ? 'bg-[#0f172a]' : 'bg-slate-50'
@@ -1212,6 +1218,7 @@ export default function App() {
                 onCreateChapter={handleCreateChapter}
                 onRenameChapter={handleRenameChapter}
                 onDeleteChapter={handleDeleteChapter}
+                isDarkMode={isDarkMode}
               />
             </section>
           </>
