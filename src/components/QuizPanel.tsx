@@ -94,14 +94,18 @@ export default function QuizPanel({
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [headerFont, setHeaderFont] = useState('Moul');
   const [bodyFont, setBodyFont] = useState('Battambang');
-  const [headerFontSize, setHeaderFontSize] = useState(11);
-  const [bodyFontSize, setBodyFontSize] = useState(10);
+  const [headerFontSize, setHeaderFontSize] = useState(10.5);
+  const [bodyFontSize, setBodyFontSize] = useState(11);
   const [pageSize, setPageSize] = useState<string>('A4');
-  const [marginTop, setMarginTop] = useState<number>(2.0);
-  const [marginBottom, setMarginBottom] = useState<number>(2.0);
-  const [marginLeft, setMarginLeft] = useState<number>(2.5);
-  const [marginRight, setMarginRight] = useState<number>(2.5);
-  const [marginUnit, setMarginUnit] = useState<string>('cm');
+  const [marginTop, setMarginTop] = useState<number>(0.5);
+  const [marginBottom, setMarginBottom] = useState<number>(0.5);
+  const [marginLeft, setMarginLeft] = useState<number>(0.5);
+  const [marginRight, setMarginRight] = useState<number>(0.5);
+  const [marginUnit, setMarginUnit] = useState<string>('in');
+  const [headerLayout, setHeaderLayout] = useState<string>('5-1-5');
+  const [customLeftSpan, setCustomLeftSpan] = useState<number>(5);
+  const [customCenterSpan, setCustomCenterSpan] = useState<number>(2);
+  const [customRightSpan, setCustomRightSpan] = useState<number>(5);
   const [examCenter, setExamCenter] = useState('.....................................................');
   const [roomNumber, setRoomNumber] = useState('..................');
   const [subjectName, setSubjectName] = useState('');
@@ -690,6 +694,89 @@ export default function QuizPanel({
   const selectedHeaderFontObj = AVAILABLE_FONTS.find(f => f.id === headerFont) || AVAILABLE_FONTS[0];
   const selectedBodyFontObj = AVAILABLE_FONTS.find(f => f.id === bodyFont) || AVAILABLE_FONTS[0];
 
+  const getLayoutClasses = (layout: string) => {
+    switch (layout) {
+      case '4-4-4':
+        return {
+          left: { className: 'col-span-4', style: {} },
+          center: { className: 'col-span-4', style: {} },
+          right: { className: 'col-span-4', style: {} }
+        };
+      case '4-2-6':
+        return {
+          left: { className: 'col-span-4', style: {} },
+          center: { className: 'col-span-2', style: {} },
+          right: { className: 'col-span-6', style: {} }
+        };
+      case '5-1-6':
+        return {
+          left: { className: 'col-span-5', style: {} },
+          center: { className: 'col-span-1', style: {} },
+          right: { className: 'col-span-6', style: {} }
+        };
+      case 'custom':
+        return {
+          left: { className: '', style: { gridColumn: `span ${customLeftSpan} / span ${customLeftSpan}` } },
+          center: { className: '', style: { gridColumn: `span ${customCenterSpan} / span ${customCenterSpan}` } },
+          right: { className: '', style: { gridColumn: `span ${customRightSpan} / span ${customRightSpan}` } }
+        };
+      case '5-1-5':
+        return {
+          left: { className: 'col-span-5', style: {} },
+          center: { className: 'col-span-1', style: {} },
+          right: { className: 'col-span-5', style: {} }
+        };
+      case '5-2-5':
+        return {
+          left: { className: 'col-span-12 md:col-span-5', style: {} },
+          center: { className: 'col-span-12 md:col-span-2', style: {} },
+          right: { className: 'col-span-12 md:col-span-5', style: {} }
+        };
+      default:
+        // Set default to 5-1-5 layout
+        return {
+          left: { className: 'col-span-5', style: {} },
+          center: { className: 'col-span-1', style: {} },
+          right: { className: 'col-span-5', style: {} }
+        };
+    }
+  };
+
+  const renderDotField = (value: string, fallbackDots: string) => {
+    const actualVal = (value || '').trim() === '' ? fallbackDots : value;
+    // Checks if the field is empty or contains purely dots/separators
+    const isPureDots = /^[.\s៖\-/_​]*$/.test(actualVal) || actualVal === fallbackDots;
+
+    if (isPureDots) {
+      return (
+        <span 
+          style={{ 
+            fontWeight: 300, 
+            color: '#64748b', 
+            letterSpacing: '1.2px', 
+            fontSize: '8.5px',
+            fontFamily: 'sans-serif'
+          }} 
+          className="print-dots inline-block border-b border-dotted border-slate-350 dark:border-slate-700 min-w-[20px] max-w-full"
+        >
+          {actualVal}
+        </span>
+      );
+    }
+
+    return (
+      <span 
+        style={{ 
+          fontWeight: 'normal', 
+          borderBottom: '1px dotted rgba(100, 116, 139, 0.4)' 
+        }} 
+        className="px-0.5 pb-[0.5px]"
+      >
+        {actualVal}
+      </span>
+    );
+  };
+
   const headerInlineStyle = {
     fontFamily: selectedHeaderFontObj.cssValue,
     fontSize: `${headerFontSize}pt`
@@ -702,6 +789,7 @@ export default function QuizPanel({
 
   const totalCount = cards.length;
   const remainingCount = cards.filter(c => !c.isRevealed).length;
+  const layoutWidths = getLayoutClasses(headerLayout);
 
   return (
     <div 
@@ -1541,7 +1629,7 @@ export default function QuizPanel({
                     </div>
 
                     <div className="space-y-4 text-xs">
-                      {/* Paper Size selector */}
+                      {/* Paper Size & Margins Settings Card */}
                       <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2">
                           <label className="font-bold text-slate-700 dark:text-slate-300">ទំហំក្រដាស (Paper Size)៖</label>
@@ -1567,15 +1655,15 @@ export default function QuizPanel({
                               const newUnit = e.target.value;
                               setMarginUnit(newUnit);
                               if (newUnit === 'in') {
-                                setMarginTop(0.75);
-                                setMarginBottom(0.75);
-                                setMarginLeft(1.0);
-                                setMarginRight(1.0);
+                                setMarginTop(0.60);
+                                setMarginBottom(0.60);
+                                setMarginLeft(0.80);
+                                setMarginRight(0.60);
                               } else {
-                                setMarginTop(2.0);
-                                setMarginBottom(2.0);
-                                setMarginLeft(2.5);
-                                setMarginRight(2.5);
+                                setMarginTop(1.5);
+                                setMarginBottom(1.5);
+                                setMarginLeft(2.0);
+                                setMarginRight(1.5);
                               }
                             }}
                             className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
@@ -1584,6 +1672,68 @@ export default function QuizPanel({
                             <option value="in" className="bg-white text-black dark:bg-slate-900 dark:text-white">អ៊ីញ (inches)</option>
                           </select>
                         </div>
+
+                        {/* Header Layout type selector */}
+                        <div className="space-y-2 col-span-2">
+                          <label className="font-bold text-slate-700 dark:text-slate-300">ប្លង់ក្បាលសន្លឹកកិច្ចការ (Header Layout)៖</label>
+                          <select
+                            value={headerLayout}
+                            onChange={(e) => setHeaderLayout(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                          >
+                            <option value="5-1-5" className="bg-white text-black dark:bg-slate-900 dark:text-white">ប្លង់ 5:1:5 (ឡូហ្គោតូច / សង្ខាងធំ - លំនាំដើម)</option>
+                            <option value="5-2-5" className="bg-white text-black dark:bg-slate-900 dark:text-white">ប្លង់ 5:2:5 (ឡូហ្គោល្មម / សង្ខាងធំ)</option>
+                            <option value="4-4-4" className="bg-white text-black dark:bg-slate-900 dark:text-white">ប្លង់ 4:4:4 (ឡូហ្គោធំ / ស្មើគ្នា)</option>
+                            <option value="4-2-6" className="bg-white text-black dark:bg-slate-900 dark:text-white">ប្លង់ 4:2:6 (ឡូហ្គោតូច / ស្ដាំធំ)</option>
+                            <option value="5-1-6" className="bg-white text-black dark:bg-slate-900 dark:text-white">ប្លង់ 5:1:6 (ឡូហ្គោតូចបំផុត / ស្ដាំធំ)</option>
+                            <option value="custom" className="bg-white text-black dark:bg-slate-900 dark:text-white">កំណត់ដោយខ្លួនឯង (Custom Layout)</option>
+                          </select>
+                        </div>
+
+                        {/* Custom layout configuration inputs displayed when "custom" is active */}
+                        {headerLayout === 'custom' && (
+                          <div className="col-span-2 p-3 bg-slate-50 dark:bg-slate-950/40 rounded-xl border border-slate-200 dark:border-slate-800 space-y-2 mt-1">
+                            <span className="font-bold block text-[11px] text-slate-600 dark:text-slate-400">សមាមាត្រកម្រាស់ជួរឈរ (Grid Column Spans out of 12)៖</span>
+                            <div className="grid grid-cols-3 gap-2">
+                              <div>
+                                <label className="block text-[10px] text-slate-500 dark:text-slate-400 mb-1 font-semibold text-center">ឆ្វេង (Left)</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="12"
+                                  value={customLeftSpan}
+                                  onChange={(e) => setCustomLeftSpan(Math.max(1, Math.min(12, parseInt(e.target.value) || 1)))}
+                                  className="w-full text-center px-1.5 py-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-slate-550 mb-1 font-semibold text-center">ឡូហ្គោ (Center)</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="12"
+                                  value={customCenterSpan}
+                                  onChange={(e) => setCustomCenterSpan(Math.max(1, Math.min(12, parseInt(e.target.value) || 1)))}
+                                  className="w-full text-center px-1.5 py-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                                />
+                              </div>
+                              <div>
+                                <label className="block text-[10px] text-slate-550 mb-1 font-semibold text-center">ស្ដាំ (Right)</label>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="12"
+                                  value={customRightSpan}
+                                  onChange={(e) => setCustomRightSpan(Math.max(1, Math.min(12, parseInt(e.target.value) || 1)))}
+                                  className="w-full text-center px-1.5 py-1 text-xs font-semibold bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                                />
+                              </div>
+                            </div>
+                            <div className="text-[9px] text-slate-400 dark:text-slate-550 text-center select-none pt-1">
+                              *ផលបូកសរុបគួរតែស្មើនឹង ១២ (ឧទាហរណ៍ ៥ + ២ + ៥) ដើម្បីឱ្យស៊ីគ្នាល្អ
+                            </div>
+                          </div>
+                        )}
                       </div>
 
                       {/* Margins Inputs */}
@@ -1666,7 +1816,7 @@ export default function QuizPanel({
                         <select
                           value={headerFontSize}
                           onChange={(e) => setHeaderFontSize(Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-755 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
                         >
                           {FONT_SIZES.map(sz => (
                             <option key={sz} value={sz} className="bg-white text-black dark:bg-slate-900 dark:text-white">{sz} pt</option>
@@ -1680,7 +1830,7 @@ export default function QuizPanel({
                         <select
                           value={bodyFont}
                           onChange={(e) => setBodyFont(e.target.value)}
-                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-755 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
                         >
                           {AVAILABLE_FONTS.map(f => (
                             <option key={f.id} value={f.id} className="bg-white text-black dark:bg-slate-900 dark:text-white">{f.name}</option>
@@ -1693,7 +1843,7 @@ export default function QuizPanel({
                         <select
                           value={bodyFontSize}
                           onChange={(e) => setBodyFontSize(Number(e.target.value))}
-                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-755 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
                         >
                           {FONT_SIZES.map(sz => (
                             <option key={sz} value={sz} className="bg-white text-black dark:bg-slate-900 dark:text-white">{sz} pt</option>
@@ -1703,6 +1853,8 @@ export default function QuizPanel({
                     </div>
                   </div>
                 </div>
+
+
 
                 {/* Right page visual preview panel */}
                 <div className="lg:col-span-7 flex flex-col gap-3">
@@ -1727,15 +1879,15 @@ export default function QuizPanel({
                     {/* Live preview header columns identical to actual layout */}
                     <div className="grid grid-cols-12 gap-1 pb-4">
                       {/* Left Block */}
-                      <div className="col-span-4 flex flex-col gap-1.5 text-left font-black text-slate-950 font-sans leading-snug" style={headerInlineStyle}>
-                        <div className="truncate">មណ្ឌលប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examCenter || '.....'}</span></div>
-                        <div className="truncate">លេខបន្ទប់៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{roomNumber || '.....'}</span></div>
-                        <div className="truncate">វិញ្ញាសា៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{subjectName || '.....'}</span></div>
-                        <div className="truncate">លេខតុ៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{deskNumber || '.....'}</span></div>
+                      <div className={`${layoutWidths.left.className} flex flex-col gap-1.5 text-left font-black text-slate-950 font-sans leading-snug`} style={{ ...headerInlineStyle, ...layoutWidths.left.style }}>
+                        <div className="truncate">មណ្ឌលប្រឡង៖ {renderDotField(examCenter, '.....................................................')}</div>
+                        <div className="truncate">លេខបន្ទប់៖ {renderDotField(roomNumber, '..................')}</div>
+                        <div className="truncate">វិញ្ញាសា៖ {renderDotField(subjectName, '.....................................')}</div>
+                        <div className="truncate">លេខតុ៖ {renderDotField(deskNumber, '..................')}</div>
                       </div>
 
                       {/* Middle Logo block */}
-                      <div className="col-span-4 flex flex-col items-center justify-start text-center" style={headerInlineStyle}>
+                      <div className={`${layoutWidths.center.className} flex flex-col items-center justify-start text-center`} style={{ ...headerInlineStyle, ...layoutWidths.center.style }}>
                         <div className="w-12 h-12 mb-1 flex items-center justify-center">
                           {customLogo ? (
                             <img
@@ -1760,19 +1912,21 @@ export default function QuizPanel({
                             />
                           )}
                         </div>
-                        <div className="font-black text-[9px] text-slate-900 leading-tight font-sans tracking-wide">{logoText1}</div>
-                        <div className="text-[8px] font-semibold text-slate-800 leading-tight tracking-tight mt-0.5">{logoText2}</div>
+                        <div className="font-black text-[9px] text-slate-900 leading-tight font-sans tracking-wide truncate max-w-full">{logoText1}</div>
+                        {headerLayout !== '5-1-6' && (
+                          <div className="text-[8px] font-semibold text-slate-800 leading-tight tracking-tight mt-0.5 truncate max-w-full">{logoText2}</div>
+                        )}
                       </div>
 
                       {/* Right Block */}
-                      <div className="col-span-4 flex items-start justify-between gap-1.5 text-left font-black text-slate-950 pl-2 leading-snug font-sans" style={headerInlineStyle}>
+                      <div className={`${layoutWidths.right.className} flex items-start justify-between gap-1.5 text-left font-black text-slate-950 pl-2 leading-snug font-sans`} style={{ ...headerInlineStyle, ...layoutWidths.right.style }}>
                         <div className="flex-1 flex flex-col gap-1.5 min-w-0 font-sans">
                           <div className="flex justify-between items-center w-full truncate">
-                            <span>ប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examName}</span></span>
-                            <span>ថ្នាក់ទី៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{gradeNumber}</span></span>
+                            <span>ប្រឡង៖ {renderDotField(examName, '..................')}</span>
+                            <span>ថ្នាក់ទី៖ {renderDotField(gradeNumber, '...............')}</span>
                           </div>
-                          <div className="truncate">សម័យប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examSession}</span></div>
-                          <div className="truncate">រយៈពេល៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{durationTime}</span> <span className="font-black text-[9px]">({totalScore})</span></div>
+                          <div className="truncate">សម័យប្រឡង៖ {renderDotField(examSession, '......../......../........')}</div>
+                          <div className="truncate">រយៈពេល៖ {renderDotField(durationTime, '................ នាទី')} <span className="font-black text-[9px]">({totalScore || '...... ពិន្ទុ'})</span></div>
                         </div>
 
                         {/* Score Oval Place */}
@@ -1901,15 +2055,15 @@ export default function QuizPanel({
       <div className="hidden print:block printable-sheet bg-white text-black p-0 font-sans w-full max-w-4xl mx-auto min-h-screen text-[12px] sm:text-[13px] leading-relaxed select-text">
         <div className="grid grid-cols-12 gap-2 w-full text-black">
           {/* Left Column */}
-          <div className="col-span-4 flex flex-col justify-start text-left font-black gap-2 mt-2" style={headerInlineStyle}>
-            <div>មណ្ឌលប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examCenter}</span></div>
-            <div>លេខបន្ទប់៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{roomNumber}</span></div>
-            <div>វិញ្ញាសា៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{subjectName}</span></div>
-            <div>លេខតុ៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{deskNumber}</span></div>
+          <div className={`${layoutWidths.left.className} flex flex-col justify-start text-left font-black gap-2 mt-2`} style={{ ...headerInlineStyle, ...layoutWidths.left.style }}>
+            <div>មណ្ឌលប្រឡង៖ {renderDotField(examCenter, '.....................................................')}</div>
+            <div>លេខបន្ទប់៖ {renderDotField(roomNumber, '..................')}</div>
+            <div>វិញ្ញាសា៖ {renderDotField(subjectName, '.....................................')}</div>
+            <div>លេខតុ៖ {renderDotField(deskNumber, '..................')}</div>
           </div>
           
           {/* Middle Column (Logo and school titles) */}
-          <div className="col-span-4 flex flex-col items-center text-center justify-start" style={headerInlineStyle}>
+          <div className={`${layoutWidths.center.className} flex flex-col items-center text-center justify-start`} style={{ ...headerInlineStyle, ...layoutWidths.center.style }}>
             <div className="mb-2">
               {customLogo ? (
                 <img 
@@ -1934,19 +2088,21 @@ export default function QuizPanel({
                 />
               )}
             </div>
-            <div className="font-black text-xs text-slate-900 leading-tight tracking-wide font-sans">{logoText1}</div>
-            <div className="text-[10px] font-medium text-slate-800 leading-tight mt-0.5">{logoText2}</div>
+            <div className="font-black text-xs text-slate-900 leading-tight tracking-wide font-sans truncate max-w-full">{logoText1}</div>
+            {headerLayout !== '5-1-6' && (
+              <div className="text-[10px] font-medium text-slate-800 leading-tight mt-0.5 truncate max-w-full">{logoText2}</div>
+            )}
           </div>
           
           {/* Right Column */}
-          <div className="col-span-4 flex items-start justify-between gap-1.5 mt-[6px] pl-4" style={headerInlineStyle}>
+          <div className={`${layoutWidths.right.className} flex items-start justify-between gap-1.5 mt-[6px] pl-4`} style={{ ...headerInlineStyle, ...layoutWidths.right.style }}>
             <div className="flex-1 flex flex-col justify-start text-left font-black gap-2 min-w-0">
               <div className="flex justify-between items-center w-full">
-                <span>ប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examName}</span></span>
-                <span>ថ្នាក់ទី៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{gradeNumber}</span></span>
+                <span>ប្រឡង៖ {renderDotField(examName, '..................')}</span>
+                <span>ថ្នាក់ទី៖ {renderDotField(gradeNumber, '...............')}</span>
               </div>
-              <div className="truncate">សម័យប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examSession}</span></div>
-              <div className="truncate">រយៈពេល៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{durationTime}</span> <span className="font-medium">({totalScore})</span></div>
+              <div className="truncate">សម័យប្រឡង៖ {renderDotField(examSession, '......../......../........')}</div>
+              <div className="truncate">រយៈពេល៖ {renderDotField(durationTime, '................ នាទី')} <span className="font-medium">({totalScore || '...... ពិន្ទុ'})</span></div>
             </div>
 
             {/* Score Oval Place */}
