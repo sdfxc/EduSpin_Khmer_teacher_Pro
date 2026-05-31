@@ -1,8 +1,49 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { UserPlus, RotateCw, Trophy, Trash2, Users, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import confetti from 'canvas-confetti';
 import { Student } from '../types';
+
+const TICK_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
+const FIREWORK_URL = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
+const APPLAUSE_URL = 'https://assets.mixkit.co/active_storage/sfx/2010/2010-preview.mp3';
+
+const playSyntheticTick = () => {
+  try {
+    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+    if (!AudioContext) return;
+    const ctx = new AudioContext();
+    
+    const osc = ctx.createOscillator();
+    const filter = ctx.createBiquadFilter();
+    const gainNode = ctx.createGain();
+    
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(850, ctx.currentTime);
+    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.03);
+    
+    filter.type = 'bandpass';
+    filter.frequency.setValueAtTime(480, ctx.currentTime);
+    filter.Q.value = 1.8;
+    
+    gainNode.gain.setValueAtTime(0.45, ctx.currentTime);
+    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
+    
+    osc.connect(filter);
+    filter.connect(gainNode);
+    gainNode.connect(ctx.destination);
+    
+    osc.start();
+    osc.stop(ctx.currentTime + 0.04);
+    
+    setTimeout(() => {
+      ctx.close().catch(() => {});
+    }, 80);
+  } catch (err) {
+    console.error("Pleasant tick synthesis error:", err);
+  }
+};
 
 interface StudentPanelProps {
   students: Student[];
@@ -28,6 +69,36 @@ export default function StudentPanel({
   const [newName, setNewName] = useState('');
   const [isSpinning, setIsSpinning] = useState(false);
   const [showBulkInput, setShowBulkInput] = useState(false);
+
+  const tickAudio = useRef<HTMLAudioElement | null>(null);
+  const fireworkAudio = useRef<HTMLAudioElement | null>(null);
+  const applauseAudio = useRef<HTMLAudioElement | null>(null);
+
+  // Load and cache audio assets for student panel randomize button selection sounds
+  useEffect(() => {
+    tickAudio.current = new Audio(TICK_URL);
+    fireworkAudio.current = new Audio(FIREWORK_URL);
+    applauseAudio.current = new Audio(APPLAUSE_URL);
+    
+    tickAudio.current.load();
+    fireworkAudio.current.load();
+    applauseAudio.current.load();
+
+    tickAudio.current.volume = 1.0;
+    fireworkAudio.current.volume = 1.0;
+    applauseAudio.current.volume = 1.0;
+
+    const handleError = (e: any) => console.warn('StudentPanel audio failed to load:', e.target.src);
+    tickAudio.current.addEventListener('error', handleError);
+    fireworkAudio.current.addEventListener('error', handleError);
+    applauseAudio.current.addEventListener('error', handleError);
+    
+    return () => {
+      tickAudio.current?.removeEventListener('error', handleError);
+      fireworkAudio.current?.removeEventListener('error', handleError);
+      applauseAudio.current?.removeEventListener('error', handleError);
+    };
+  }, []);
 
   // Reset picked list if students are cleared from external source
   useEffect(() => {
@@ -79,6 +150,23 @@ export default function StudentPanel({
   const spin = () => {
     if (students.length === 0 || isSpinning) return;
     
+    // Soft-trigger warm up of audio contexts on user touch/click gesture to prevent autoplay blocks
+    if (tickAudio.current) {
+      tickAudio.current.play().then(() => {
+        tickAudio.current?.pause();
+      }).catch(() => {});
+    }
+    if (applauseAudio.current) {
+      applauseAudio.current.play().then(() => {
+        applauseAudio.current?.pause();
+      }).catch(() => {});
+    }
+    if (fireworkAudio.current) {
+      fireworkAudio.current.play().then(() => {
+        fireworkAudio.current?.pause();
+      }).catch(() => {});
+    }
+
     setIsSpinning(true);
     let count = 0;
     
@@ -94,6 +182,7 @@ export default function StudentPanel({
     const interval = setInterval(() => {
       const displayIndex = Math.floor(Math.random() * students.length);
       onSelectStudent(students[displayIndex]);
+
       count++;
       
       if (count > 20) {
@@ -107,6 +196,34 @@ export default function StudentPanel({
           return [...prev, finalSelection.id];
         });
         setIsSpinning(false);
+
+        // Play celebration audio on final selection
+        if (fireworkAudio.current) {
+          fireworkAudio.current.currentTime = 0;
+          fireworkAudio.current.play().catch(() => {});
+        }
+        if (applauseAudio.current) {
+          applauseAudio.current.currentTime = 0;
+          applauseAudio.current.play().catch(() => {});
+        }
+
+        // Fire continuous high-intensity fireworks confetti sequence (lasts for 2.5 seconds)
+        const duration = 2.5 * 1000;
+        const animationEnd = Date.now() + duration;
+        const defaults = { startVelocity: 35, spread: 360, ticks: 75, zIndex: 100 };
+
+        const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+        const intervalId = setInterval(() => {
+          const timeLeft = animationEnd - Date.now();
+          if (timeLeft <= 0) {
+            return clearInterval(intervalId);
+          }
+          const particleCount = 60 * (timeLeft / duration);
+          // Shoot multi-angle beautiful color firecracker explosions
+          confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.12, 0.3), y: Math.random() - 0.25 } });
+          confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.88), y: Math.random() - 0.25 } });
+        }, 250);
       }
     }, 100);
   };

@@ -38,8 +38,8 @@ const playHighPitchTick = () => {
     filter.frequency.setValueAtTime(480, ctx.currentTime);
     filter.Q.value = 1.8;
     
-    // Gentle amplitude (down from 3.0 to a comfortable 0.28)
-    gainNode.gain.setValueAtTime(0.28, ctx.currentTime);
+    // Gentle amplitude (increased slightly to 0.45 for better presence)
+    gainNode.gain.setValueAtTime(0.45, ctx.currentTime);
     gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
     
     osc.connect(filter);
@@ -96,7 +96,7 @@ export default function SpinningWheel({
     applauseAudio.current.load();
 
     // Volume configuration (max is 1.0)
-    tickAudio.current.volume = 0.8;
+    tickAudio.current.volume = 1.0;
     fireworkAudio.current.volume = 1.0;
     applauseAudio.current.volume = 1.0;
 

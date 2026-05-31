@@ -107,14 +107,13 @@ export default function StudentManager({
       return {
         'ឈ្មោះសិស្ស': s.name,
         'ភេទ': s.gender || 'ប្រុស',
-        'កម្រិតសិក្សា': s.status || 'សកម្ម',
         'ថ្នាក់': clsName,
         'ពិន្ទុ': s.score || 0
       };
     });
 
     const ws = XLSX.utils.json_to_sheet(exportData);
-    ws['!cols'] = [{ wch: 20 }, { wch: 10 }, { wch: 18 }, { wch: 15 }, { wch: 10 }];
+    ws['!cols'] = [{ wch: 20 }, { wch: 10 }, { wch: 15 }, { wch: 10 }];
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, "គ្រប់គ្រងសិស្ស");
     XLSX.writeFile(wb, `បញ្ជីឈ្មោះសិស្ស_លម្អិត_${new Date().toLocaleDateString()}.xlsx`);

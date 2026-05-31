@@ -346,7 +346,6 @@ export default function GroupDivider({
           'ឈ្មោះសិស្ស': m.name,
           'ភេទ': m.gender || 'មិនស្គាល់',
           'តួនាទី': m.assignedRole || 'សមាជិក',
-          'កម្រិតសិក្សា': m.status || 'កំពុងរីកចម្រើន',
           'ពិន្ទុក្នុងក្រុម (ពិន្ទុក្រុម)': groupScoreVal,
           'ពិន្ទុក្នុងថ្នាក់រៀន (ក្ដារចុច/បង្វិល)': generalScoreVal
         });
@@ -361,7 +360,6 @@ export default function GroupDivider({
       { wch: 25 }, // name
       { wch: 10 }, // gender
       { wch: 15 }, // role
-      { wch: 20 }, // status
       { wch: 22 }, // group score
       { wch: 30 }  // general class score
     ];
@@ -387,7 +385,6 @@ export default function GroupDivider({
         'ឈ្មោះសិស្ស': s.name,
         'ភេទ': s.gender || 'មិនស្គាល់',
         'សាលា/ថ្នាក់': activeClassName,
-        'កម្រិត': s.status || 'កំពុងរីកចម្រើន',
         'ក្រុមដែលបានបែងចែក': groupAssigned,
         'ពិន្ទុក្នុងក្រុម (ពិន្ទុក្រុម)': currentGroupScore,
         'ពិន្ទុសរុបក្នុងថ្នាក់ (ក្ដារចុច/បង្វិល)': s.score
@@ -399,7 +396,6 @@ export default function GroupDivider({
       { wch: 25 },
       { wch: 10 },
       { wch: 15 },
-      { wch: 20 },
       { wch: 25 },
       { wch: 22 },
       { wch: 30 }
