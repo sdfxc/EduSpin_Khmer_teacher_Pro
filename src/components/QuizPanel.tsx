@@ -24,6 +24,25 @@ interface QuizPanelProps {
   isDarkMode?: boolean;
 }
 
+export const AVAILABLE_FONTS = [
+  { id: 'Battambang', name: 'បាត់ដំបង (Battambang)', cssValue: "'Battambang', 'Khmer OS Battambang', sans-serif" },
+  { id: 'Moul', name: 'អក្សរមូល (Moul)', cssValue: "'Moul', 'Khmer OS Muol Light', sans-serif" },
+  { id: 'Ang DaunTep', name: 'សន្លឹកសៀវភៅ (Ang DaunTep)', cssValue: "'Ang DaunTep', 'AngDaunTep', 'Khmer OS Ang DaunTep', sans-serif" },
+  { id: 'Content', name: 'មាតិកា (Content)', cssValue: "'Content', 'Khmer OS Content', sans-serif" },
+  { id: 'Kantumruy Pro', name: 'កន្ទុយរុយ (Kantumruy Pro)', cssValue: "'Kantumruy Pro', sans-serif" },
+  { id: 'Siemreap', name: 'សៀមរាប (Siemreap)', cssValue: "'Siemreap', sans-serif" },
+  { id: 'Hanuman', name: 'ហនុមាន (Hanuman)', cssValue: "'Hanuman', serif" },
+  { id: 'Nokora', name: 'នគរ (Nokora)', cssValue: "'Nokora', serif" },
+  { id: 'Odor Mean Chey', name: 'ឧត្តរមានជ័យ (Odor)', cssValue: "'Odor Mean Chey', sans-serif" },
+  { id: 'Preahvihear', name: 'ព្រះវិហារ (Preahvihear)', cssValue: "'Preahvihear', sans-serif" },
+  { id: 'Koulen', name: 'កូលែន (Koulen)', cssValue: "'Koulen', sans-serif" },
+  { id: 'Angkor', name: 'អង្គរ (Angkor)', cssValue: "'Angkor', display" },
+  { id: 'Bokor', name: 'បូកគោ (Bokor)', cssValue: "'Bokor', display" },
+  { id: 'Fasthand', name: 'ដៃរហ័ស (Fasthand)', cssValue: "'Fasthand', cursive" }
+];
+
+export const FONT_SIZES = [5, 6, 7, 8, 9, 10, 10.5, 11, 11.5, 12, 13, 14, 15, 16, 18, 20, 24];
+
 export default function QuizPanel({ 
   cards, 
   onCardClick, 
@@ -73,6 +92,16 @@ export default function QuizPanel({
 
   // Export & Print state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [headerFont, setHeaderFont] = useState('Moul');
+  const [bodyFont, setBodyFont] = useState('Battambang');
+  const [headerFontSize, setHeaderFontSize] = useState(11);
+  const [bodyFontSize, setBodyFontSize] = useState(10);
+  const [pageSize, setPageSize] = useState<string>('A4');
+  const [marginTop, setMarginTop] = useState<number>(2.0);
+  const [marginBottom, setMarginBottom] = useState<number>(2.0);
+  const [marginLeft, setMarginLeft] = useState<number>(2.5);
+  const [marginRight, setMarginRight] = useState<number>(2.5);
+  const [marginUnit, setMarginUnit] = useState<string>('cm');
   const [examCenter, setExamCenter] = useState('.....................................................');
   const [roomNumber, setRoomNumber] = useState('..................');
   const [subjectName, setSubjectName] = useState('');
@@ -131,9 +160,19 @@ export default function QuizPanel({
     window.print();
   };
 
-  const exportToWord = () => {
-    const questionCards = cards.filter(c => c.question) as (QuizCard & { question: Question })[];
-    
+  const getWordPageSize = (size: string) => {
+    switch (size) {
+      case 'A3': return 'size: 11.69in 16.54in;';
+      case 'B4': return 'size: 9.84in 13.90in;';
+      case 'B5': return 'size: 6.93in 9.84in;';
+      case 'Letter': return 'size: 8.50in 11.00in;';
+      case 'A4':
+      default:
+        return 'size: 8.27in 11.69in;';
+    }
+  };
+
+  const generateDocHtml = (selectedHeaderFontObj: any, selectedBodyFontObj: any, questionCards: any[]) => {
     let questionsHtml = '';
     questionCards.forEach((card, qIdx) => {
       let optionsHtml = '';
@@ -161,7 +200,7 @@ export default function QuizPanel({
       } else {
         optionsHtml = `
           <table class="options-table">
-            ${card.question.options.map((opt, oIdx) => `
+            ${card.question.options.map((opt: string, oIdx: number) => `
               <tr>
                 <td class="option-cell ${highlightKey && card.question.correctIndex === oIdx ? 'correct-highlight' : ''}" style="width: 100%;">
                   ${getOptionPrefix(oIdx)}. ${renderFormulaToHtml(opt)}
@@ -180,7 +219,7 @@ export default function QuizPanel({
       `;
     });
 
-    const docHtml = `
+    return `
     <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
     <head>
       <meta charset="utf-8">
@@ -195,11 +234,11 @@ export default function QuizPanel({
       </xml>
       <![endif]-->
       <style>
-        @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=${selectedHeaderFontObj.id.replace(/ /g, '+')}&family=${selectedBodyFontObj.id.replace(/ /g, '+')}&display=swap');
         
         @page Section1 {
-          size: 8.27in 11.69in; /* A4 size */
-          margin: 0.75in 0.75in 0.75in 0.75in;
+          ${getWordPageSize(pageSize)}
+          margin: ${marginTop}${marginUnit} ${marginRight}${marginUnit} ${marginBottom}${marginUnit} ${marginLeft}${marginUnit};
           mso-header-margin: 0.5in;
           mso-footer-margin: 0.5in;
           mso-footer: f1;
@@ -212,7 +251,7 @@ export default function QuizPanel({
           margin-bottom: .0001pt;
           mso-pagination: widow-orphan;
           font-size: 10.0pt;
-          font-family: 'Battambang', 'Khmer OS Battambang', sans-serif;
+          font-family: ${selectedBodyFontObj.cssValue};
           text-align: center;
           color: #4b5563;
         }
@@ -221,7 +260,7 @@ export default function QuizPanel({
         }
         
         body {
-          font-family: 'Battambang', 'Khmer OS Battambang', 'Arial', sans-serif;
+          font-family: ${selectedBodyFontObj.cssValue};
           line-height: 1.5;
           padding: 20px;
         }
@@ -231,6 +270,8 @@ export default function QuizPanel({
           margin-bottom: 5px;
         }
         .header-cell {
+          font-family: ${selectedHeaderFontObj.cssValue};
+          font-size: ${headerFontSize}pt;
           vertical-align: top;
           padding: 4px;
         }
@@ -241,9 +282,9 @@ export default function QuizPanel({
           font-weight: bold;
         }
         .school-title {
-          font-family: 'Khmer OS Muol Light', 'Battambang', sans-serif;
+          font-family: ${selectedHeaderFontObj.cssValue};
           font-weight: bold;
-          font-size: 11pt;
+          font-size: ${headerFontSize}pt;
           margin-top: 4px;
         }
         .divider {
@@ -255,10 +296,12 @@ export default function QuizPanel({
         .exam-title-container {
           text-align: center;
           margin-bottom: 20px;
+          font-family: ${selectedBodyFontObj.cssValue};
         }
         .exam-title {
+          font-family: ${selectedBodyFontObj.cssValue};
           font-weight: bold;
-          font-size: 13pt;
+          font-size: ${bodyFontSize + 2}pt;
           text-decoration: underline;
         }
         .question-block {
@@ -266,9 +309,10 @@ export default function QuizPanel({
           page-break-inside: avoid;
         }
         .question-text {
+          font-family: ${selectedBodyFontObj.cssValue};
           font-weight: bold;
           margin-bottom: 6px;
-          font-size: 10.5pt;
+          font-size: ${bodyFontSize}pt;
         }
         .options-table {
           width: 100%;
@@ -276,9 +320,10 @@ export default function QuizPanel({
           margin-left: 15px;
         }
         .option-cell {
+          font-family: ${selectedBodyFontObj.cssValue};
           padding: 3px;
           vertical-align: top;
-          font-size: 10pt;
+          font-size: ${Math.max(5, bodyFontSize - 0.5)}pt;
         }
         .correct-highlight {
           color: #059669;
@@ -356,6 +401,13 @@ export default function QuizPanel({
     </body>
     </html>
     `;
+  };
+
+  const exportToWord = () => {
+    const selectedHeaderFontObj = AVAILABLE_FONTS.find(f => f.id === headerFont) || AVAILABLE_FONTS[0];
+    const selectedBodyFontObj = AVAILABLE_FONTS.find(f => f.id === bodyFont) || AVAILABLE_FONTS[0];
+    const questionCards = cards.filter(c => c.question) as (QuizCard & { question: Question })[];
+    const docHtml = generateDocHtml(selectedHeaderFontObj, selectedBodyFontObj, questionCards);
 
     const blob = new Blob(['\ufeff' + docHtml], { type: 'application/msword;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -634,6 +686,19 @@ export default function QuizPanel({
       </div>
     );
   }
+
+  const selectedHeaderFontObj = AVAILABLE_FONTS.find(f => f.id === headerFont) || AVAILABLE_FONTS[0];
+  const selectedBodyFontObj = AVAILABLE_FONTS.find(f => f.id === bodyFont) || AVAILABLE_FONTS[0];
+
+  const headerInlineStyle = {
+    fontFamily: selectedHeaderFontObj.cssValue,
+    fontSize: `${headerFontSize}pt`
+  };
+
+  const bodyInlineStyle = {
+    fontFamily: selectedBodyFontObj.cssValue,
+    fontSize: `${bodyFontSize}pt`
+  };
 
   const totalCount = cards.length;
   const remainingCount = cards.filter(c => !c.isRevealed).length;
@@ -1467,6 +1532,176 @@ export default function QuizPanel({
                       </label>
                     </div>
                   </div>
+
+                  {/* Page Size & Margins Settings Card */}
+                  <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                    <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <Layers className="w-4 h-4 text-purple-500" />
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">ការរៀបចំទំព័រ និងគែមក្រដាស (Page & Margins)</span>
+                    </div>
+
+                    <div className="space-y-4 text-xs">
+                      {/* Paper Size selector */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="space-y-2">
+                          <label className="font-bold text-slate-700 dark:text-slate-300">ទំហំក្រដាស (Paper Size)៖</label>
+                          <select
+                            value={pageSize}
+                            onChange={(e) => setPageSize(e.target.value)}
+                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                          >
+                            <option value="A4" className="bg-white text-black dark:bg-slate-900 dark:text-white">A4 (ធម្មតា)</option>
+                            <option value="A3" className="bg-white text-black dark:bg-slate-900 dark:text-white">A3 (ធំ)</option>
+                            <option value="B4" className="bg-white text-black dark:bg-slate-900 dark:text-white">B4 (មធ្យមធំ)</option>
+                            <option value="B5" className="bg-white text-black dark:bg-slate-900 dark:text-white">B5 (តូចបង្គួរ)</option>
+                            <option value="Letter" className="bg-white text-black dark:bg-slate-900 dark:text-white">Letter (កាត់តម្រឹម)</option>
+                          </select>
+                        </div>
+
+                        {/* Margin Unit selector */}
+                        <div className="space-y-2">
+                          <label className="font-bold text-slate-700 dark:text-slate-300">ខ្នាតរង្វាស់ (Unit)៖</label>
+                          <select
+                            value={marginUnit}
+                            onChange={(e) => {
+                              const newUnit = e.target.value;
+                              setMarginUnit(newUnit);
+                              if (newUnit === 'in') {
+                                setMarginTop(0.75);
+                                setMarginBottom(0.75);
+                                setMarginLeft(1.0);
+                                setMarginRight(1.0);
+                              } else {
+                                setMarginTop(2.0);
+                                setMarginBottom(2.0);
+                                setMarginLeft(2.5);
+                                setMarginRight(2.5);
+                              }
+                            }}
+                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                          >
+                            <option value="cm" className="bg-white text-black dark:bg-slate-900 dark:text-white">សង់ទីម៉ែត្រ (cm)</option>
+                            <option value="in" className="bg-white text-black dark:bg-slate-900 dark:text-white">អ៊ីញ (inches)</option>
+                          </select>
+                        </div>
+                      </div>
+
+                      {/* Margins Inputs */}
+                      <div className="space-y-2">
+                        <span className="font-bold block text-slate-755 dark:text-slate-300">គម្លាតគែមក្រដាស (Margins)៖</span>
+                        <div className="grid grid-cols-4 gap-2">
+                          <div>
+                            <label className="block text-[10px] text-slate-550 text-center mb-1">ឆ្វេង (Left)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={marginLeft}
+                              onChange={(e) => setMarginLeft(parseFloat(e.target.value) || 0)}
+                              className="w-full text-center px-1 py-1 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-550 text-center mb-1">ស្ដាំ (Right)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={marginRight}
+                              onChange={(e) => setMarginRight(parseFloat(e.target.value) || 0)}
+                              className="w-full text-center px-1 py-1 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-550 text-center mb-1">លើ (Top)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={marginTop}
+                              onChange={(e) => setMarginTop(parseFloat(e.target.value) || 0)}
+                              className="w-full text-center px-1 py-1 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] text-slate-550 text-center mb-1">ក្រោម (Bottom)</label>
+                            <input
+                              type="number"
+                              step="0.1"
+                              min="0"
+                              value={marginBottom}
+                              onChange={(e) => setMarginBottom(parseFloat(e.target.value) || 0)}
+                              className="w-full text-center px-1 py-1 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                            />
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Font & Font Size Configurations */}
+                  <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
+                    <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
+                      <Sparkles className="w-4 h-4 text-indigo-500" />
+                      <span className="text-xs font-black text-slate-800 dark:text-slate-200 uppercase tracking-wider">កំណត់ពុម្ពអក្សរ និងទំហំ (Typography)</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-4 text-xs">
+                      {/* Header Font and Size */}
+                      <div className="space-y-2">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">ពុម្ពអក្សរក្បាលលើ (Header Font)៖</label>
+                        <select
+                          value={headerFont}
+                          onChange={(e) => setHeaderFont(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                        >
+                          {AVAILABLE_FONTS.map(f => (
+                            <option key={f.id} value={f.id} className="bg-white text-black dark:bg-slate-900 dark:text-white">{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">ទំហំក្បាលលើ (Header Size)៖</label>
+                        <select
+                          value={headerFontSize}
+                          onChange={(e) => setHeaderFontSize(Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                        >
+                          {FONT_SIZES.map(sz => (
+                            <option key={sz} value={sz} className="bg-white text-black dark:bg-slate-900 dark:text-white">{sz} pt</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Body Font and Size */}
+                      <div className="space-y-2 col-span-1">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">ពុម្ពអក្សរវិញ្ញាសា (Exam Body Font)៖</label>
+                        <select
+                          value={bodyFont}
+                          onChange={(e) => setBodyFont(e.target.value)}
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                        >
+                          {AVAILABLE_FONTS.map(f => (
+                            <option key={f.id} value={f.id} className="bg-white text-black dark:bg-slate-900 dark:text-white">{f.name}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      <div className="space-y-2 col-span-1">
+                        <label className="font-bold text-slate-700 dark:text-slate-300">ទំហំអក្សរវិញ្ញាសា (Body Size)៖</label>
+                        <select
+                          value={bodyFontSize}
+                          onChange={(e) => setBodyFontSize(Number(e.target.value))}
+                          className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                        >
+                          {FONT_SIZES.map(sz => (
+                            <option key={sz} value={sz} className="bg-white text-black dark:bg-slate-900 dark:text-white">{sz} pt</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  </div>
                 </div>
 
                 {/* Right page visual preview panel */}
@@ -1480,11 +1715,19 @@ export default function QuizPanel({
                   </div>
 
                   {/* Standard A4 Styled Document Mock Card */}
-                  <div className="bg-white text-black p-8 rounded-2xl border border-slate-200 shadow-lg min-h-[500px] overflow-y-auto max-h-[60vh] custom-scrollbar text-[11px] sm:text-[12px] leading-relaxed select-text font-serif">
+                  <div 
+                    style={{
+                      paddingTop: `${marginTop}${marginUnit}`,
+                      paddingBottom: `${marginBottom}${marginUnit}`,
+                      paddingLeft: `${marginLeft}${marginUnit}`,
+                      paddingRight: `${marginRight}${marginUnit}`,
+                    }}
+                    className="bg-white text-black rounded-2xl border border-slate-200 shadow-lg min-h-[500px] overflow-y-auto max-h-[60vh] custom-scrollbar text-[11px] sm:text-[12px] leading-relaxed select-text font-serif"
+                  >
                     {/* Live preview header columns identical to actual layout */}
                     <div className="grid grid-cols-12 gap-1 pb-4">
                       {/* Left Block */}
-                      <div className="col-span-4 flex flex-col gap-1.5 text-left font-black text-slate-950 font-sans leading-snug">
+                      <div className="col-span-4 flex flex-col gap-1.5 text-left font-black text-slate-950 font-sans leading-snug" style={headerInlineStyle}>
                         <div className="truncate">មណ្ឌលប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examCenter || '.....'}</span></div>
                         <div className="truncate">លេខបន្ទប់៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{roomNumber || '.....'}</span></div>
                         <div className="truncate">វិញ្ញាសា៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{subjectName || '.....'}</span></div>
@@ -1492,7 +1735,7 @@ export default function QuizPanel({
                       </div>
 
                       {/* Middle Logo block */}
-                      <div className="col-span-4 flex flex-col items-center justify-start text-center">
+                      <div className="col-span-4 flex flex-col items-center justify-start text-center" style={headerInlineStyle}>
                         <div className="w-12 h-12 mb-1 flex items-center justify-center">
                           {customLogo ? (
                             <img
@@ -1522,7 +1765,7 @@ export default function QuizPanel({
                       </div>
 
                       {/* Right Block */}
-                      <div className="col-span-4 flex items-start justify-between gap-1.5 text-left font-black text-slate-950 pl-2 leading-snug font-sans">
+                      <div className="col-span-4 flex items-start justify-between gap-1.5 text-left font-black text-slate-950 pl-2 leading-snug font-sans" style={headerInlineStyle}>
                         <div className="flex-1 flex flex-col gap-1.5 min-w-0 font-sans">
                           <div className="flex justify-between items-center w-full truncate">
                             <span>ប្រឡង៖ <span className="font-normal underline underline-offset-2 decoration-dotted">{examName}</span></span>
@@ -1543,7 +1786,7 @@ export default function QuizPanel({
                     <div className="border-b-4 border-double border-black my-2"></div>
 
                     {/* Visual Preview Header title */}
-                    <div className="text-center mb-4">
+                    <div className="text-center mb-4" style={bodyInlineStyle}>
                       <div className="font-black text-slate-900 uppercase tracking-wider text-[11px] sm:text-xs font-sans">
                         សន្លឹកកិច្ចការវិញ្ញាសា
                       </div>
@@ -1556,7 +1799,7 @@ export default function QuizPanel({
                     </div>
 
                     {/* Preview list of questions */}
-                    <div className="space-y-4 text-slate-900 mt-2 font-sans text-black">
+                    <div className="space-y-4 text-slate-900 mt-2 font-sans text-black" style={bodyInlineStyle}>
                       {cards.filter(c => c.question).map((card, qIdx) => (
                         <div key={card.id}>
                           <div className="font-bold text-slate-800 flex items-start gap-1">
@@ -1611,7 +1854,7 @@ export default function QuizPanel({
                   <span>សំណួរសរុប៖ {cards.filter(c => c.question).length} សំណួរ</span>
                 </span>
                 
-                <div className="flex items-center gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3">
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(false)}
@@ -1647,10 +1890,18 @@ export default function QuizPanel({
       </AnimatePresence>
 
       {/* Hidden layout rendered only at print-time */}
-      <div className="hidden print:block printable-sheet bg-white text-black p-8 font-sans w-full max-w-4xl mx-auto min-h-screen text-[12px] sm:text-[13px] leading-relaxed select-text">
+      <style>{`
+        @media print {
+          @page {
+            size: ${pageSize};
+            margin: ${marginTop}${marginUnit} ${marginRight}${marginUnit} ${marginBottom}${marginUnit} ${marginLeft}${marginUnit} !important;
+          }
+        }
+      `}</style>
+      <div className="hidden print:block printable-sheet bg-white text-black p-0 font-sans w-full max-w-4xl mx-auto min-h-screen text-[12px] sm:text-[13px] leading-relaxed select-text">
         <div className="grid grid-cols-12 gap-2 w-full text-black">
           {/* Left Column */}
-          <div className="col-span-4 flex flex-col justify-start text-left font-black gap-2 mt-2">
+          <div className="col-span-4 flex flex-col justify-start text-left font-black gap-2 mt-2" style={headerInlineStyle}>
             <div>មណ្ឌលប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examCenter}</span></div>
             <div>លេខបន្ទប់៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{roomNumber}</span></div>
             <div>វិញ្ញាសា៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{subjectName}</span></div>
@@ -1658,7 +1909,7 @@ export default function QuizPanel({
           </div>
           
           {/* Middle Column (Logo and school titles) */}
-          <div className="col-span-4 flex flex-col items-center text-center justify-start">
+          <div className="col-span-4 flex flex-col items-center text-center justify-start" style={headerInlineStyle}>
             <div className="mb-2">
               {customLogo ? (
                 <img 
@@ -1688,7 +1939,7 @@ export default function QuizPanel({
           </div>
           
           {/* Right Column */}
-          <div className="col-span-4 flex items-start justify-between gap-1.5 mt-[6px] pl-4">
+          <div className="col-span-4 flex items-start justify-between gap-1.5 mt-[6px] pl-4" style={headerInlineStyle}>
             <div className="flex-1 flex flex-col justify-start text-left font-black gap-2 min-w-0">
               <div className="flex justify-between items-center w-full">
                 <span>ប្រឡង៖ <span className="font-bold underline underline-offset-4 decoration-dotted">{examName}</span></span>
@@ -1709,7 +1960,7 @@ export default function QuizPanel({
         <div className="border-b-4 border-double border-black my-4 w-full"></div>
         
         {/* Document Body */}
-        <div className="text-center mb-6">
+        <div className="text-center mb-6" style={bodyInlineStyle}>
           <div className="font-black text-[13px] tracking-wider uppercase text-slate-900">
             សន្លឹកកិច្ចការវិញ្ញាសា
           </div>
@@ -1721,7 +1972,7 @@ export default function QuizPanel({
           </div>
         </div>
         
-        <div className="space-y-6 text-black mt-4">
+        <div className="space-y-6 text-black mt-4" style={bodyInlineStyle}>
           {cards.filter(c => c.question).map((card, qIdx) => (
             <div key={card.id} className="break-inside-avoid">
               <div className="font-black text-slate-950 flex items-start gap-1">
