@@ -710,7 +710,7 @@ export default function QuizPanel({
             runs.push(...numRuns);
 
             runs.push(new TextRun({
-              text: " ÷ ",
+              text: " / ",
               font: fontName,
               size: fontSizePt * 2,
               bold: true,

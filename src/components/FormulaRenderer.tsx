@@ -4,7 +4,7 @@ import React from "react";
 const SYMBOL_MAP: Record<string, string> = {
   "\\\\pm": "±",
   "\\\\times": "×",
-  "\\\\div": "÷",
+  "\\\\div": " / ",
   "\\\\rightarrow": "→",
   "\\\\Delta": "Δ",
   "\\\\delta": "δ",
@@ -76,9 +76,9 @@ export function preprocessText(text: string): string {
   processed = processed.replace(/(\d+)\s*[xX]\s*(10\^|10\{|10\b)/g, "$1 × $2");
   processed = processed.replace(/(\d+)\s*[xX]\s*(\d+)/g, "$1 × $2");
 
-  // 5. Handle division slash (/) -> convert to " ÷ "
+  // 5. Handle division slash (/) -> clean it up as " / "
   // Avoid replacing html tag closing slashes, URLs, or dates (thanks to shielding)
-  processed = processed.replace(/\s*(?<!<)\/(?![a-zA-Z0-9]*>)\s*/g, " ÷ ");
+  processed = processed.replace(/\s*(?<!<)\/(?![a-zA-Z0-9]*>)\s*/g, " / ");
 
   // 6. Support standard and LaTeX subscripts & superscripts
   // Convert ^{...} -> <sup>...</sup>
