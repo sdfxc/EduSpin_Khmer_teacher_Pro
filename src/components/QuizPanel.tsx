@@ -36,6 +36,7 @@ interface QuizPanelProps {
   onRenameChapter: (chapterId: string, newName: string) => void;
   onDeleteChapter: (chapterId: string) => void;
   isDarkMode?: boolean;
+  onUpdateCards?: (updatedCards: QuizCard[]) => void;
 }
 
 export const AVAILABLE_FONTS = [
@@ -79,7 +80,8 @@ export default function QuizPanel({
   onCreateChapter,
   onRenameChapter,
   onDeleteChapter,
-  isDarkMode = false
+  isDarkMode = false,
+  onUpdateCards
 }: QuizPanelProps) {
   const activeRoom = chapters.reduce<QuizRoom | null>((found, ch) => {
     if (found) return found;
@@ -93,7 +95,98 @@ export default function QuizPanel({
   const [correctIndex, setCorrectIndex] = useState<number>(0);
   const [showResult, setShowResult] = useState<'correct' | 'wrong' | null>(null);
   
+  // Teacher QA editing states
+  const [isEditQuestionsModalOpen, setIsEditQuestionsModalOpen] = useState(false);
+  const [localEditCards, setLocalEditCards] = useState<QuizCard[]>([]);
+  const [selectedEditIndex, setSelectedEditIndex] = useState<number>(0);
+
+  // Sync copy of cards when edit modal is opened
+  useEffect(() => {
+    if (isEditQuestionsModalOpen) {
+      setLocalEditCards(JSON.parse(JSON.stringify(cards)));
+      setSelectedEditIndex(0);
+    }
+  }, [isEditQuestionsModalOpen, cards]);
+
   const [viewMode, setViewMode] = useState<'quiz' | 'manage'>('quiz');
+  
+  const handleDeleteLocalQuestion = (index: number) => {
+    const updated = localEditCards.filter((_, idx) => idx !== index);
+    const reindexed = updated.map((card, i) => ({
+      ...card,
+      number: i + 1
+    }));
+    setLocalEditCards(reindexed);
+    if (selectedEditIndex >= reindexed.length) {
+      setSelectedEditIndex(Math.max(0, reindexed.length - 1));
+    }
+  };
+
+  const handleAddLocalQuestion = () => {
+    const newQuestionCard: QuizCard = {
+      id: `c-added-${Date.now()}-${Math.random()}`,
+      number: localEditCards.length + 1,
+      question: {
+        id: `q-added-${Date.now()}-${Math.random()}`,
+        text: 'សំណួរថ្មី...',
+        options: ['ចម្លើយទី ១', 'ចម្លើយទី ២', 'ចម្លើយទី ៣', 'ចម្លើយទី ៤'],
+        correctIndex: 0
+      },
+      isRevealed: false,
+      status: 'idle'
+    };
+    const updated = [...localEditCards, newQuestionCard];
+    setLocalEditCards(updated);
+    setSelectedEditIndex(updated.length - 1);
+  };
+
+  const handleUpdateLocalQuestionText = (text: string) => {
+    setLocalEditCards(prev => prev.map((card, idx) => {
+      if (idx === selectedEditIndex) {
+        return {
+          ...card,
+          question: {
+            ...card.question,
+            text
+          }
+        };
+      }
+      return card;
+    }));
+  };
+
+  const handleUpdateLocalOption = (optIndex: number, value: string) => {
+    setLocalEditCards(prev => prev.map((card, idx) => {
+      if (idx === selectedEditIndex) {
+        const newOptions = [...card.question.options];
+        newOptions[optIndex] = value;
+        return {
+          ...card,
+          question: {
+            ...card.question,
+            options: newOptions
+          }
+        };
+      }
+      return card;
+    }));
+  };
+
+  const handleUpdateLocalCorrectIndex = (correctIndex: number) => {
+    setLocalEditCards(prev => prev.map((card, idx) => {
+      if (idx === selectedEditIndex) {
+        return {
+          ...card,
+          question: {
+            ...card.question,
+            correctIndex
+          }
+        };
+      }
+      return card;
+    }));
+  };
+
   const [savedScrollTop, setSavedScrollTop] = useState(0);
   const containerRef = useRef<HTMLDivElement>(null);
   
@@ -1590,14 +1683,24 @@ export default function QuizPanel({
 
             <div className="flex items-center gap-2 shrink-0">
               {cards.filter(c => c.question).length > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setIsExportModalOpen(true)}
-                  className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-755 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95 transition-all"
-                >
-                  <Printer className="w-3.5 h-3.5" />
-                  <span>នាំចេញវិញ្ញាសា (PDF/Word)</span>
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() => setIsEditQuestionsModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>កែសម្រួលសំណួរ & ចម្លើយ</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsExportModalOpen(true)}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>នាំចេញវិញ្ញាសា (PDF/Word)</span>
+                  </button>
+                </>
               )}
               <button
                 type="button"
@@ -2092,6 +2195,218 @@ export default function QuizPanel({
           </div>
         </div>
       )}
+
+      {/* Edit Questions & Answers Modal */}
+      <AnimatePresence>
+        {isEditQuestionsModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-[2px] overflow-y-auto no-print">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className="bg-white dark:bg-slate-900 rounded-[2rem] border border-slate-200 dark:border-slate-800 shadow-2xl w-full max-w-5xl overflow-hidden flex flex-col max-h-[90vh]"
+            >
+              {/* Modal Header */}
+              <div className="flex items-center justify-between px-6 py-4 bg-slate-50 dark:bg-slate-950 border-b border-slate-200 dark:border-slate-800 shrink-0">
+                <div className="flex items-center gap-2">
+                  <div className="w-10 h-10 bg-amber-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-amber-500/25">
+                    <Edit3 className="w-5 h-5" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm sm:text-base font-black text-slate-800 dark:text-white">កែសម្រួលសំណួរ & ចម្លើយមេរៀន</h3>
+                    <p className="text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500">លោកគ្រូ អ្នកគ្រូអាចកែប្រែសំណួរ ជម្រើសចម្លើយ និងជ្រើសរើសចម្លើយត្រឹមត្រូវមុនពេលនាំចេញ ឬសិស្សឆ្លើយ</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsEditQuestionsModalOpen(false)}
+                  className="p-1 px-2.5 text-slate-400 hover:text-slate-600 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-all cursor-pointer font-bold text-xs flex items-center gap-1 border border-transparent hover:border-slate-200 shrink-0"
+                >
+                  <X className="w-4 h-4" />
+                  <span>បិទ</span>
+                </button>
+              </div>
+
+              {/* Modal Content - Split layout */}
+              <div className="flex-1 overflow-hidden grid grid-cols-1 md:grid-cols-12 min-h-0">
+                {/* Left side list of questions */}
+                <div className="md:col-span-4 border-r border-slate-100 dark:border-slate-800/80 bg-slate-50/50 dark:bg-slate-950/20 flex flex-col h-full min-h-0">
+                  <div className="p-3 bg-white dark:bg-slate-900 border-b border-slate-100 dark:border-slate-800 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleAddLocalQuestion}
+                      className="w-full flex items-center justify-center gap-2 py-2 px-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs transition-all cursor-pointer active:scale-95 border-none"
+                    >
+                      <Plus className="w-4 h-4" />
+                      <span>បន្ថែមសំណួរថ្មី</span>
+                    </button>
+                  </div>
+
+                  <div className="flex-1 overflow-y-auto p-3 space-y-2 custom-scrollbar">
+                    {localEditCards.map((card, idx) => (
+                      <div
+                        key={card.id || idx}
+                        onClick={() => setSelectedEditIndex(idx)}
+                        className={`group p-3 rounded-xl border transition-all cursor-pointer flex items-center justify-between gap-3 text-left ${
+                          idx === selectedEditIndex
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-200 shadow-sm font-bold'
+                            : 'bg-white dark:bg-slate-800/40 border-slate-200 dark:border-slate-800/60 hover:border-slate-300 dark:hover:border-slate-700 text-slate-700 dark:text-slate-300 font-semibold'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 min-w-0 flex-1">
+                          <span className={`w-6 h-6 rounded-lg flex items-center justify-center font-black text-xs shrink-0 select-none ${
+                            idx === selectedEditIndex
+                              ? 'bg-amber-500 text-white'
+                              : 'bg-slate-100 dark:bg-slate-805 bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400'
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <span className="text-xs font-bold truncate pr-1">
+                            {card.question?.text || '(គ្មានសំណួរ)'}
+                          </span>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteLocalQuestion(idx);
+                          }}
+                          className="opacity-0 group-hover:opacity-100 p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-lg transition-all shrink-0 cursor-pointer border-none"
+                          title="លុបសំណួរ"
+                        >
+                          <Trash2 className="w-3.5 h-3.5" />
+                        </button>
+                      </div>
+                    ))}
+
+                    {localEditCards.length === 0 && (
+                      <div className="text-center py-12 text-xs italic text-slate-400 dark:text-slate-500">
+                        មិនទាន់មានសំណួរនៅឡើយទេ
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Right side editing form workspace */}
+                <div className="md:col-span-8 flex flex-col h-full overflow-y-auto p-6 bg-white dark:bg-slate-900 custom-scrollbar min-h-0">
+                  {localEditCards[selectedEditIndex] ? (
+                    <div className="space-y-6">
+                      {/* Form Header */}
+                      <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 shrink-0">
+                        <span className="text-xs font-black uppercase tracking-widest text-amber-655 text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-400 px-3 py-1.5 rounded-xl border border-amber-100 dark:border-amber-900/30">
+                          កែសម្រួលសំណួរទី {selectedEditIndex + 1}
+                        </span>
+                      </div>
+
+                      {/* Question text */}
+                      <div className="space-y-2">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                          ខ្លឹមសារសំណួរ៖
+                        </label>
+                        <textarea
+                          rows={3}
+                          value={localEditCards[selectedEditIndex].question?.text || ''}
+                          onChange={(e) => handleUpdateLocalQuestionText(e.target.value)}
+                          placeholder="បញ្ចូលខ្លឹមសារសំណួរ..."
+                          className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-850 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 shadow-sm"
+                        />
+                      </div>
+
+                      {/* Option Inputs */}
+                      <div className="space-y-3">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block mb-1">
+                          ជម្រើសចម្លើយ និងជម្រើសចម្លើយត្រឹមត្រូវ៖
+                        </label>
+                        {Array.from({ length: 4 }).map((_, oIdx) => {
+                          const prefix = getOptionPrefix(oIdx);
+                          const isCorrect = localEditCards[selectedEditIndex].question?.correctIndex === oIdx;
+                          return (
+                            <div
+                              key={oIdx}
+                              className={`flex items-center gap-3 p-2 rounded-2xl border transition-all ${
+                                isCorrect
+                                  ? 'bg-emerald-500/10 border-emerald-500 dark:border-emerald-600'
+                                  : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700/80 hover:border-slate-300 dark:hover:border-slate-600'
+                              }`}
+                            >
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateLocalCorrectIndex(oIdx)}
+                                className={`w-8 h-8 rounded-xl font-bold text-xs flex items-center justify-center shrink-0 transition-all select-none cursor-pointer border-none ${
+                                  isCorrect
+                                    ? 'bg-emerald-500 text-white shadow-md shadow-emerald-500/20'
+                                    : 'bg-white dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 hover:bg-slate-50'
+                                }`}
+                                title="កំណត់ជាចម្លើយត្រឹមត្រូវ"
+                              >
+                                {prefix}
+                              </button>
+
+                              <input
+                                type="text"
+                                value={localEditCards[selectedEditIndex].question?.options[oIdx] || ''}
+                                onChange={(e) => handleUpdateLocalOption(oIdx, e.target.value)}
+                                placeholder={`បញ្ចូលជម្រើសចម្លើយ (${prefix})...`}
+                                className="flex-1 bg-transparent border-none text-slate-805 text-slate-800 dark:text-slate-200 focus:outline-none text-sm font-semibold select-all"
+                              />
+
+                              <button
+                                type="button"
+                                onClick={() => handleUpdateLocalCorrectIndex(oIdx)}
+                                className={`px-2.5 py-1.5 rounded-lg text-[10px] font-black tracking-wider transition-all cursor-pointer border-none ${
+                                  isCorrect
+                                    ? 'bg-emerald-500 text-white'
+                                    : 'bg-slate-200/50 dark:bg-slate-800 hover:bg-emerald-500/10 hover:text-emerald-600 dark:hover:text-emerald-400 text-slate-500 dark:text-slate-400'
+                                }`}
+                              >
+                                {isCorrect ? '✅ ត្រឹមត្រូវ' : 'កំណត់ត្រូវ'}
+                              </button>
+                            </div>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex-grow flex flex-col items-center justify-center text-center p-12">
+                      <HelpCircle className="w-16 h-16 text-slate-300 dark:text-slate-600 mb-4 animate-bounce" />
+                      <h3 className="text-sm font-bold text-slate-600 dark:text-slate-400 mb-1">មិនទាន់មានសំណួរជ្រើសរើសទេ</h3>
+                      <p className="text-xs text-slate-400 dark:text-slate-500">សូមចុច "+ បន្ថែមសំណួរថ្មី" នៅផ្នែកខាងឆ្វេងដើម្បីបង្កើតសំណួរថ្មី។</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Modal footer */}
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex items-center justify-between gap-4 shrink-0">
+                <p className="text-[11px] text-slate-400 dark:text-slate-500 font-semibold italic">
+                  * ការកែប្រែនឹងត្រូវរក្សាទុកទៅក្នុងប្រព័ន្ធផ្ទុកទិន្នន័យ (Cloud/Local Cache) ស្វ័យប្រវត្តិ។
+                </p>
+                <div className="flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditQuestionsModalOpen(false)}
+                    className="px-4 py-2 bg-white hover:bg-slate-100 dark:bg-slate-900 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs border border-slate-200 dark:border-slate-700 transition-all cursor-pointer active:scale-95"
+                  >
+                    បោះបង់
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      onUpdateCards?.(localEditCards);
+                      setIsEditQuestionsModalOpen(false);
+                    }}
+                    className="flex items-center gap-1.5 px-5 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 transition-all border-none"
+                  >
+                    <Check className="w-4 h-4" />
+                    <span>រក្សាទុកទាំងអស់</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* Export & Print Preview Modal */}
       <AnimatePresence>

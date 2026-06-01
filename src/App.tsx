@@ -835,6 +835,11 @@ export default function App() {
     saveClassMetadata(newCards, pickedIds);
   }, [pickedIds, saveClassMetadata]);
 
+  const handleUpdateCards = useCallback((updatedCards: QuizCard[]) => {
+    setCards(updatedCards);
+    saveClassMetadata(updatedCards, pickedIds);
+  }, [pickedIds, saveClassMetadata]);
+
   const handleAnswer = useCallback((correct: boolean) => {
     if (!activeCardId || !selectedStudentId) return;
 
@@ -1219,6 +1224,7 @@ export default function App() {
                 onRenameChapter={handleRenameChapter}
                 onDeleteChapter={handleDeleteChapter}
                 isDarkMode={isDarkMode}
+                onUpdateCards={handleUpdateCards}
               />
             </section>
           </>
