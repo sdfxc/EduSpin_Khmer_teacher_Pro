@@ -365,11 +365,14 @@ export default function App() {
     const syncClassInfo = async () => {
       try {
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+        const currentActiveCard = cards.find(c => c.id === activeCardId) || null;
+        
         await setDoc(classDocRef, {
           activeCardId: activeCardId,
           activeRoomId: activeRoomId,
           activeTab: activeTab,
-          activeCardState: activeCardState
+          activeCardState: activeCardState,
+          activeCard: currentActiveCard
         }, { merge: true });
       } catch (err) {
         console.error("Failed to sync active state to Firestore:", err);
@@ -377,7 +380,7 @@ export default function App() {
     };
 
     syncClassInfo();
-  }, [activeClassId, activeCardId, activeRoomId, activeTab, activeCardState, teacher]);
+  }, [activeClassId, activeCardId, activeRoomId, activeTab, activeCardState, teacher, cards]);
 
   // Save changes to localStorage on states update as fallback for offline use
   useEffect(() => {

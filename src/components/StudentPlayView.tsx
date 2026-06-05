@@ -31,6 +31,7 @@ export default function StudentPlayView() {
   const [chapters, setChapters] = useState<any[]>([]);
   const [classCards, setClassCards] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
+  const [directActiveCard, setDirectActiveCard] = useState<QuizCard | null>(null);
 
   // Local play state
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -40,7 +41,7 @@ export default function StudentPlayView() {
   const [pointsEarned, setPointsEarned] = useState<number>(0);
   const [localTimeLeft, setLocalTimeLeft] = useState(25);
 
-  const emojisList = ["🧑‍🎓", "🦊", "🦁", "🐼", "🐨", "🦄", "👑", "🚀", "⚡", "🔥", "⚽", "⭐", "🎉", "👾", "🦊", "🐻", "🐝", "🐙", "💎", "🎯"];
+  const emojisList = ["🧑‍🎓", "🦊", "🦁", "🐼", "🐨", "🦄", "👑", "🚀", "⚡", "🔥", "⚽", "⭐", "🎉", "👾", "🤖", "🐻", "🐝", "🐙", "💎", "🎯"];
 
   // Chime Sound synthesizers
   const playChime = (correct: boolean) => {
@@ -122,6 +123,7 @@ export default function StudentPlayView() {
         setActiveRoomId(data.activeRoomId || null);
         setActiveCardId(data.activeCardId || null);
         setActiveCardState(data.activeCardState || 'answering');
+        setDirectActiveCard(data.activeCard || null);
       }
     }, (err) => {
       console.error("Live Class snapshot failed:", err);
@@ -168,6 +170,11 @@ export default function StudentPlayView() {
 
     // Locate card with multi-tier lookup strategies
     let targetCard: QuizCard | null = null;
+
+    // Strategy 0: Direct activeCard matching from class doc sync
+    if (directActiveCard && directActiveCard.id === activeCardId) {
+      targetCard = directActiveCard;
+    }
 
     // Strategy A: Match activeRoomId inside chapters
     if (activeRoomId && chapters.length > 0) {
@@ -228,7 +235,7 @@ export default function StudentPlayView() {
       setCurrentQuestion(null);
       setCurrentCard(null);
     }
-  }, [activeCardId, chapters, activeRoomId, classId, classCards]);
+  }, [activeCardId, chapters, activeRoomId, classId, classCards, directActiveCard]);
 
   // 4. Timer Countdown effect
   useEffect(() => {

@@ -234,7 +234,8 @@ export default function StudentLobby({
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         await setDoc(classDocRef, {
           activeCardId: nextCard.id,
-          activeCardState: 'answering'
+          activeCardState: 'answering',
+          activeCard: nextCard
         }, { merge: true });
       } catch (err) {
         console.error("Next question sync failed:", err);
@@ -246,7 +247,8 @@ export default function StudentLobby({
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         await setDoc(classDocRef, {
           activeCardId: null,
-          activeCardState: 'answering'
+          activeCardState: 'answering',
+          activeCard: null
         }, { merge: true });
       } catch (err) {
         console.error("Reset active game state failed:", err);
@@ -263,7 +265,8 @@ export default function StudentLobby({
       const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
       await setDoc(classDocRef, {
         activeCardId: null,
-        activeCardState: 'answering'
+        activeCardState: 'answering',
+        activeCard: null
       }, { merge: true });
     } catch (err) {
       console.error("Exit active game failed:", err);
@@ -281,7 +284,8 @@ export default function StudentLobby({
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         await setDoc(classDocRef, {
           activeCardId: firstQ.id,
-          activeCardState: 'answering'
+          activeCardState: 'answering',
+          activeCard: firstQ
         }, { merge: true });
       } catch (err) {
         console.error("First question sync failed:", err);
