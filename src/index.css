@@ -54,8 +54,12 @@
 
 /* Math and Chemistry Formula Typography Helpers */
 .inline-math-container {
-  display: inline-block;
-  white-space: nowrap;
+  display: inline;
+  max-width: 100%;
+  white-space: pre-wrap;
+  word-wrap: break-word;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 
 .math-fraction {

@@ -6,6 +6,10 @@ export interface Student {
   gender?: 'ប្រុស' | 'ស្រី';
   status?: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ';
   classId?: string; // To keep track if queried overall
+  currentAnswerCardId?: string;
+  currentAnswerIndex?: number;
+  currentAnswerIsCorrect?: boolean;
+  isApproved?: boolean;
 }
 
 export interface Question {

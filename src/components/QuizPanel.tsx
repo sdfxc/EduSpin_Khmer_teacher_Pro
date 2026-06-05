@@ -90,7 +90,7 @@ export default function QuizPanel({
 
   const activeChapter = chapters.find(ch => ch.rooms?.some(r => r.id === activeRoomId));
 
-  const [timeLeft, setTimeLeft] = useState(20);
+  const [timeLeft, setTimeLeft] = useState(25);
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [correctIndex, setCorrectIndex] = useState<number>(0);
   const [showResult, setShowResult] = useState<'correct' | 'wrong' | null>(null);
@@ -1388,7 +1388,7 @@ export default function QuizPanel({
       const newCorrectIdx = items.findIndex(item => item.isCorrect);
       setCorrectIndex(newCorrectIdx >= 0 ? newCorrectIdx : 0);
       
-      setTimeLeft(20);
+      setTimeLeft(25);
       setShowResult(null);
     }
   }, [activeCard]);
@@ -1439,7 +1439,7 @@ export default function QuizPanel({
               <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
                 <motion.div 
                   initial={{ width: '100%' }}
-                  animate={{ width: `${(timeLeft / 20) * 100}%` }}
+                  animate={{ width: `${(timeLeft / 25) * 100}%` }}
                   className={`h-full ${timeLeft <= 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
                 />
               </div>
@@ -1455,7 +1455,7 @@ export default function QuizPanel({
             <div className="bg-white dark:bg-white border-2 border-slate-200 shadow-md rounded-[2rem] p-10 mb-8 flex-1 flex flex-col items-center justify-center relative overflow-hidden">
               <HelpCircle className="absolute -top-12 -right-12 w-48 h-48 text-indigo-500/5 rotate-12" />
               <span className="text-xs uppercase font-black tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">សំណួរលេខ {activeCard.number}</span>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-950 text-center leading-relaxed relative z-10 max-w-2xl">
+              <h2 className="text-3xl sm:text-4xl font-black text-slate-950 text-center leading-relaxed relative z-10 max-w-2xl break-words whitespace-normal word-break-break-word">
                 <FormulaRenderer text={activeCard.question?.text || ''} />
               </h2>
             </div>
@@ -1476,8 +1476,8 @@ export default function QuizPanel({
                           : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-65 text-slate-400 dark:text-slate-500'
                   }`}
                 >
-                  <div className="flex items-center gap-5 relative z-10">
-                    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-md transition-all ${
+                  <div className="flex items-center gap-5 relative z-10 w-full">
+                    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-md transition-all shrink-0 ${
                       idx === correctIndex && showResult !== null
                         ? 'bg-green-600 text-white'
                         : showResult !== null
@@ -1486,7 +1486,7 @@ export default function QuizPanel({
                     }`}>
                       {String.fromCharCode(65 + idx)}
                     </span>
-                    <span className={`text-lg sm:text-xl font-bold tracking-tight leading-snug ${
+                    <span className={`text-lg sm:text-xl font-bold tracking-tight leading-snug break-words whitespace-normal flex-1 ${
                       idx === correctIndex && showResult !== null
                         ? 'text-green-600 dark:text-green-400'
                         : 'text-slate-800 dark:text-slate-200'
