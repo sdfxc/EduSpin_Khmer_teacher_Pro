@@ -29,6 +29,7 @@ export default function StudentPlayView() {
   const [activeCardState, setActiveCardState] = useState<'answering' | 'revealed'>('answering');
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
   const [chapters, setChapters] = useState<any[]>([]);
+  const [classCards, setClassCards] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
 
   // Local play state
@@ -87,7 +88,37 @@ export default function StudentPlayView() {
     const unsubscribe = onSnapshot(classDocRef, (snapshot) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
-        setChapters(data.chapters || []);
+        console.log("Student play view class doc update:", data);
+
+        let loadedChapters = data.chapters || [];
+        
+        // Build fallback chapter structure if data has legacy rooms or legacy cards directly
+        if (loadedChapters.length === 0) {
+          if (data.rooms && data.rooms.length > 0) {
+            loadedChapters = [{
+              id: 'chapter-default-legacy',
+              name: 'ជំពូកទី១',
+              rooms: data.rooms,
+              createdAt: Date.now()
+            }];
+          } else if (data.cards && data.cards.length > 0) {
+            loadedChapters = [{
+              id: 'chapter-default-legacy',
+              name: 'ជំពូកទី១',
+              rooms: [{
+                id: data.activeRoomId || 'room-default-legacy',
+                name: 'មេរៀនទី១',
+                cards: data.cards,
+                pickedIds: data.pickedIds || [],
+                createdAt: Date.now()
+              }],
+              createdAt: Date.now()
+            }];
+          }
+        }
+
+        setChapters(loadedChapters);
+        setClassCards(data.cards || []);
         setActiveRoomId(data.activeRoomId || null);
         setActiveCardId(data.activeCardId || null);
         setActiveCardState(data.activeCardState || 'answering');
@@ -125,7 +156,7 @@ export default function StudentPlayView() {
 
   // 3. Sync Active Question and Options
   useEffect(() => {
-    if (!activeCardId || chapters.length === 0) {
+    if (!activeCardId) {
       setCurrentQuestion(null);
       setCurrentCard(null);
       setAnsweredState(null);
@@ -135,16 +166,44 @@ export default function StudentPlayView() {
       return;
     }
 
-    // Locate card from active room inside chapters
+    // Locate card with multi-tier lookup strategies
     let targetCard: QuizCard | null = null;
-    for (const ch of chapters) {
-      const room = ch.rooms?.find((r: any) => r.id === activeRoomId);
-      if (room) {
-        const card = room.cards?.find((c: any) => c.id === activeCardId);
-        if (card) {
-          targetCard = card;
-          break;
+
+    // Strategy A: Match activeRoomId inside chapters
+    if (activeRoomId && chapters.length > 0) {
+      for (const ch of chapters) {
+        const room = ch.rooms?.find((r: any) => r.id === activeRoomId);
+        if (room) {
+          const card = room.cards?.find((c: any) => c.id === activeCardId);
+          if (card) {
+            targetCard = card;
+            break;
+          }
         }
+      }
+    }
+
+    // Strategy B: Mismatched or non-existing activeRoomId - search through ANY room/chapter
+    if (!targetCard && chapters.length > 0) {
+      for (const ch of chapters) {
+        if (ch.rooms) {
+          for (const room of ch.rooms) {
+            const card = room.cards?.find((c: any) => c.id === activeCardId);
+            if (card) {
+              targetCard = card;
+              break;
+            }
+          }
+        }
+        if (targetCard) break;
+      }
+    }
+
+    // Strategy C: Search top-level unstructured/class-level cards
+    if (!targetCard && classCards && classCards.length > 0) {
+      const card = classCards.find((c: any) => c.id === activeCardId);
+      if (card) {
+        targetCard = card;
       }
     }
 
@@ -165,8 +224,11 @@ export default function StudentPlayView() {
         setPointsEarned(0);
         setLocalTimeLeft(25);
       }
+    } else {
+      setCurrentQuestion(null);
+      setCurrentCard(null);
     }
-  }, [activeCardId, chapters, activeRoomId, classId]);
+  }, [activeCardId, chapters, activeRoomId, classId, classCards]);
 
   // 4. Timer Countdown effect
   useEffect(() => {
