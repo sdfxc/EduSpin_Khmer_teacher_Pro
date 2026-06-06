@@ -41,6 +41,19 @@ export default function StudentPlayView() {
   const [pointsEarned, setPointsEarned] = useState<number>(0);
   const [localTimeLeft, setLocalTimeLeft] = useState(25);
 
+  const activeRoomCards = (() => {
+    if (activeRoomId && chapters.length > 0) {
+      for (const ch of chapters) {
+        const room = ch.rooms?.find((r: any) => r.id === activeRoomId);
+        if (room) return room.cards || [];
+      }
+    }
+    return classCards || [];
+  })();
+
+  const currentCardIndex = activeRoomCards.findIndex((c: any) => c.id === activeCardId);
+  const totalCardsCount = activeRoomCards.length;
+
   const emojisList = ["🧑‍🎓", "🦊", "🦁", "🐼", "🐨", "🦄", "👑", "🚀", "⚡", "🔥", "⚽", "⭐", "🎉", "👾", "🤖", "🐻", "🐝", "🐙", "💎", "🎯"];
 
   // Chime Sound synthesizers
@@ -396,6 +409,13 @@ export default function StudentPlayView() {
     .sort((a,b) => b.score - a.score)
     .findIndex(s => s.id === studentId) + 1;
 
+  // Find classmates' response results for active card
+  const approvedStudents = allStudents.filter(s => s.isApproved !== false);
+  const answeredStudents = approvedStudents.filter(s => s.currentAnswerCardId === activeCardId);
+  const correctStudents = answeredStudents.filter(s => s.currentAnswerIsCorrect === true);
+  const wrongStudents = answeredStudents.filter(s => s.currentAnswerIsCorrect === false || s.currentAnswerIndex === -1);
+  const pendingStudents = approvedStudents.filter(s => s.currentAnswerCardId !== activeCardId);
+
   if (!classId || !teacherId) {
     return (
       <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col items-center justify-center p-6 text-center select-none">
@@ -627,6 +647,55 @@ export default function StudentPlayView() {
               </p>
             </div>
 
+            {/* Show other students' results on mobile too! */}
+            <div className="text-left space-y-3 p-4 bg-slate-950/40 rounded-2xl border border-slate-900 text-xs">
+              <div>
+                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                  សិស្សឆ្លើយត្រូវ ({correctStudents.length} នាក់)
+                </p>
+                {correctStudents.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                    {correctStudents.map(s => (
+                      <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded-full text-[10px] font-bold border border-emerald-500/15">
+                        <span>{s.emoji || "🧑‍🎓"}</span>
+                        <span className="truncate max-w-[70px]">{s.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-500 italic">គ្មានសិស្សឆ្លើយត្រូវទេ 😔</p>
+                )}
+              </div>
+
+              <div className="border-t border-slate-900/80 my-2" />
+
+              <div>
+                <p className="text-[10px] font-black text-red-400 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                  សិស្សឆ្លើយខុស / មិនឆ្លើយ ({wrongStudents.length + pendingStudents.length} នាក់)
+                </p>
+                {wrongStudents.length > 0 || pendingStudents.length > 0 ? (
+                  <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                    {wrongStudents.map(s => (
+                      <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-500/10 text-red-305 text-red-300 rounded-full text-[10px] font-bold border border-red-500/15">
+                        <span>{s.emoji || "🧑‍🎓"}</span>
+                        <span className="truncate max-w-[70px]">{s.name}</span>
+                      </span>
+                    ))}
+                    {pendingStudents.map(s => (
+                      <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-500/10 text-slate-400 rounded-full text-[10px] font-bold border border-slate-850 border-slate-800">
+                        <span>{s.emoji || "🧑‍🎓"}</span>
+                        <span className="truncate max-w-[70px]">{s.name}</span>
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-[10px] text-slate-500 italic">គ្មានសិស្សណាឆ្លើយខុសទេ! 🎉</p>
+                )}
+              </div>
+            </div>
+
             <div className="text-center text-[10px] text-slate-500 animate-pulse font-bold">
               កំពុងរង់ចាំលោកគ្រូ-អ្នកគ្រូបើកសំនួរបន្ទាប់...
             </div>
@@ -635,30 +704,32 @@ export default function StudentPlayView() {
           /* Active Question Workspace for Student answering */
           <div className="w-full max-w-sm flex-1 flex flex-col justify-between">
             {/* Question status header */}
-            <div className="flex items-center justify-between mb-4">
+            <div className="flex items-center justify-between mb-4 shrink-0">
               <span className="text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/10 px-2.5 py-1 rounded-full flex items-center gap-1">
                 <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
-                សំណួរលេខ {currentCard?.number || ''}
+                សំណួរ៖ {currentCardIndex !== -1 ? (currentCardIndex + 1) : (currentCard?.number || 1)} / {totalCardsCount || 1}
               </span>
 
               {/* Countdown Progress Bar */}
-              <div className="flex items-center gap-1.5">
-                <Timer className={`w-4 h-4 ${localTimeLeft <= 5 ? 'text-red-500 animate-ping' : 'text-slate-400'}`} />
-                <span className={`text-xs font-black font-mono ${localTimeLeft <= 5 ? 'text-red-400' : 'text-slate-300'}`}>
+              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all duration-300 ${
+                localTimeLeft <= 5 ? 'bg-red-500/10 border border-red-500/20 animate-bounce scale-110' : ''
+              }`}>
+                <Timer className={`w-4 h-4 ${localTimeLeft <= 5 ? 'text-red-550 animate-pulse' : 'text-slate-400'}`} />
+                <span className={`text-xs font-black font-mono tracking-tight transition-all ${localTimeLeft <= 5 ? 'text-red-400 text-sm' : 'text-slate-300'}`}>
                   {localTimeLeft} វិនាទី
                 </span>
               </div>
             </div>
 
             {/* Question description card */}
-            <div className="flex-1 bg-slate-900/40 border border-slate-800/80 p-6 rounded-[2rem] flex flex-col items-center justify-center text-center shadow-lg min-h-[140px] mb-6">
-              <h2 className="text-base sm:text-lg font-black text-white leading-relaxed">
+            <div className="flex-1 bg-slate-900/40 border border-slate-800/80 p-5 sm:p-6 rounded-[2rem] flex flex-col items-center justify-center text-center shadow-lg min-h-[110px] sm:min-h-[140px] mb-4 overflow-y-auto">
+              <h2 className="text-sm sm:text-base md:text-lg font-black text-white leading-relaxed">
                 <FormulaRenderer text={currentQuestion.text || ''} />
               </h2>
             </div>
 
             {/* Answer Options Action Deck */}
-            <div className="grid grid-cols-1 gap-3 shrink-0">
+            <div className="grid grid-cols-1 gap-2.5 sm:gap-3 shrink-0 mb-2">
               {currentQuestion.options.map((opt, i) => {
                 const colors = [
                   'bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.01]',
@@ -673,12 +744,12 @@ export default function StudentPlayView() {
                   <button
                     key={i}
                     onClick={() => handleSelectOption(i)}
-                    className={`w-full p-4 rounded-2xl flex items-center gap-3 text-left transition-all text-white cursor-pointer select-none border-none shadow-md ${activeColor}`}
+                    className={`w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl flex items-center gap-2.5 sm:gap-3 text-left transition-all text-white cursor-pointer select-none border-none shadow-md ${activeColor}`}
                   >
-                    <span className="w-7 h-7 rounded-xl bg-black/20 flex items-center justify-center font-black text-xs shrink-0 select-none">
+                    <span className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-black/20 flex items-center justify-center font-black text-[11px] sm:text-xs shrink-0 select-none">
                       {optPrefix}
                     </span>
-                    <span className="text-xs font-black select-none leading-snug break-words whitespace-normal">
+                    <span className="text-[11px] sm:text-xs font-black select-none leading-snug break-words whitespace-normal">
                       <FormulaRenderer text={opt || ''} />
                     </span>
                   </button>

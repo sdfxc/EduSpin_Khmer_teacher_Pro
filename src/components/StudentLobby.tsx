@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { 
   Crown, QrCode, Award, Trophy, Sparkles, Timer, Check, Copy, 
   Plus, Users, CheckCircle, TrendingUp, UserCheck, Volume2, Tv, RefreshCw, Smartphone,
-  HelpCircle, AlertCircle, Play, ArrowRight, XCircle, Info, ChevronRight
+  HelpCircle, AlertCircle, Play, ArrowRight, XCircle, Info, ChevronRight, Pencil, Trash2
 } from 'lucide-react';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -157,12 +157,39 @@ export default function StudentLobby({
   };
 
   const handleDeclineStudent = async (studentId: string) => {
-    if (!teacher || !activeClassId) return;
+    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId) return;
     try {
-      const studentDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', studentId);
+      const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
       await deleteDoc(studentDocRef);
     } catch (err) {
       console.error("Decline student failed:", err);
+    }
+  };
+
+  const handleEditStudentNameInLobby = async (studentId: string, currentName: string) => {
+    const newName = window.prompt("សូមបញ្ចូលឈ្មោះថ្មីរបស់សិស្ស៖", currentName);
+    if (newName && newName.trim() && newName.trim() !== currentName) {
+      const trimmedName = newName.trim();
+      const currentTeacherId = teacher?.id || 'local';
+      try {
+        const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
+        await setDoc(studentDocRef, { name: trimmedName }, { merge: true });
+      } catch (err) {
+        console.error("Failed to update student name in lobby:", err);
+      }
+    }
+  };
+
+  const handleRemoveStudentFromLobby = async (studentId: string, studentName: string) => {
+    if (window.confirm(`តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសិស្ស «${studentName}» នេះចេញមែនទេ?`)) {
+      const currentTeacherId = teacher?.id || 'local';
+      try {
+        const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
+        await deleteDoc(studentDocRef);
+      } catch (err) {
+        console.error("Failed to delete student in lobby:", err);
+      }
     }
   };
 
@@ -214,7 +241,8 @@ export default function StudentLobby({
 
   // 4. Advance questions handler
   const handleNextQuestion = async () => {
-    if (!activeRoomId || cards.length === 0 || !teacher) return;
+    if (!activeRoomId || cards.length === 0) return;
+    const currentTeacherId = teacher?.id || 'local';
     
     const currentIdx = cards.findIndex(c => c.id === activeCardId);
     let nextCard = null;
@@ -231,7 +259,7 @@ export default function StudentLobby({
       setActiveCardState('answering');
       
       try {
-        const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+        const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
         await setDoc(classDocRef, {
           activeCardId: nextCard.id,
           activeCardState: 'answering',
@@ -244,7 +272,7 @@ export default function StudentLobby({
       // End game and show victory podium ceremony
       setActiveCardId(null);
       try {
-        const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+        const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
         await setDoc(classDocRef, {
           activeCardId: null,
           activeCardState: 'answering',
@@ -257,12 +285,23 @@ export default function StudentLobby({
     }
   };
 
+  // 4b. Auto-advance to the next question 3 seconds after an answer has been revealed
+  useEffect(() => {
+    if (activeCardState !== 'revealed' || !activeCardId) return;
+
+    const timer = setTimeout(() => {
+      handleNextQuestion();
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [activeCardState, activeCardId, cards, activeClassId]);
+
   // 5. Exit active game handler
   const handleExitGame = async () => {
     setActiveCardId(null);
-    if (!teacher) return;
+    const currentTeacherId = teacher?.id || 'local';
     try {
-      const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+      const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
       await setDoc(classDocRef, {
         activeCardId: null,
         activeCardState: 'answering',
@@ -275,13 +314,14 @@ export default function StudentLobby({
 
   // 6. Start the first live game question from the lobby
   const handleStartGameFirst = async () => {
-    if (cards.length === 0 || !teacher) return;
+    if (cards.length === 0) return;
     const firstQ = cards.find(c => c.question);
+    const currentTeacherId = teacher?.id || 'local';
     if (firstQ) {
       setActiveCardId(firstQ.id);
       setActiveCardState('answering');
       try {
-        const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+        const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
         await setDoc(classDocRef, {
           activeCardId: firstQ.id,
           activeCardState: 'answering',
@@ -515,11 +555,17 @@ export default function StudentLobby({
 
           <div className="flex items-center gap-3 shrink-0">
             {/* Live Timer Meter */}
-            <div className="flex items-center gap-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 px-4 py-2 rounded-2xl shadow-sm">
-              <Timer className={`w-5 h-5 ${liveLeftTime <= 5 ? 'text-red-500 animate-pulse' : 'text-indigo-500'}`} />
+            <div className={`flex items-center gap-2.5 bg-white dark:bg-slate-900 border px-4 py-2 rounded-2xl shadow-sm transition-all duration-300 ${
+              liveLeftTime <= 5 && !isRevealed 
+                ? 'border-red-500/50 bg-red-50/50 dark:bg-red-950/20 scale-110 animate-bounce' 
+                : 'border-slate-200 dark:border-slate-800'
+            }`}>
+              <Timer className={`w-5 h-5 ${liveLeftTime <= 5 && !isRevealed ? 'text-red-550 dark:text-red-400 animate-pulse' : 'text-indigo-500'}`} />
               <div className="text-right">
-                <p className="text-[9px] font-black text-slate-400 uppercase tracking-wider leading-none">រយៈពេលនៅសល់</p>
-                <p className="text-lg font-extrabold font-mono tracking-tight text-slate-800 dark:text-white mt-1 leading-none">
+                <p className={`text-[9px] font-black uppercase tracking-wider leading-none ${liveLeftTime <= 5 && !isRevealed ? 'text-red-450 dark:text-red-400' : 'text-slate-400'}`}>រយៈពេលនៅសល់</p>
+                <p className={`text-lg font-extrabold font-mono tracking-tight mt-1 leading-none transition-all duration-300 ${
+                  liveLeftTime <= 5 && !isRevealed ? 'text-red-650 dark:text-red-400 text-xl' : 'text-slate-800 dark:text-white'
+                }`}>
                   {isRevealed ? 'Revealed' : `${liveLeftTime} វិនាទី`}
                 </p>
               </div>
@@ -993,11 +1039,37 @@ export default function StudentLobby({
                     return (
                       <div 
                         key={student.id || sIdx}
-                        className={`flex flex-col items-center justify-center text-center p-4 rounded-2xl border bg-gradient-to-br transition-all hover:scale-[1.05] hover:-translate-y-0.5 active:scale-95 cursor-pointer shadow-md relative overflow-hidden group ${gridColor}`}
+                        className={`flex flex-col items-center justify-center text-center p-4 rounded-2xl border bg-gradient-to-br transition-all hover:scale-[1.05] hover:-translate-y-0.5 relative overflow-hidden group shadow-md ${gridColor}`}
                       >
                         {/* Glow outline on group hover */}
                         <div className="absolute inset-0 bg-white/5 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
                         
+                        {/* Inline controls to edit name or delete student */}
+                        <div className="absolute top-2 right-2 flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity duration-200 z-10">
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleEditStudentNameInLobby(student.id, student.name);
+                            }}
+                            className="p-1.5 bg-slate-900/85 hover:bg-slate-800 text-slate-300 hover:text-indigo-400 rounded-lg transition-colors border-none cursor-pointer flex items-center justify-center"
+                            title="កែឈ្មោះសិស្ស (Edit Name)"
+                          >
+                            <Pencil className="w-3 h-3 text-slate-300 hover:text-indigo-400" />
+                          </button>
+                          <button
+                            type="button"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              handleRemoveStudentFromLobby(student.id, student.name);
+                            }}
+                            className="p-1.5 bg-slate-900/85 hover:bg-slate-800 text-slate-300 hover:text-red-400 rounded-lg transition-colors border-none cursor-pointer flex items-center justify-center"
+                            title="លុបសិស្ស (Delete Student)"
+                          >
+                            <Trash2 className="w-3 h-3 text-slate-300 hover:text-red-405 hover:text-red-400" />
+                          </button>
+                        </div>
+
                         {/* 3D-feeling Character Avatar with customizable platform background */}
                         <div className="w-12 h-12 rounded-xl bg-slate-950/50 border border-white/10 flex items-center justify-center text-2xl shadow-inner select-none mb-2 duration-300 group-hover:rotate-6">
                           {student.emoji || "🧑‍🎓"}

@@ -459,7 +459,7 @@ export default function StudentManager({
                       setEditStatus(student.status || 'សកម្ម');
                       setEditClassId(student.classId || activeClassId);
                     }}
-                    className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-505/10 rounded-xl cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200"
+                    className="p-2 text-slate-400 hover:text-indigo-500 hover:bg-indigo-50 dark:hover:bg-indigo-950/20 rounded-xl cursor-pointer transition-all duration-200"
                     title="កែប្រែព័ត៌មាន"
                   >
                     <Pencil className="w-4.5 h-4.5" />
@@ -470,7 +470,7 @@ export default function StudentManager({
                         onRemoveStudent(student.id);
                       }
                     }}
-                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl cursor-pointer opacity-0 group-hover:opacity-100 transition-all duration-200"
+                    className="p-2 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-xl cursor-pointer transition-all duration-200"
                     title="លុបឈ្មោះសិស្ស"
                   >
                     <Trash2 className="w-4.5 h-4.5" />

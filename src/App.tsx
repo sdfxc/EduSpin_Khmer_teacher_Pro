@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect } from 'react';
-import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2 } from 'lucide-react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
@@ -19,6 +19,30 @@ import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
+
+const SAMPLE_STUDENTS: Record<string, Student[]> = {
+  'class-7a': [
+    { id: 's-1', name: 'សុខ ម៉េង', score: 120, emoji: '😎', gender: 'ប្រុស', status: 'ឆ្នើម', classId: 'class-7a' },
+    { id: 's-2', name: 'ចាន់ ធារ៉ា', score: 95, emoji: '🥰', gender: 'ស្រី', status: 'សកម្ម', classId: 'class-7a' },
+    { id: 's-3', name: 'កុសល សីហា', score: 110, emoji: '🤩', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-7a' },
+    { id: 's-4', name: 'លីដា ណាវិក', score: 80, emoji: '🥳', gender: 'ស្រី', status: 'សកម្ម', classId: 'class-7a' },
+    { id: 's-5', name: 'រដ្ឋា ចាន់ឌី', score: 70, emoji: '🤪', gender: 'ប្រុស', status: 'កំពុងរីកចម្រើន', classId: 'class-7a' },
+    { id: 's-6', name: 'កញ្ញា ពិសី', score: 130, emoji: '😇', gender: 'ស្រី', status: 'ឆ្នើម', classId: 'class-7a' },
+  ],
+  'class-8a': [
+    { id: 's-11', name: 'មករា ចន្ទ', score: 105, emoji: '😎', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-8a' },
+    { id: 's-12', name: 'ធីតា រតនា', score: 115, emoji: '🥰', gender: 'ស្រី', status: 'ឆ្នើម', classId: 'class-8a' },
+    { id: 's-13', name: 'សម្បត្ដិ វណ្ណា', score: 90, emoji: '🤩', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-8a' },
+    { id: 's-14', name: 'សុភា លីន', score: 65, emoji: '🥺', gender: 'ស្រី', status: 'គួរឲ្យបារម្ភ', classId: 'class-8a' },
+    { id: 's-15', name: 'វិបុល ទេវី', score: 85, emoji: '🤪', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-8a' },
+  ],
+  'class-9a': [
+    { id: 's-21', name: 'ណារ៉ុង ចាន់', score: 140, emoji: '😎', gender: 'ប្រុស', status: 'ឆ្នើម', classId: 'class-9a' },
+    { id: 's-22', name: 'មន្នី ផល្លា', score: 100, emoji: '🥰', gender: 'ស្រី', status: 'សកម្ម', classId: 'class-9a' },
+    { id: 's-23', name: 'វិចិត្រ សាវី', score: 125, emoji: '🤩', gender: 'ប្រុស', status: 'ឆ្នើម', classId: 'class-9a' },
+    { id: 's-24', name: 'បុប្ផា រី', score: 75, emoji: '🥺', gender: 'ស្រី', status: 'កំពុងរីកចម្រើន', classId: 'class-9a' },
+  ]
+};
 
 const DEFAULT_CLASSES: ClassInfo[] = [
   { id: 'class-7a', name: 'ថ្នាក់ទី៧ក' },
@@ -58,7 +82,7 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(() => {
     const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
     const saved = localStorage.getItem(`students_class_${activeId}`);
-    return saved ? JSON.parse(saved) : [];
+    return saved ? JSON.parse(saved) : (SAMPLE_STUDENTS[activeId] || []);
   });
   
   const [cards, setCards] = useState<QuizCard[]>(() => {
@@ -166,7 +190,7 @@ export default function App() {
     if (!teacher) {
       // Local fallback
       const loadedStudents = localStorage.getItem(`students_class_${activeClassId}`);
-      setStudents(loadedStudents ? JSON.parse(loadedStudents) : []);
+      setStudents(loadedStudents ? JSON.parse(loadedStudents) : (SAMPLE_STUDENTS[activeClassId] || []));
 
       const loadedChaptersStr = localStorage.getItem(`chapters_class_${activeClassId}`);
       let loadedChapters: QuizChapter[] = [];
@@ -342,9 +366,10 @@ export default function App() {
 
   // Real-time Student Synchronization for cloud sessions
   useEffect(() => {
-    if (!teacher || !activeClassId) return;
+    if (!activeClassId) return;
+    const currentTeacherId = teacher?.id || 'local';
 
-    const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
+    const studentsCollRef = collection(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students');
     const unsubscribe = onSnapshot(studentsCollRef, (snapshot) => {
       let loadedStudents: Student[] = [];
       snapshot.forEach(docSnap => {
@@ -360,11 +385,12 @@ export default function App() {
 
   // Sync active quiz state to Class document in Firestore for student phones
   useEffect(() => {
-    if (!teacher || !activeClassId) return;
+    if (!activeClassId) return;
+    const currentTeacherId = teacher?.id || 'local';
 
     const syncClassInfo = async () => {
       try {
-        const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+        const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
         const currentActiveCard = cards.find(c => c.id === activeCardId) || null;
         
         await setDoc(classDocRef, {
@@ -427,16 +453,18 @@ export default function App() {
 
     setChapters(updatedChapters);
 
-    if (teacher && activeClassId) {
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
       try {
-        await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
           chapters: updatedChapters,
           activeRoomId: activeRoomId
         }, { merge: true });
       } catch (err) {
         console.error('Failed to save class metadata to cloud:', err);
       }
-    } else if (activeClassId) {
+    }
+    if (!teacher && activeClassId) {
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
       localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
     }
@@ -444,9 +472,10 @@ export default function App() {
 
   // Helper to save student score updates to Firestore
   const saveStudentScore = useCallback(async (studentId: string, newScore: number) => {
-    if (teacher && activeClassId) {
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
       try {
-        await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', studentId), {
+        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId), {
           score: newScore
         }, { merge: true });
       } catch (err) {
@@ -720,12 +749,11 @@ export default function App() {
     if (window.confirm(`តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបថ្នាក់ទី «${className}» នេះចោលមែនទេ?`)) {
       const updatedClasses = classes.filter(c => c.id !== classId);
       
-      if (teacher) {
-        try {
-          await deleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
-        } catch (err) {
-          handleFirestoreError(err, OperationType.DELETE, `teachers/${teacher.id}/classes/${classId}`);
-        }
+      const currentTeacherId = teacher?.id || 'local';
+      try {
+        await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
+      } catch (err) {
+        console.error(err);
       }
       
       setClasses(updatedClasses);
@@ -735,6 +763,26 @@ export default function App() {
       
       if (activeClassId === classId) {
         handleSwitchClass(updatedClasses[0].id);
+      }
+    }
+  };
+
+  const handleRenameClass = async (e: React.MouseEvent, classId: string, currentName: string) => {
+    e.stopPropagation();
+    const newName = window.prompt('សូមបញ្ចូលឈ្មោះថ្នាក់រៀនថ្មី៖', currentName);
+    if (newName && newName.trim() && newName.trim() !== currentName) {
+      const trimmedName = newName.trim();
+      const updatedClasses = classes.map(c => c.id === classId ? { ...c, name: trimmedName } : c);
+      setClasses(updatedClasses);
+      
+      const currentTeacherId = teacher?.id || 'local';
+      try {
+        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId), {
+          id: classId,
+          name: trimmedName
+        }, { merge: true });
+      } catch (err) {
+        console.error("Failed to rename class in Cloud:", err);
       }
     }
   };
@@ -751,12 +799,11 @@ export default function App() {
       classId: activeClassId
     };
 
-    if (teacher) {
-      try {
-        await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', newStudent.id), newStudent);
-      } catch (err) {
-        handleFirestoreError(err, OperationType.CREATE, `teachers/${teacher.id}/classes/${activeClassId}/students/${newStudent.id}`);
-      }
+    const currentTeacherId = teacher?.id || 'local';
+    try {
+      await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
+    } catch (err) {
+      console.error(err);
     }
 
     setStudents(prev => [...prev, newStudent]);
@@ -774,35 +821,32 @@ export default function App() {
       classId: fields.classId
     };
     
+    const currentTeacherId = teacher?.id || 'local';
     if (fields.classId === activeClassId) {
-      if (teacher) {
-        try {
-          await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', newStudent.id), newStudent);
-        } catch (err) {
-          handleFirestoreError(err, OperationType.CREATE, `teachers/${teacher.id}/classes/${activeClassId}/students/${newStudent.id}`);
-        }
+      try {
+        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
+      } catch (err) {
+        console.error(err);
       }
       setStudents(prev => [...prev, newStudent]);
     } else {
-      if (teacher) {
-        try {
-          await setDoc(doc(db, 'teachers', teacher.id, 'classes', fields.classId, 'students', newStudent.id), newStudent);
-        } catch (err) {
-          handleFirestoreError(err, OperationType.CREATE, `teachers/${teacher.id}/classes/${fields.classId}/students/${newStudent.id}`);
-        }
-      } else {
-        const savedKey = `students_class_${fields.classId}`;
-        const savedRaw = localStorage.getItem(savedKey);
-        const savedList = savedRaw ? JSON.parse(savedRaw) : [];
-        savedList.push(newStudent);
-        localStorage.setItem(savedKey, JSON.stringify(savedList));
+      try {
+        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', fields.classId, 'students', newStudent.id), newStudent);
+      } catch (err) {
+        console.error(err);
       }
+      const savedKey = `students_class_${fields.classId}`;
+      const savedRaw = localStorage.getItem(savedKey);
+      const savedList = savedRaw ? JSON.parse(savedRaw) : [];
+      savedList.push(newStudent);
+      localStorage.setItem(savedKey, JSON.stringify(savedList));
       alert(`បានរក្សាទុកសិស្ស «${fields.name}» ទៅកាន់ថ្នាក់ផ្សេងជោគជ័យ!`);
     }
   }, [activeClassId, teacher]);
 
   const updateStudentDetail = useCallback(async (id: string, fields: Partial<Student>) => {
     let updatedStudent: Student | null = null;
+    const currentTeacherId = teacher?.id || 'local';
     
     setStudents(prev => {
       const studentToUpdate = prev.find(s => s.id === id);
@@ -817,49 +861,44 @@ export default function App() {
         // Move to another class
         const filtered = prev.filter(s => s.id !== id);
         
-        if (teacher) {
-          (async () => {
-            try {
-              await deleteDoc(doc(db, 'teachers', teacher.id, 'classes', oldClassId, 'students', id));
-              await setDoc(doc(db, 'teachers', teacher.id, 'classes', newClassId, 'students', id), updatedStudent!);
-            } catch (err) {
-              console.error(err);
-            }
-          })();
-        } else {
-          const targetKey = `students_class_${newClassId}`;
-          const targetRaw = localStorage.getItem(targetKey);
-          const targetList = targetRaw ? JSON.parse(targetRaw) : [];
-          
-          const cleanedList = targetList.filter((s: any) => s.id !== id);
-          cleanedList.push(updatedStudent);
-          localStorage.setItem(targetKey, JSON.stringify(cleanedList));
-        }
+        (async () => {
+          try {
+            await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', oldClassId, 'students', id));
+            await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', newClassId, 'students', id), updatedStudent!);
+          } catch (err) {
+            console.error(err);
+          }
+        })();
+        
+        const targetKey = `students_class_${newClassId}`;
+        const targetRaw = localStorage.getItem(targetKey);
+        const targetList = targetRaw ? JSON.parse(targetRaw) : [];
+        
+        const cleanedList = targetList.filter((s: any) => s.id !== id);
+        cleanedList.push(updatedStudent);
+        localStorage.setItem(targetKey, JSON.stringify(cleanedList));
         
         alert(`បានផ្លាស់ប្ដូរថ្នាក់សិស្ស «${fields.name || studentToUpdate.name}» ទៅកាន់ថ្នាក់ផ្សេងជោគជ័យ!`);
         return filtered;
       } else {
-        if (teacher) {
-          (async () => {
-            try {
-              await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', id), updatedStudent!);
-            } catch (err) {
-              console.error(err);
-            }
-          })();
-        }
+        (async () => {
+          try {
+            await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id), updatedStudent!);
+          } catch (err) {
+            console.error(err);
+          }
+        })();
         return prev.map(s => s.id === id ? { ...s, ...fields } : s);
       }
     });
   }, [activeClassId, teacher]);
 
   const removeStudent = useCallback(async (id: string) => {
-    if (teacher) {
-      try {
-        await deleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', id));
-      } catch (err) {
-        handleFirestoreError(err, OperationType.DELETE, `teachers/${teacher.id}/classes/${activeClassId}/students/${id}`);
-      }
+    const currentTeacherId = teacher?.id || 'local';
+    try {
+      await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id));
+    } catch (err) {
+      console.error(err);
     }
     setStudents(prev => prev.filter(s => s.id !== id));
     if (selectedStudentId === id) setSelectedStudentId(null);
@@ -867,14 +906,13 @@ export default function App() {
 
   const clearStudents = useCallback(async () => {
     if (window.confirm('តើអ្នកពិតជាចង់លុបឈ្មោះសិស្សទាំងអស់មែនទេ?')) {
-      if (teacher) {
-        try {
-          for (const s of students) {
-            await deleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id));
-          }
-        } catch (err) {
-          handleFirestoreError(err, OperationType.DELETE, `teachers/${teacher.id}/classes/${activeClassId}/students`);
+      const currentTeacherId = teacher?.id || 'local';
+      try {
+        for (const s of students) {
+          await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id));
         }
+      } catch (err) {
+        console.error(err);
       }
       setStudents([]);
       setSelectedStudentId(null);
@@ -1197,15 +1235,32 @@ export default function App() {
               }`}
             >
               <span>{cls.name}</span>
-              {classes.length > 1 && (
+              <div className="flex items-center gap-1 shrink-0">
                 <button
-                  onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
-                  className="p-0.5 hover:bg-red-500/20 hover:text-red-500 rounded-md transition-colors"
-                  title="លុបថ្នាក់"
+                  onClick={(e) => handleRenameClass(e, cls.id, cls.name)}
+                  className={`p-0.5 rounded-md transition-colors ${
+                    activeClassId === cls.id 
+                      ? 'hover:bg-white/20 text-white hover:text-indigo-200' 
+                      : 'hover:text-indigo-500 hover:bg-slate-500/10 text-slate-400 dark:text-slate-400'
+                  }`}
+                  title="កែឈ្មោះថ្នាក់"
                 >
-                  <Trash2 className="w-3 h-3" />
+                  <Pencil className="w-2.5 h-2.5" />
                 </button>
-              )}
+                {classes.length > 1 && (
+                  <button
+                    onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                    className={`p-0.5 rounded-md transition-colors ${
+                      activeClassId === cls.id
+                        ? 'hover:bg-red-500/40 text-red-200 hover:text-red-100'
+                        : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400 dark:text-slate-400'
+                    }`}
+                    title="លុបថ្នាក់"
+                  >
+                    <Trash2 className="w-2.5 h-2.5" />
+                  </button>
+                )}
+              </div>
             </div>
           ))}
           <button
