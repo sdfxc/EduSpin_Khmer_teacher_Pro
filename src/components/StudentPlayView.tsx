@@ -552,95 +552,95 @@ export default function StudentPlayView() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col relative select-none">
+    <div className="min-h-screen min-h-[100dvh] bg-slate-950 text-slate-100 flex flex-col relative select-none">
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_center,rgba(99,102,241,0.04)_0%,transparent_100%)] pointer-events-none" />
 
       {/* Header Deck */}
-      <header className="h-16 px-6 border-b border-slate-900 bg-slate-950/40 flex items-center justify-between shrink-0 relative z-10 backdrop-blur">
-        <div className="flex items-center gap-2.5">
-          <span className="text-2xl select-none">{joinedStudent.emoji || "🧑‍🎓"}</span>
+      <header className="h-14 sm:h-16 px-4 sm:px-6 border-b border-slate-900 bg-slate-950/40 flex items-center justify-between shrink-0 relative z-10 backdrop-blur">
+        <div className="flex items-center gap-2 sm:gap-2.5">
+          <span className="text-xl sm:text-2xl select-none">{joinedStudent.emoji || "🧑‍🎓"}</span>
           <div>
-            <h4 className="text-xs font-black text-white leading-none">{joinedStudent.name}</h4>
-            <p className="text-[10px] font-black text-slate-400 mt-1 uppercase flex items-center gap-1.5">
+            <h4 className="text-[11px] sm:text-xs font-black text-white leading-none">{joinedStudent.name}</h4>
+            <p className="text-[9px] sm:text-[10px] font-black text-slate-400 mt-1 uppercase flex items-center gap-1 sm:gap-1.5">
               <span>{allStudents.length} នាក់ក្នុងថ្នាក់</span>
               {currentRank > 0 && <span>• លេខ {currentRank}</span>}
             </p>
           </div>
         </div>
 
-        <div className="bg-slate-900 border border-slate-800 text-amber-400 px-3 py-1 bg-gradient-to-r from-amber-500/5 to-amber-500/15 rounded-full flex items-center gap-1">
-          <Trophy className="w-3.5 h-3.5 animate-bounce" />
-          <span className="text-[10px] font-black font-mono leading-none">{joinedStudent.score || 0} ពិន្ទុ</span>
+        <div className="bg-slate-900 border border-slate-800 text-amber-400 px-2.5 py-0.5 sm:px-3 sm:py-1 bg-gradient-to-r from-amber-500/5 to-amber-500/15 rounded-full flex items-center gap-1">
+          <Trophy className="w-3 h-3 sm:w-3.5 sm:h-3.5 animate-bounce" />
+          <span className="text-[9px] sm:text-[10px] font-black font-mono leading-none">{joinedStudent.score || 0} ពិន្ទុ</span>
         </div>
       </header>
 
       {/* Core Play Area */}
-      <main className="flex-1 p-6 flex flex-col justify-center items-center relative z-10 overflow-y-auto">
+      <main className="flex-1 p-3.5 sm:p-6 flex flex-col justify-center items-center relative z-10 overflow-y-auto">
         {!currentQuestion ? (
           /* Waiting Screen Workspace */
-          <div className="text-center p-8 space-y-6 max-w-sm">
+          <div className="text-center p-4 sm:p-8 space-y-4 sm:space-y-6 max-w-sm">
             <div className="relative">
-              <div className="w-20 h-20 bg-indigo-600/10 border-2 border-indigo-500/20 rounded-[2rem] flex items-center justify-center text-indigo-400 mx-auto animate-pulse">
-                <RefreshCw className="w-8 h-8 animate-spin-slow" />
+              <div className="w-16 h-16 sm:w-20 sm:h-20 bg-indigo-600/10 border-2 border-indigo-500/20 rounded-2xl sm:rounded-[2rem] flex items-center justify-center text-indigo-400 mx-auto animate-pulse">
+                <RefreshCw className="w-6 h-6 sm:w-8 sm:h-8 animate-spin-slow" />
               </div>
-              <div className="absolute top-0 right-1/4 w-3 h-3 bg-indigo-400 rounded-full animate-ping" />
+              <div className="absolute top-0 right-1/4 w-2.5 h-2.5 bg-indigo-400 rounded-full animate-ping" />
             </div>
 
-            <div className="space-y-2">
-              <h3 className="text-lg font-black text-white">រង់ចាំលោកគ្រូ-អ្នកគ្រូ...</h3>
-              <p className="text-[10px] font-black uppercase text-indigo-400 tracking-wider">សកម្មភាពរបស់អ្នកៈ រួចរាល់</p>
-              <p className="text-xs text-slate-400 max-w-xs mx-auto leading-relaxed font-semibold">
+            <div className="space-y-1.5">
+              <h3 className="text-base sm:text-lg font-black text-white">រង់ចាំលោកគ្រូ-អ្នកគ្រូ...</h3>
+              <p className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 tracking-wider">សកម្មភាពរបស់អ្នកៈ រួចរាល់</p>
+              <p className="text-[11px] sm:text-xs text-slate-400 max-w-xs mx-auto leading-relaxed font-semibold">
                 សូមរង់ចាំនៅលើអេក្រង់នេះ លោកគ្រូ-អ្នកគ្រូកំពុងរៀបចំ បើកសន្លឹកសំណួរនៅលើក្ដារសំណួរ! វានឹងដំណើរការស្វ័យប្រវត្ត។
               </p>
             </div>
 
             {/* Minor Score Board */}
-            <div className="p-4 bg-slate-900/40 border border-slate-900 rounded-3xl space-y-2 text-left">
-              <div className="flex justify-between items-center text-[10px] font-black text-slate-400">
+            <div className="p-3 sm:p-4 bg-slate-900/40 border border-slate-900 rounded-2xl sm:rounded-3xl space-y-2 text-left">
+              <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-black text-slate-400">
                 <span>ចំណាត់ថ្នាក់របស់អ្នក (Class Rank)៖</span>
                 <span className="text-indigo-400">លេខ {currentRank} / {allStudents.length}</span>
               </div>
-              <div className="flex justify-between items-center text-[10px] font-black text-slate-400">
+              <div className="flex justify-between items-center text-[9px] sm:text-[10px] font-black text-slate-400">
                 <span>ពិន្ទុសរុប (Cumulative Points)៖</span>
-                <span className="text-amber-400 font-mono text-xs">{joinedStudent.score || 0} ពិន្ទុ</span>
+                <span className="text-amber-400 font-mono text-[11px] sm:text-xs">{joinedStudent.score || 0} ពិន្ទុ</span>
               </div>
             </div>
           </div>
         ) : answeredState !== null ? (
           /* Answer Feedback Screen Workspace */
-          <div className="text-center p-8 max-w-sm bg-slate-900/35 border border-slate-800 rounded-[2.5rem] space-y-6">
-            <div className="space-y-4">
+          <div className="text-center p-4 sm:p-8 max-w-sm bg-slate-900/35 border border-slate-800 rounded-2xl sm:rounded-[2.5rem] space-y-4 sm:space-y-6">
+            <div className="space-y-3">
               {answeredState === 'correct' ? (
                 <>
-                  <div className="w-16 h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-2xl flex items-center justify-center text-emerald-400 mx-auto">
-                    <CheckCircle2 className="w-10 h-10 animate-bounce" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-emerald-500/10 border border-emerald-500/20 rounded-xl sm:rounded-2xl flex items-center justify-center text-emerald-400 mx-auto">
+                    <CheckCircle2 className="w-8 h-8 sm:w-10 sm:h-10 animate-bounce" />
                   </div>
-                  <h3 className="text-xl font-black text-emerald-400">🥳 ត្រឹមត្រូវល្អណាស់!</h3>
-                  <div className="inline-flex items-center gap-1 py-1 px-3 bg-emerald-500/10 text-emerald-300 border border-emerald-500/10 rounded-full text-[10px] font-bold">
-                    <Sparkles className="w-3.5 h-3.5" />
+                  <h3 className="text-lg sm:text-xl font-black text-emerald-400">🥳 ត្រឹមត្រូវល្អណាស់!</h3>
+                  <div className="inline-flex items-center gap-1 py-0.5 px-2.5 bg-emerald-500/10 text-emerald-300 border border-emerald-500/10 rounded-full text-[9px] sm:text-[10px] font-bold">
+                    <Sparkles className="w-3 h-3 sm:w-3.5 sm:h-3.5" />
                     ទទួលបាន +{pointsEarned} ពិន្ទុ
                   </div>
                 </>
               ) : answeredState === 'wrong' ? (
                 <>
-                  <div className="w-16 h-16 bg-red-500/10 border border-red-500/20 rounded-2xl flex items-center justify-center text-red-400 mx-auto">
-                    <XCircle className="w-10 h-10" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-red-500/10 border border-red-500/20 rounded-xl sm:rounded-2xl flex items-center justify-center text-red-400 mx-auto">
+                    <XCircle className="w-8 h-8 sm:w-10 sm:h-10" />
                   </div>
-                  <h3 className="text-xl font-black text-red-400">😢 មិនត្រឹមត្រូវទេ!</h3>
-                  <p className="text-xs text-slate-400">កុំបារម្ភ! ព្យាយាមម្ដងទៀតនៅសំណួរបន្ទាប់។</p>
+                  <h3 className="text-lg sm:text-xl font-black text-red-400">😢 មិនត្រឹមត្រូវទេ!</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400">កុំបារម្ភ! ព្យាយាមម្ដងទៀតនៅសំណួរបន្ទាប់។</p>
                 </>
               ) : (
                 <>
-                  <div className="w-16 h-16 bg-orange-500/10 border border-orange-500/20 rounded-2xl flex items-center justify-center text-orange-400 mx-auto">
-                    <Timer className="w-10 h-10" />
+                  <div className="w-12 h-12 sm:w-16 sm:h-16 bg-orange-500/10 border border-orange-500/20 rounded-xl sm:rounded-2xl flex items-center justify-center text-orange-400 mx-auto">
+                    <Timer className="w-8 h-8 sm:w-10 sm:h-10" />
                   </div>
-                  <h3 className="text-xl font-black text-orange-400">⏳ អស់រយៈពេលឆ្លើយ!</h3>
-                  <p className="text-xs text-slate-400">សំណួរផុតកំណត់រយៈពេល ២៥វិនាទី។</p>
+                  <h3 className="text-lg sm:text-xl font-black text-orange-400">⏳ អស់រយៈពេលឆ្លើយ!</h3>
+                  <p className="text-[11px] sm:text-xs text-slate-400">សំណួរផុតកំណត់រយៈពេល ២៥វិនាទី។</p>
                 </>
               )}
             </div>
 
-            <div className="p-4 bg-slate-950/60 rounded-2xl text-left text-xs border border-slate-900/80">
+            <div className="p-3 sm:p-4 bg-slate-950/60 rounded-xl sm:rounded-2xl text-left text-[11px] sm:text-xs border border-slate-900/80">
               <h5 className="font-bold text-slate-400 mb-1">ចម្លើយត្រឹមត្រូវគឺ៖</h5>
               <p className="text-slate-200 font-black">
                 <FormulaRenderer text={currentQuestion.options[currentQuestion.correctIndex] || ''} />
@@ -648,88 +648,88 @@ export default function StudentPlayView() {
             </div>
 
             {/* Show other students' results on mobile too! */}
-            <div className="text-left space-y-3 p-4 bg-slate-950/40 rounded-2xl border border-slate-900 text-xs">
+            <div className="text-left space-y-2.5 p-3 sm:p-4 bg-slate-950/40 rounded-xl sm:rounded-2xl border border-slate-900 text-[10px] sm:text-xs">
               <div>
-                <p className="text-[10px] font-black text-emerald-400 uppercase tracking-wide flex items-center gap-1 mb-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse" />
+                <p className="text-[9px] sm:text-[10px] font-black text-emerald-400 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-emerald-400 animate-pulse" />
                   សិស្សឆ្លើយត្រូវ ({correctStudents.length} នាក់)
                 </p>
                 {correctStudents.length > 0 ? (
-                  <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                  <div className="flex flex-wrap gap-1 max-h-[60px] sm:max-h-[80px] overflow-y-auto custom-scrollbar">
                     {correctStudents.map(s => (
-                      <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-emerald-500/10 text-emerald-300 rounded-full text-[10px] font-bold border border-emerald-500/15">
+                      <span key={s.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-emerald-500/10 text-emerald-300 rounded-full text-[9px] sm:text-[10px] font-bold border border-emerald-500/15">
                         <span>{s.emoji || "🧑‍🎓"}</span>
-                        <span className="truncate max-w-[70px]">{s.name}</span>
+                        <span className="truncate max-w-[65px] sm:max-w-[70px]">{s.name}</span>
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-slate-500 italic">គ្មានសិស្សឆ្លើយត្រូវទេ 😔</p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 italic">គ្មានសិស្សឆ្លើយត្រូវទេ 😔</p>
                 )}
               </div>
 
-              <div className="border-t border-slate-900/80 my-2" />
+              <div className="border-t border-slate-900/80 my-1.5 sm:my-2" />
 
               <div>
-                <p className="text-[10px] font-black text-red-400 uppercase tracking-wide flex items-center gap-1 mb-1">
-                  <span className="w-1.5 h-1.5 rounded-full bg-red-400 animate-pulse" />
+                <p className="text-[9px] sm:text-[10px] font-black text-red-400 uppercase tracking-wide flex items-center gap-1 mb-1">
+                  <span className="w-1 h-1 sm:w-1.5 sm:h-1.5 rounded-full bg-red-400 animate-pulse" />
                   សិស្សឆ្លើយខុស / មិនឆ្លើយ ({wrongStudents.length + pendingStudents.length} នាក់)
                 </p>
                 {wrongStudents.length > 0 || pendingStudents.length > 0 ? (
-                  <div className="flex flex-wrap gap-1 max-h-[80px] overflow-y-auto custom-scrollbar">
+                  <div className="flex flex-wrap gap-1 max-h-[60px] sm:max-h-[80px] overflow-y-auto custom-scrollbar">
                     {wrongStudents.map(s => (
-                      <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-red-500/10 text-red-305 text-red-300 rounded-full text-[10px] font-bold border border-red-500/15">
+                      <span key={s.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-red-500/10 text-red-300 rounded-full text-[9px] sm:text-[10px] font-bold border border-red-500/15">
                         <span>{s.emoji || "🧑‍🎓"}</span>
-                        <span className="truncate max-w-[70px]">{s.name}</span>
+                        <span className="truncate max-w-[65px] sm:max-w-[70px]">{s.name}</span>
                       </span>
                     ))}
                     {pendingStudents.map(s => (
-                      <span key={s.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-500/10 text-slate-400 rounded-full text-[10px] font-bold border border-slate-850 border-slate-800">
+                      <span key={s.id} className="inline-flex items-center gap-0.5 px-1.5 py-0.5 bg-slate-500/10 text-slate-400 rounded-full text-[9px] sm:text-[10px] font-bold border border-slate-800">
                         <span>{s.emoji || "🧑‍🎓"}</span>
-                        <span className="truncate max-w-[70px]">{s.name}</span>
+                        <span className="truncate max-w-[65px] sm:max-w-[70px]">{s.name}</span>
                       </span>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-[10px] text-slate-500 italic">គ្មានសិស្សណាឆ្លើយខុសទេ! 🎉</p>
+                  <p className="text-[9px] sm:text-[10px] text-slate-500 italic">គ្មានសិស្សណាឆ្លើយខុសទេ! 🎉</p>
                 )}
               </div>
             </div>
 
-            <div className="text-center text-[10px] text-slate-500 animate-pulse font-bold">
+            <div className="text-center text-[9px] sm:text-[10px] text-slate-500 animate-pulse font-bold">
               កំពុងរង់ចាំលោកគ្រូ-អ្នកគ្រូបើកសំនួរបន្ទាប់...
             </div>
           </div>
         ) : (
           /* Active Question Workspace for Student answering */
-          <div className="w-full max-w-sm flex-1 flex flex-col justify-between">
+          <div className="w-full max-w-sm flex flex-col justify-start gap-2.5 sm:gap-4">
             {/* Question status header */}
-            <div className="flex items-center justify-between mb-4 shrink-0">
-              <span className="text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/10 px-2.5 py-1 rounded-full flex items-center gap-1">
-                <HelpCircle className="w-3.5 h-3.5 text-indigo-400" />
+            <div className="flex items-center justify-between mb-0.5 sm:mb-1 shrink-0">
+              <span className="text-[9px] sm:text-[10px] font-black uppercase text-indigo-400 bg-indigo-500/10 border border-indigo-500/10 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-full flex items-center gap-1">
+                <HelpCircle className="w-3 sm:w-3.5 h-3 sm:h-3.5 text-indigo-400" />
                 សំណួរ៖ {currentCardIndex !== -1 ? (currentCardIndex + 1) : (currentCard?.number || 1)} / {totalCardsCount || 1}
               </span>
 
               {/* Countdown Progress Bar */}
-              <div className={`flex items-center gap-1.5 px-2.5 py-1 rounded-xl transition-all duration-300 ${
+              <div className={`flex items-center gap-1 sm:gap-1.5 px-2 sm:px-2.5 py-0.5 sm:py-1 rounded-xl transition-all duration-300 ${
                 localTimeLeft <= 5 ? 'bg-red-500/10 border border-red-500/20 animate-bounce scale-110' : ''
               }`}>
-                <Timer className={`w-4 h-4 ${localTimeLeft <= 5 ? 'text-red-550 animate-pulse' : 'text-slate-400'}`} />
-                <span className={`text-xs font-black font-mono tracking-tight transition-all ${localTimeLeft <= 5 ? 'text-red-400 text-sm' : 'text-slate-300'}`}>
+                <Timer className={`w-3.5 sm:w-4 h-3.5 sm:h-4 ${localTimeLeft <= 5 ? 'text-red-550 animate-pulse' : 'text-slate-400'}`} />
+                <span className={`text-[11px] sm:text-xs font-black font-mono tracking-tight transition-all ${localTimeLeft <= 5 ? 'text-red-400 text-xs sm:text-sm' : 'text-slate-300'}`}>
                   {localTimeLeft} វិនាទី
                 </span>
               </div>
             </div>
 
             {/* Question description card */}
-            <div className="flex-1 bg-slate-900/40 border border-slate-800/80 p-5 sm:p-6 rounded-[2rem] flex flex-col items-center justify-center text-center shadow-lg min-h-[110px] sm:min-h-[140px] mb-4 overflow-y-auto">
-              <h2 className="text-sm sm:text-base md:text-lg font-black text-white leading-relaxed">
+            <div className="bg-slate-900/40 border border-slate-800/80 p-3.5 sm:p-6 rounded-2xl sm:rounded-[2rem] flex flex-col items-center justify-center text-center shadow-lg min-h-[75px] sm:min-h-[120px] max-h-[140px] overflow-y-auto">
+              <h2 className="text-xs sm:text-sm md:text-base font-bold text-white leading-relaxed break-words w-full">
                 <FormulaRenderer text={currentQuestion.text || ''} />
               </h2>
             </div>
 
             {/* Answer Options Action Deck */}
-            <div className="grid grid-cols-1 gap-2.5 sm:gap-3 shrink-0 mb-2">
+            <div className="grid grid-cols-1 gap-1.5 sm:gap-2.5 shrink-0">
               {currentQuestion.options.map((opt, i) => {
                 const colors = [
                   'bg-emerald-600 hover:bg-emerald-700 hover:scale-[1.01]',
@@ -744,12 +744,12 @@ export default function StudentPlayView() {
                   <button
                     key={i}
                     onClick={() => handleSelectOption(i)}
-                    className={`w-full p-3 sm:p-4 rounded-xl sm:rounded-2xl flex items-center gap-2.5 sm:gap-3 text-left transition-all text-white cursor-pointer select-none border-none shadow-md ${activeColor}`}
+                    className={`w-full p-2.5 sm:p-4 rounded-xl sm:rounded-2xl flex items-center gap-2 sm:gap-3 text-left transition-all text-white cursor-pointer select-none border-none shadow-md ${activeColor}`}
                   >
-                    <span className="w-6.5 h-6.5 sm:w-7 sm:h-7 rounded-lg sm:rounded-xl bg-black/20 flex items-center justify-center font-black text-[11px] sm:text-xs shrink-0 select-none">
+                    <span className="w-5.5 h-5.5 sm:w-7 sm:h-7 rounded-md sm:rounded-xl bg-black/20 flex items-center justify-center font-black text-[9px] sm:text-xs shrink-0 select-none">
                       {optPrefix}
                     </span>
-                    <span className="text-[11px] sm:text-xs font-black select-none leading-snug break-words whitespace-normal">
+                    <span className="text-[10px] sm:text-xs font-bold select-none leading-snug break-words whitespace-normal flex-1">
                       <FormulaRenderer text={opt || ''} />
                     </span>
                   </button>
