@@ -740,173 +740,180 @@ export default function StudentLobby({
   }
 
   return (
-    <div className="flex-1 flex flex-col p-4 md:p-6 overflow-y-auto custom-scrollbar relative bg-[#0b0f19] text-white">
+    <div className={`flex-1 flex flex-col p-4 md:p-6 overflow-y-auto custom-scrollbar relative transition-colors duration-300 ${
+      isDarkMode ? 'bg-[#0b0f19] text-white' : 'bg-slate-50 text-slate-800'
+    }`}>
       {/* Background visual effects for game feel */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08)_0%,transparent_50%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.04)_0%,transparent_50%)] pointer-events-none" />
 
       {/* Top Header Panel - Styled like original StudyPlay Host */}
-      <div className="flex flex-col md:flex-row items-center justify-between pb-4 mb-6 border-b border-indigo-950/60 gap-4 relative z-10 shrink-0">
+      <div className={`flex flex-col md:flex-row items-center justify-between pb-4 mb-6 border-b gap-4 relative z-10 shrink-0 ${
+        isDarkMode ? 'border-indigo-950/60' : 'border-slate-200'
+      }`}>
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-amber-500 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-md shadow-indigo-500/10">
             🎮
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className="text-xl font-black tracking-tight text-white flex items-center gap-1">
+              <h1 className={`text-xl font-black tracking-tight flex items-center gap-1 ${
+                isDarkMode ? 'text-white' : 'text-slate-900'
+              }`}>
                 StudyPlay Host <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full">របៀបគ្រូ (Classic)</span>
               </h1>
             </div>
-            <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-              ថ្នាក់រៀន៖ <span className="text-indigo-400 font-extrabold">{className}</span> • គាំទ្រការឆ្លើយតបពេលវេលាពិត (Connected Room Live Sync)
+            <p className={`text-[10px] font-bold mt-0.5 ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-500'
+            }`}>
+              ថ្នាក់រៀន៖ <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{className}</span> • គាំទ្រការឆ្លើយតបពេលវេលាពិត (Connected Room Live Sync)
             </p>
           </div>
         </div>
 
         {/* Live connections badge */}
         <div className="flex items-center gap-3">
-          <div className="bg-slate-900 border border-indigo-950/60 px-3 py-1.5 rounded-xl text-xs font-bold text-slate-400 flex items-center gap-2">
+          <div className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 border ${
+            isDarkMode 
+              ? 'bg-slate-900 border-indigo-950/60 text-slate-400' 
+              : 'bg-white border-slate-200 text-slate-650 text-slate-600 shadow-xs'
+          }`}>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>ម៉ាស៊ីនមេ Live (Online Server)</span>
+            <span>ម៉ាស៊ីេនមេ Live (Online Server)</span>
           </div>
         </div>
       </div>
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 relative z-10">
-        {/* Left Panel: Access & QR Code Box (StudyPlay Host Frame) */}
+        {/* Left Panel: Access & QR Code Box (StudyPlay Host Frame) - Styled dynamically for light and dark modes */}
         <div className="lg:col-span-5 flex flex-col gap-6">
-          <div className="bg-gradient-to-br from-[#121829] to-[#0d1222] border-2 border-indigo-950/85 rounded-[2.5rem] p-6 shadow-xl relative overflow-hidden flex flex-col items-center justify-between text-center flex-1 min-h-[500px]">
-            <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/5 rounded-full -mr-16 -mt-16 animate-pulse" />
+          <div className={`${
+            isDarkMode 
+              ? 'bg-gradient-to-br from-[#121829] to-[#0d1222] border-2 border-indigo-950/85 shadow-[0_8px_30px_rgb(0,0,0,0.3)]' 
+              : 'bg-white border-2 border-slate-100 shadow-xl'
+          } rounded-[2.5rem] p-8 relative overflow-hidden flex flex-col items-center justify-center text-center flex-1 min-h-[500px]`}>
+            <div className={`absolute top-0 right-0 w-32 h-32 ${
+              isDarkMode ? 'bg-indigo-500/5' : 'bg-indigo-50/50'
+            } rounded-full -mr-16 -mt-16 pointer-events-none`} />
             
             <div className="w-full flex items-center justify-center gap-2 mb-2">
-              <Smartphone className="w-5 h-5 text-indigo-400 animate-bounce" />
-              <span className="text-xs font-black uppercase tracking-wider text-indigo-400">ស្កែន QR ឬបញ្ចូលលេខកូដដើម្បីចូលលេង</span>
+              <Smartphone className={`w-5 h-5 animate-bounce ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>ស្កែន QR ឬបញ្ចូលលេខកូដដើម្បីចូលលេង</span>
             </div>
 
-            <h2 className="text-2xl font-black text-white tracking-tight drop-shadow mb-1 flex items-center gap-2 justify-center">
+            <h2 className={`text-2xl font-black tracking-tight mb-1 flex items-center gap-2 justify-center ${
+              isDarkMode ? 'text-white' : 'text-slate-900'
+            }`}>
               <span>ចូលរួមលេងជាមួយ PIN</span>
-              <span className="text-[10px] px-2 py-0.5 bg-amber-500/15 text-amber-400 border border-amber-500/20 rounded-full font-black uppercase tracking-wider">Classic</span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider animate-pulse ${
+                isDarkMode 
+                  ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' 
+                  : 'bg-amber-100 text-amber-800 border border-amber-200'
+              }`}>Classic</span>
             </h2>
 
-            <p className="text-[11px] text-slate-400 max-w-sm mb-4 font-semibold leading-relaxed">
+            <p className={`text-[11.5px] max-w-sm mb-5 font-bold leading-relaxed ${
+              isDarkMode ? 'text-slate-400' : 'text-slate-600'
+            }`}>
               សិស្សប្រើប្រាស់ទូរស័ព្ទដៃស្កេន QR Code ខាងក្រោម ដើម្បីចុះឈ្មោះ និងចូលរួមលេងហ្គេមឆ្លើយសំណួរផ្ដាច់មុខរបស់ StudyPlay ភ្លាមៗ!
             </p>
 
-            {/* Unique Game PIN Block */}
-            <div className="w-full bg-slate-950/60 border border-indigo-950/80 p-4 rounded-3xl mb-4 text-center relative overflow-hidden group">
+            {/* Unique Game PIN Block - Elegant Dynamic design */}
+            <div className={`w-full p-5 rounded-3xl mb-5 text-center relative overflow-hidden group ${
+              isDarkMode ? 'bg-slate-950/60 border border-indigo-950/80' : 'bg-slate-50 border border-slate-200/80'
+            }`}>
               <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
               
-              <span className="text-[10px] font-black uppercase text-indigo-400/80 tracking-widest flex items-center justify-center gap-1.5 mb-1 z-10 relative">
-                <Crown className="w-3 h-3 text-amber-500 animate-pulse" />
+              <span className={`text-[10.5px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1.5 z-10 relative ${
+                isDarkMode ? 'text-indigo-400/90' : 'text-indigo-600/90'
+              }`}>
+                <Crown className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
                 លេខកូដសម្គាល់បន្ទប់ (GAME PIN)
               </span>
-              <div className="text-4xl font-extrabold font-sans tracking-[0.2em] text-amber-400 drop-shadow-[0_4px_12px_rgba(245,158,11,0.25)] select-all z-10 relative pl-[0.2em]">
+              <div className={`text-5xl font-black font-sans tracking-[0.2em] select-all z-10 relative pl-[0.2em] ${
+                isDarkMode 
+                  ? 'text-amber-400 drop-shadow-[0_4px_12px_rgba(245,158,11,0.25)]' 
+                  : 'text-slate-900 drop-shadow-[0_2px_4px_rgba(0,0,0,0.04)]'
+              }`}>
                 {(activeRoomId || 'default').substring(0, 8).toUpperCase()}
               </div>
             </div>
 
-            {/* Dynamic QR Code Frame */}
-            <div className="bg-slate-950 p-4 rounded-[2rem] border-2 border-indigo-950 shadow-inner shrink-0 flex flex-col items-center gap-2 group hover:scale-[1.02] transition-all duration-300 relative">
-              <div className="absolute -inset-1 rounded-[2.1rem] bg-gradient-to-tr from-indigo-500/20 to-amber-500/20 opacity-0 group-hover:opacity-100 transition-opacity blur" />
+            {/* Dynamic QR Code Frame - Styled cleanly for dark or light backgrounds */}
+            <div className={`p-4 rounded-[2rem] shadow-md shrink-0 flex flex-col items-center gap-2 group hover:scale-[1.02] transition-all duration-300 relative ${
+              isDarkMode ? 'bg-slate-950 border border-indigo-950' : 'bg-slate-50 border border-slate-200/80'
+            }`}>
               <img 
                 src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(studentJoinLink)}`}
                 alt="QR Code For Joining" 
                 className="w-36 h-36 object-contain rounded-xl select-none z-10 relative"
               />
-              <span className="text-[9px] font-black tracking-wider text-indigo-400/85 uppercase flex items-center gap-1 z-10 relative">
-                <QrCode className="w-3 h-3 text-indigo-400" />
+              <span className={`text-[9.5px] font-black tracking-wider uppercase flex items-center gap-1.5 z-10 relative ${
+                isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
+              }`}>
+                <QrCode className={`w-3.5 h-3.5 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'} animate-pulse`} />
                 ស្កេនរូបដើម្បីចូលរួម (Scan QR)
               </span>
             </div>
 
-            {/* Host Domain Switcher Game Consoles Selector */}
-            <div className="w-full mt-4 bg-slate-950/40 border border-indigo-950/40 p-2.5 rounded-2xl">
-              <p className="text-[10px] font-black uppercase text-indigo-400/90 tracking-wider mb-2 text-center flex items-center justify-center gap-1.5">
-                <span>🔗 ជ្រើសរើសតំណភ្ជាប់ហ្គេម (GAME LINK CONFIG)</span>
-              </p>
-              <div className="grid grid-cols-3 gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setSelectedDomain('auto')}
-                  className={`py-2 px-1 rounded-xl text-[10px] font-black transition-all cursor-pointer border-none select-none text-center ${
-                    selectedDomain === 'auto'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-white border border-indigo-950/40'
-                  }`}
-                >
-                  ស្វ័យប្រវត្ត (Auto)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDomain('vercel')}
-                  className={`py-2 px-1 rounded-xl text-[10px] font-black transition-all cursor-pointer border-none select-none text-center ${
-                    selectedDomain === 'vercel'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-white border border-indigo-950/40'
-                  }`}
-                  title="StudyPlay Khmer Teacher Pro on Vercel"
-                >
-                  Vercel (លឿន)
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedDomain('aistudio')}
-                  className={`py-2 px-1 rounded-xl text-[10px] font-black transition-all cursor-pointer border-none select-none text-center ${
-                    selectedDomain === 'aistudio'
-                      ? 'bg-indigo-600 text-white shadow-md'
-                      : 'bg-slate-900/60 text-slate-400 hover:text-white border border-indigo-950/40'
-                  }`}
-                  title="AI Studio App"
-                >
-                  AI Studio
-                </button>
-              </div>
-            </div>
-
-            {/* Connection Link Output Direct Box */}
-            <div className="w-full flex items-center gap-2 p-1 bg-slate-950/80 rounded-2xl border border-indigo-950/80 mt-3">
-              <input 
-                type="text" 
-                readOnly 
-                value={studentJoinLink}
-                className="flex-1 bg-transparent border-none text-[10px] text-slate-405 text-slate-400 px-3 outline-none select-all truncate font-mono font-semibold"
-              />
-              <button
-                onClick={handleCopyLink}
-                className={`px-3 py-2 text-xs font-bold rounded-xl transition-all flex items-center gap-1 cursor-pointer shrink-0 border-none select-none ${
-                  copied 
-                    ? 'bg-emerald-500 text-white shadow-md' 
-                    : 'bg-indigo-650 bg-indigo-600 hover:bg-indigo-700 text-white'
-                }`}
-              >
-                {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span className="text-[10px]">{copied ? "ចម្លងរួច!" : "ចម្លង Link"}</span>
-              </button>
-            </div>
+            {/* Quick Share Link - Minimal and elegant copy-trigger */}
+            <button
+              onClick={handleCopyLink}
+              className={`mt-4 px-4 py-2 border transition-all flex items-center gap-1.5 cursor-pointer shrink-0 select-none rounded-[14px] text-[10.5px] font-black ${
+                copied 
+                  ? isDarkMode
+                    ? 'bg-emerald-950/80 text-emerald-300 border-emerald-900 shadow-sm' 
+                    : 'bg-emerald-50 text-emerald-700 border-emerald-250 shadow-sm'
+                  : isDarkMode
+                    ? 'bg-indigo-950/80 text-indigo-300 hover:text-white hover:bg-indigo-900/60 border-indigo-900/50'
+                    : 'bg-indigo-50 text-indigo-700 hover:text-indigo-800 hover:bg-indigo-100/70 border-indigo-100/60'
+              }`}
+            >
+              {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
+              <span>{copied ? "ចម្លងតំណភ្ជាប់ជោគជ័យ!" : "ចម្លងតំណភ្ជាប់ចូលរួម (Copy Link)"}</span>
+            </button>
           </div>
         </div>
 
         {/* Right Panel: Joined Members & Action Deck (Classic StudyPlay Layout) */}
         <div className="lg:col-span-7 flex flex-col gap-6">
           {/* Quick Stats & Core Controls Frame */}
-          <div className="bg-gradient-to-br from-[#121829] to-[#0a0e1a] border border-indigo-950/80 rounded-[2.5rem] p-6 relative overflow-hidden flex flex-col justify-between shrink-0">
+          <div className={`border rounded-[2.5rem] p-6 relative overflow-hidden flex flex-col justify-between shrink-0 transition-all duration-300 ${
+            isDarkMode 
+              ? 'bg-gradient-to-br from-[#121829] to-[#0a0e1a] border-indigo-950/80' 
+              : 'bg-white border-slate-200/80 shadow-sm'
+          }`}>
             <div className="absolute -bottom-10 -left-10 w-32 h-32 bg-indigo-500/5 rounded-full animate-pulse pointer-events-none" />
             
-            <div className="flex justify-between items-center pb-4 border-b border-indigo-950/50">
+            <div className={`flex justify-between items-center pb-4 border-b ${
+              isDarkMode ? 'border-indigo-950/50' : 'border-slate-100'
+            }`}>
               <div>
-                <h3 className="text-[10px] text-indigo-400 font-extrabold tracking-widest uppercase mb-1">ស្ថានភាពបន្ទប់ហ្គេម (GAME STATISTICS)</h3>
-                <h2 className="text-3xl font-black font-sans tracking-tight text-white mt-1 flex items-baseline gap-2">
+                <h3 className={`text-[10px] font-extrabold tracking-widest uppercase mb-1 ${
+                  isDarkMode ? 'text-indigo-400' : 'text-indigo-650'
+                }`}>ស្ថានភាពបន្ទប់ហ្គេម (GAME STATISTICS)</h3>
+                <h2 className={`text-3xl font-black font-sans tracking-tight mt-1 flex items-baseline gap-2 ${
+                  isDarkMode ? 'text-white' : 'text-slate-900'
+                }`}>
                   {approvedStudents.length} 
-                  <span className="text-xs font-semibold text-indigo-300">នាក់បានចូលរួម (Connected)</span>
+                  <span className={`text-xs font-semibold ${isDarkMode ? 'text-indigo-300' : 'text-slate-500'}`}>នាក់បានចូលរួម (Connected)</span>
                 </h2>
               </div>
-              <div className="w-11 h-11 bg-indigo-500/10 text-indigo-300 rounded-2xl flex items-center justify-center animate-pulse border border-indigo-500/20">
-                <Users className="w-5 h-5 text-indigo-400" />
+              <div className={`w-11 h-11 rounded-2xl flex items-center justify-center animate-pulse border ${
+                isDarkMode 
+                  ? 'bg-indigo-500/10 text-indigo-300 border-indigo-500/20' 
+                  : 'bg-indigo-50 text-indigo-600 border-indigo-200'
+              }`}>
+                <Users className={`w-5 h-5 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-505'}`} />
               </div>
             </div>
 
-            <div className="grid grid-cols-2 gap-4 my-5 bg-slate-950/30 p-4 border border-indigo-950/55 rounded-2xl text-xs font-semibold">
+            <div className={`grid grid-cols-2 gap-4 my-5 p-4 rounded-2xl text-xs font-semibold border ${
+              isDarkMode 
+                ? 'bg-slate-950/30 border-indigo-950/55 text-slate-300' 
+                : 'bg-slate-50 border-slate-200/80 text-slate-750 text-slate-700'
+            }`}>
               <div className="space-y-1">
                 <span className="text-slate-400 block text-[10px] uppercase font-black">សកម្មភាពម៉ាស៊ីនបន្តផ្ទាល់</span>
                 {isUsingSimulatedPlayers ? (
@@ -1010,13 +1017,25 @@ export default function StudentLobby({
           )}
 
           {/* Connected Students Block Grid (StudyPlay Blocks Theme) */}
-          <div className="bg-gradient-to-br from-[#121829] to-[#0a0e1a] border border-indigo-950/80 rounded-[2.5rem] p-6 flex flex-col flex-1 min-h-[300px]">
-            <div className="flex items-center justify-between border-b border-indigo-950/50 pb-4 mb-4">
+          <div className={`border rounded-[2.5rem] p-6 flex flex-col flex-1 min-h-[300px] transition-all duration-300 ${
+            isDarkMode 
+              ? 'bg-gradient-to-br from-[#121829] to-[#0a0e1a] border-indigo-950/80' 
+              : 'bg-white border-slate-200/80 shadow-sm'
+          }`}>
+            <div className={`flex items-center justify-between border-b pb-4 mb-4 ${
+              isDarkMode ? 'border-indigo-950/50' : 'border-slate-100'
+            }`}>
               <div className="flex items-center gap-2">
                 <div className="w-1.5 h-5 bg-amber-500 rounded-full animate-pulse" />
-                <h3 className="text-xs font-bold text-white tracking-wider uppercase">សិស្សដែលបានចូលរួម (CONNECTED STUDENT ROSTER)</h3>
+                <h3 className={`text-xs font-bold tracking-wider uppercase ${
+                  isDarkMode ? 'text-white' : 'text-slate-800'
+                }`}>សិស្សដែលបានចូលរួម (CONNECTED STUDENT ROSTER)</h3>
               </div>
-              <span className="text-[10px] font-black text-indigo-300 bg-indigo-500/10 px-2.5 py-1 rounded-full border border-indigo-500/20">
+              <span className={`text-[10px] font-black px-2.5 py-1 rounded-full border ${
+                isDarkMode 
+                  ? 'text-indigo-300 bg-indigo-500/10 border-indigo-500/20' 
+                  : 'text-indigo-700 bg-indigo-50 border-indigo-200'
+              }`}>
                 ចំនួន {approvedStudents.length} នាក់
               </span>
             </div>
@@ -1025,14 +1044,22 @@ export default function StudentLobby({
               {approvedStudents.length > 0 ? (
                 <div className="grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-4 gap-3 p-1">
                   {sortedStudents.map((student, sIdx) => {
-                    const blockColors = [
-                      'from-[#ffd9a6]/8 to-[#ffd9a6]/15 hover:from-[#ffd9a6]/20 border-[#ffd9a6]/30 text-amber-200',
-                      'from-[#a8e6cf]/8 to-[#a8e6cf]/15 hover:from-[#a8e6cf]/20 border-[#a8e6cf]/30 text-emerald-250',
-                      'from-[#dcedc1]/8 to-[#dcedc1]/15 hover:from-[#dcedc1]/20 border-[#dcedc1]/30 text-lime-200',
-                      'from-[#ffd3b6]/8 to-[#ffd3b6]/15 hover:from-[#ffd3b6]/20 border-[#ffd3b6]/30 text-orange-200',
-                      'from-[#ff8b94]/8 to-[#ff8b94]/15 hover:from-[#ff8b94]/20 border-[#ff8b94]/30 text-rose-200',
-                      'from-[#a8d8ea]/8 to-[#a8d8ea]/15 hover:from-[#a8d8ea]/20 border-[#a8d8ea]/30 text-sky-200',
-                      'from-[#aa96da]/8 to-[#aa96da]/15 hover:from-[#aa96da]/20 border-[#aa96da]/30 text-purple-200'
+                    const blockColors = isDarkMode ? [
+                      'from-[#ffd9a6]/8 to-[#ffd9a6]/15 hover:from-[#ffd9a6]/20 border-amber-950/45 text-amber-200',
+                      'from-[#a8e6cf]/8 to-[#a8e6cf]/15 hover:from-[#a8e6cf]/20 border-emerald-950/45 text-emerald-250',
+                      'from-[#dcedc1]/8 to-[#dcedc1]/15 hover:from-[#dcedc1]/20 border-lime-950/45 text-lime-200',
+                      'from-[#ffd3b6]/8 to-[#ffd3b6]/15 hover:from-[#ffd3b6]/20 border-orange-950/45 text-orange-200',
+                      'from-[#ff8b94]/8 to-[#ff8b94]/15 hover:from-[#ff8b94]/20 border-rose-950/45 text-rose-200',
+                      'from-[#a8d8ea]/8 to-[#a8d8ea]/15 hover:from-[#a8d8ea]/20 border-sky-950/45 text-sky-200',
+                      'from-[#aa96da]/8 to-[#aa96da]/15 hover:from-[#aa96da]/20 border-purple-950/45 text-purple-200'
+                    ] : [
+                      'from-[#ffd9a6]/15 to-[#ffd9a6]/40 hover:from-[#ffd9a6]/50 border-amber-200 text-amber-900',
+                      'from-[#a8e6cf]/15 to-[#a8e6cf]/40 hover:from-[#a8e6cf]/50 border-emerald-200 text-emerald-900',
+                      'from-[#dcedc1]/15 to-[#dcedc1]/40 hover:from-[#dcedc1]/50 border-lime-200 text-lime-900',
+                      'from-[#ffd3b6]/15 to-[#ffd3b6]/40 hover:from-[#ffd3b6]/50 border-orange-200 text-orange-900',
+                      'from-[#ff8b94]/15 to-[#ff8b94]/40 hover:from-[#ff8b94]/50 border-rose-200 text-rose-900',
+                      'from-[#a8d8ea]/15 to-[#a8d8ea]/40 hover:from-[#a8d8ea]/50 border-sky-200 text-sky-900',
+                      'from-[#aa96da]/15 to-[#aa96da]/40 hover:from-[#aa96da]/50 border-purple-200 text-purple-900'
                     ];
                     const gridColor = blockColors[sIdx % blockColors.length];
                     
@@ -1052,10 +1079,14 @@ export default function StudentLobby({
                               e.stopPropagation();
                               handleEditStudentNameInLobby(student.id, student.name);
                             }}
-                            className="p-1.5 bg-slate-900/85 hover:bg-slate-800 text-slate-300 hover:text-indigo-400 rounded-lg transition-colors border-none cursor-pointer flex items-center justify-center"
+                            className={`p-1.5 rounded-lg transition-colors border shadow-xs cursor-pointer flex items-center justify-center ${
+                              isDarkMode 
+                                ? 'bg-slate-900/85 border-slate-850 hover:bg-slate-800 text-slate-300 hover:text-indigo-400' 
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-600 hover:text-indigo-600'
+                            }`}
                             title="កែឈ្មោះសិស្ស (Edit Name)"
                           >
-                            <Pencil className="w-3 h-3 text-slate-300 hover:text-indigo-400" />
+                            <Pencil className="w-3 h-3 text-slate-400 group-hover:text-indigo-400" />
                           </button>
                           <button
                             type="button"
@@ -1063,23 +1094,33 @@ export default function StudentLobby({
                               e.stopPropagation();
                               handleRemoveStudentFromLobby(student.id, student.name);
                             }}
-                            className="p-1.5 bg-slate-900/85 hover:bg-slate-800 text-slate-300 hover:text-red-400 rounded-lg transition-colors border-none cursor-pointer flex items-center justify-center"
+                            className={`p-1.5 rounded-lg transition-colors border shadow-xs cursor-pointer flex items-center justify-center ${
+                              isDarkMode 
+                                ? 'bg-slate-900/85 border-slate-850 hover:bg-slate-800 text-slate-300 hover:text-red-400' 
+                                : 'bg-white border-slate-200 hover:bg-slate-50 text-slate-605 group-hover:text-red-650 text-slate-600'
+                            }`}
                             title="លុបសិស្ស (Delete Student)"
                           >
-                            <Trash2 className="w-3 h-3 text-slate-300 hover:text-red-405 hover:text-red-400" />
+                            <Trash2 className="w-3 h-3 text-slate-400 group-hover:text-red-400" />
                           </button>
                         </div>
 
                         {/* 3D-feeling Character Avatar with customizable platform background */}
-                        <div className="w-12 h-12 rounded-xl bg-slate-950/50 border border-white/10 flex items-center justify-center text-2xl shadow-inner select-none mb-2 duration-300 group-hover:rotate-6">
+                        <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-2xl shadow-inner select-none mb-2 duration-300 group-hover:rotate-6 border ${
+                          isDarkMode ? 'bg-slate-950/50 border-white/10' : 'bg-white/80 border-black/5'
+                        }`}>
                           {student.emoji || "🧑‍🎓"}
                         </div>
 
                         <div className="min-w-0 w-full">
-                          <p className="text-xs font-black truncate text-white leading-tight">{student.name}</p>
-                          <p className="text-[9px] font-mono font-bold mt-1 text-slate-450 text-slate-400 flex items-center justify-center gap-1 leading-none">
-                            <span className="text-indigo-300 font-black">{student.score} XP</span>
-                            {sIdx === 0 && <span className="text-[8px] bg-amber-500/20 text-amber-400 px-1 py-0.5 rounded border border-amber-500/10">👑 លេខ១</span>}
+                          <p className={`text-xs font-black truncate leading-tight ${
+                            isDarkMode ? 'text-white' : 'text-slate-800'
+                          }`}>{student.name}</p>
+                          <p className={`text-[9px] font-mono font-bold mt-1 flex items-center justify-center gap-1 leading-none ${
+                            isDarkMode ? 'text-slate-450 text-slate-400' : 'text-slate-500'
+                          }`}>
+                            <span className={isDarkMode ? 'text-indigo-350' : 'text-indigo-650 font-black'}>{student.score} XP</span>
+                            {sIdx === 0 && <span className="text-[8px] bg-amber-500/20 text-amber-500 dark:text-amber-400 px-1 py-0.5 rounded border border-amber-500/10">👑 លេខ១</span>}
                           </p>
                         </div>
                       </div>
@@ -1087,12 +1128,18 @@ export default function StudentLobby({
                   })}
                 </div>
               ) : (
-                <div className="flex-1 flex flex-col items-center justify-center p-12 text-center text-slate-500">
+                <div className={`flex-1 flex flex-col items-center justify-center p-12 text-center ${
+                  isDarkMode ? 'text-slate-500' : 'text-slate-400'
+                }`}>
                   <div className="w-16 h-16 bg-indigo-500/5 rounded-full flex items-center justify-center border border-indigo-500/10 mb-4 animate-pulse">
                     <RefreshCw className="w-8 h-8 animate-spin text-indigo-500" />
                   </div>
-                  <p className="text-sm font-black text-slate-300">មិនទាន់មានសិស្សភ្ជាប់លេងនៅឡើយទេ...</p>
-                  <p className="text-[10px] text-slate-500 mt-1.5 max-w-sm mx-auto leading-relaxed">
+                  <p className={`text-sm font-black ${
+                    isDarkMode ? 'text-slate-300' : 'text-slate-600'
+                  }`}>មិនទាន់មានសិស្សភ្ជាប់លេងនៅឡើយទេ...</p>
+                  <p className={`text-[10px] mt-1.5 max-w-sm mx-auto leading-relaxed ${
+                    isDarkMode ? 'text-slate-500' : 'text-slate-500'
+                  }`}>
                     ស្កេនរូប QR Code ឬចុចចម្លងតំណភ្ជាប់ហ្គេម ដើម្បីអញ្ជើញសិស្សឱ្យចូលរួមលេងជាមួយគ្នាភ្លាមៗ!
                   </p>
                 </div>

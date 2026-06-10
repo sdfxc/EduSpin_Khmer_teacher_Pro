@@ -149,7 +149,8 @@ export async function generateQuestions(
   count: number = 25,
   images: FileData[] = [],
   pdfs: FileData[] = [],
-  officeFiles: FileData[] = []
+  officeFiles: FileData[] = [],
+  questionType: 'general' | 'pisa' = 'general'
 ): Promise<Question[]> {
   try {
     // 1. First, try to request the custom backend server proxy
@@ -159,17 +160,24 @@ export async function generateQuestions(
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles })
+        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles, questionType })
       });
 
       if (response.ok) {
-        const data = await response.json();
+        let data: any;
+        try {
+          data = await response.json();
+        } catch (parseError) {
+          throw new Error("ទទួលបានទិន្នន័យមិនត្រឹមត្រូវពីម៉ាស៊ីនបម្រើ (Invalid response format from server)");
+        }
         const rawQuestions: any[] = data.questions || [];
         return rawQuestions.map((q: any, i: number) => ({
           text: q.text,
           options: q.options,
           correctIndex: q.correctIndex,
-          id: `q-${i}-${Date.now()}`
+          id: `q-${i}-${Date.now()}`,
+          questionType: q.questionType || questionType,
+          explanation: q.explanation || ""
         }));
       }
 
@@ -178,18 +186,25 @@ export async function generateQuestions(
       if (response.status === 404) {
         throw new Error("SERVER_404");
       } else {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || `HTTP ${response.status}`);
+        let errorMsg = `HTTP ${response.status}`;
+        try {
+          const errorData = await response.json();
+          if (errorData?.error) {
+            errorMsg = errorData.error;
+          }
+        } catch (_) {}
+        throw new Error(errorMsg);
       }
     } catch (serverError: any) {
-      if (serverError.message === "SERVER_404") {
-        console.log("Server proxy call returned 404, falling back to direct client-side request.");
+      const savedKey = getSavedApiKey();
+      if (serverError.message === "SERVER_404" || (savedKey && savedKey.trim().length > 0)) {
+        console.log("Server proxy call failed or returned 404, falling back to direct client-side request using client's API key. Error was:", serverError);
       } else {
-        throw serverError; // Propagate normal server extraction/validation errors
+        throw serverError; // Propagate normal server errors if no local key is available to fall back to
       }
       
       // Calculate API key
-      const apiKey = getSavedApiKey();
+      const apiKey = savedKey;
       if (!apiKey) {
         // Throw a specific error that the UI can catch to ask for a key
         throw new Error("NEED_API_KEY");
@@ -212,9 +227,28 @@ export async function generateQuestions(
         }
       }
 
+      const isPisa = questionType === 'pisa';
       const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${count} multiple-choice questions for students in Khmer language. 
 Each question should be high-quality and have exactly 4 options.
 The language of the output questions and options must be in Khmer language, matching the theme.
+
+${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
+
+=== គំរូ Prompt 01 (PISA Structure & Context) ===
+- តម្រូវឱ្យបង្កើតសំណួរបែប PISA សមស្របទៅតាមមុខវិជ្ជា (គណិតវិទ្យា/វិទ្យាសាស្ត្រ/អំណាន) និងកម្រិតថ្នាក់របស់សិស្ស។
+- សំណួរត្រូវតែផ្អែកលើស្ថានភាពជីវិតពិតជាក់ស្ដែង (Real-life situation) ហើយតម្រូវឱ្យមានការវិភាគវែកញែករកហេតុផល (Reasoning) មិនមែនគ្រាន់តែរំលឹកទ្រឹស្ដី ឬរូបមន្តមេរៀនឡើងវិញនោះទេ។
+- ក្នុងសំណួរនីមួយៗត្រូវរួមបញ្ចូល៖
+  * បរិបទ ឬ សេណារីយ៉ូខ្លីមួយ (Context/Scenario) សម្រាប់ឱ្យសិស្សអាននិងយល់។
+  * សំណួរពហុជ្រើសរើស មានជម្រើសចម្លើយ ៤ ជម្រើស មានចម្លើយត្រឹមត្រូវ ១ និងចម្លើយបន្លំជាលក្ខណៈគិតថ្លឹងថ្លែងចំនួន ៣។
+  * ចម្លើយត្រឹមត្រូវជាមួយនឹងការពន្យល់ល្អិតល្អន់ និងខ្លីៗអំពីមូលហេតុ។
+
+=== គំរូ Prompt 02 (Problem-Solving Level - PISA Level 3) ===
+- បង្កើតសំណួរបែប PISA ក្នុងកម្រិត៣ (Level 3) ដោយប្រើបរិបទពិភពលោកពិតពីជីវិតប្រចាំថ្ងៃទាក់ទងនឹងមេរៀន និងកម្រិតថ្នាក់។
+- ភារកិច្ចរបស់សំណួរគួរតែវាយតម្លៃលើសមត្ថភាពដោះស្រាយបញ្ហា (Problem-solving) និងការគិតត្រិះរិះស៊ីជម្រៅ (Critical Thinking)។
+- ត្រូវតែរួមបញ្ចូល៖
+  * អត្ថបទខ្លី ទិន្នន័យ តារាង ឬស្ថានភាពជាក់ស្ដែងមួយ។
+  * សំណួរផ្ទាល់ដែលតម្រូវឱ្យមានការបកស្រាយ (Interpretation) ការវិភាគ ឬការគណនាដោយប្រើការគិត។
+  * ចម្លើយច្បាស់លាស់ និងការបង្ហាញពីការដោះស្រាយជាជំហានៗ។` : ''}
 
 CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
 If the questions involve math, physics, or chemistry:
@@ -358,7 +392,9 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
         text: q.text,
         options: q.options,
         correctIndex: q.correctIndex,
-        id: `q-${i}-${Date.now()}`
+        id: `q-${i}-${Date.now()}`,
+        questionType: questionType,
+        explanation: q.explanation || ""
       }));
     }
   } catch (error: any) {

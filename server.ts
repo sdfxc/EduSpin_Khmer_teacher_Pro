@@ -169,7 +169,7 @@ const ai = new GoogleGenAI({
 
 // API route to proxy Gemini API call
 app.post("/api/generate-questions", async (req, res) => {
-  const { lessonText, count, images, pdfs, officeFiles } = req.body;
+  const { lessonText, count, images, pdfs, officeFiles, questionType } = req.body;
   
   const hasText = lessonText && lessonText.trim().length > 0;
   const hasImages = images && Array.isArray(images) && images.length > 0;
@@ -228,9 +228,28 @@ app.post("/api/generate-questions", async (req, res) => {
     }
   }
 
+  const isPisa = questionType === 'pisa';
   const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${count || 25} multiple-choice questions for students in Khmer language. 
 Each question should be high-quality and have exactly 4 options.
 The language of the output questions and options must be in Khmer language, matching the theme of the material.
+
+${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
+
+=== គំរូ Prompt 01 (PISA Structure & Context) ===
+- តម្រូវឱ្យបង្កើតសំណួរបែប PISA សមស្របទៅតាមមុខវិជ្ជា (គណិតវិទ្យា/វិទ្យាសាស្ត្រ/អំណាន) និងកម្រិតថ្នាក់របស់សិស្ស។
+- សំណួរត្រូវតែផ្អែកលើស្ថានភាពជីវិតពិតជាក់ស្ដែង (Real-life situation) ហើយតម្រូវឱ្យមានការវិភាគវែកញែករកហេតុផល (Reasoning) មិនមែនគ្រាន់តែរំលឹកទ្រឹស្ដី ឬរូបមន្តមេរៀនឡើងវិញនោះទេ។
+- ក្នុងសំណួរនីមួយៗត្រូវរួមបញ្ចូល៖
+  * បរិបទ ឬ សេណារីយ៉ូខ្លីមួយ (Context/Scenario) សម្រាប់ឱ្យសិស្សអាននិងយល់។
+  * សំណួរពហុជ្រើសរើស មានជម្រើសចម្លើយ ៤ ជម្រើស មានចម្លើយត្រឹមត្រូវ ១ និងចម្លើយបន្លំជាលក្ខណៈគិតថ្លឹងថ្លែងចំនួន ៣។
+  * ចម្លើយត្រឹមត្រូវជាមួយនឹងការពន្យល់ល្អិតល្អន់ និងខ្លីៗអំពីមូលហេតុ។
+
+=== គំរូ Prompt 02 (Problem-Solving Level - PISA Level 3) ===
+- បង្កើតសំណួរបែប PISA ក្នុងកម្រិត៣ (Level 3) ដោយប្រើបរិបទពិភពលោកពិតពីជីវិតប្រចាំថ្ងៃទាក់ទងនឹងមេរៀន និងកម្រិតថ្នាក់។
+- ភារកិច្ចរបស់សំណួរគួរតែវាយតម្លៃលើសមត្ថភាពដោះស្រាយបញ្ហា (Problem-solving) និងការគិតត្រិះរិះស៊ីជម្រៅ (Critical Thinking)។
+- ត្រូវតែរួមបញ្ចូល៖
+  * អត្ថបទខ្លី ទិន្នន័យ តារាង ឬស្ថានភាពជាក់ស្ដែងមួយ។
+  * សំណួរផ្ទាល់ដែលតម្រូវឱ្យមានការបកស្រាយ (Interpretation) ការវិភាគ ឬការគណនាដោយប្រើការគិត។
+  * ចម្លើយច្បាស់លាស់ និងការបង្ហាញពីការដោះស្រាយជាជំហានៗ។` : ''}
 
 CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
 If the questions involve math, physics, or chemistry:
@@ -291,56 +310,73 @@ Provide the response in JSON format.`;
   }
 
   try {
-    const generateWithRetry = async (partsList: any[], retriesLeft = 4, delayMs = 1500): Promise<any> => {
-      try {
-        return await ai.models.generateContent({
-          model: "gemini-3.5-flash",
-          contents: { parts: partsList },
-          config: {
-            responseMimeType: "application/json",
-            responseSchema: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  text: { type: Type.STRING, description: "The question text, written in Khmer" },
-                  options: { 
-                    type: Type.ARRAY, 
-                    items: { type: Type.STRING },
-                    description: "Exactly 4 multiple choice options, written in Khmer"
-                  },
-                  correctIndex: { type: Type.INTEGER, description: "The 0-based index of the correct option" }
-                },
-                required: ["text", "options", "correctIndex"]
+    const modelsToTry = [
+      "gemini-flash-latest",
+      "gemini-3.1-flash-lite",
+      "gemini-3.5-flash"
+    ];
+
+    const generateWithFallback = async (partsList: any[]): Promise<any> => {
+      let lastError: any = null;
+      
+      for (const modelName of modelsToTry) {
+        const attempts = 2;
+        for (let attempt = 1; attempt <= attempts; attempt++) {
+          try {
+            console.log(`Attempting question generation with model: ${modelName} (attempt ${attempt}/${attempts})`);
+            const result = await ai.models.generateContent({
+              model: modelName,
+              contents: { parts: partsList },
+              config: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: Type.ARRAY,
+                  items: {
+                    type: Type.OBJECT,
+                    properties: {
+                      text: { type: Type.STRING, description: "The question text, written in Khmer" },
+                      options: { 
+                        type: Type.ARRAY, 
+                        items: { type: Type.STRING },
+                        description: "Exactly 4 multiple choice options, written in Khmer"
+                      },
+                      correctIndex: { type: Type.INTEGER, description: "The 0-based index of the correct option" },
+                      explanation: { type: Type.STRING, description: "Detailed explanation of why the correct option is right of the scenario and step-by-step reasoning in Khmer" }
+                    },
+                    required: ["text", "options", "correctIndex"]
+                  }
+                }
               }
+            });
+            return result;
+          } catch (error: any) {
+            lastError = error;
+            const errorMsg = error?.message || String(error);
+            console.warn(`Model ${modelName} failed on attempt ${attempt}: ${errorMsg}`);
+            
+            if (attempt < attempts) {
+              const delay = 1000 * attempt;
+              console.log(`Retrying ${modelName} in ${delay}ms...`);
+              await new Promise(resolve => setTimeout(resolve, delay));
             }
           }
-        });
-      } catch (error: any) {
-        const errorMsg = error?.message || String(error);
-        const isRetryable = 
-          errorMsg.includes("503") || 
-          errorMsg.includes("UNAVAILABLE") || 
-          errorMsg.includes("429") || 
-          errorMsg.includes("500") || 
-          errorMsg.toLowerCase().includes("overloaded") || 
-          errorMsg.toLowerCase().includes("demand") ||
-          errorMsg.toLowerCase().includes("temporary");
-          
-        if (isRetryable && retriesLeft > 0) {
-          console.warn(`Gemini API returned retryable error: ${errorMsg}. Retrying in ${delayMs}ms... (${retriesLeft} retries left)`);
-          await new Promise((resolve) => setTimeout(resolve, delayMs));
-          return generateWithRetry(partsList, retriesLeft - 1, delayMs * 2);
         }
-        throw error;
+        console.log(`Failing over to standard fallback model after ${modelName} encountered errors...`);
+        await new Promise(resolve => setTimeout(resolve, 500));
       }
+      
+      throw lastError || new Error("Failed after attempting all generative models and retries.");
     };
 
-    const response = await generateWithRetry(parts);
+    const response = await generateWithFallback(parts);
 
     const generatedText = response.text || "[]";
     const jsonParsed = JSON.parse(generatedText);
-    res.json({ questions: jsonParsed });
+    const mappedQuestions = Array.isArray(jsonParsed) ? jsonParsed.map((q: any) => ({
+      ...q,
+      questionType: questionType || 'general'
+    })) : [];
+    res.json({ questions: mappedQuestions });
   } catch (error: any) {
     console.error("Error generating questions from Gemini API:", error);
     res.status(500).json({ error: error.message || "មានកំហុសក្នុងការបង្កើតសំណួរពី Gemini API" });

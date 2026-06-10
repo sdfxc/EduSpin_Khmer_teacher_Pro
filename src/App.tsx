@@ -1222,9 +1222,9 @@ export default function App() {
         <GraduationCap className="w-5 h-5 text-indigo-500 shrink-0" />
         <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-2 shrink-0">ថ្នាក់រៀនសកម្ម៖</span>
         <div className="flex items-center gap-2">
-          {classes.map((cls) => (
+          {classes.map((cls, idx) => (
             <div 
-              key={cls.id}
+              key={cls.id ? `class-${cls.id}-${idx}` : `class-idx-${idx}`}
               onClick={() => handleSwitchClass(cls.id)}
               className={`px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all select-none border ${
                 activeClassId === cls.id 
@@ -1358,22 +1358,24 @@ export default function App() {
         )}
 
         {activeTab === 'groups' && (
-          <div className="flex-1 h-full overflow-y-auto bg-slate-50 dark:bg-[#0b0f19]">
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
             <GroupDivider
               students={students}
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
               activeClassId={activeClassId || ''}
               teacher={teacher}
+              isDarkMode={isDarkMode}
             />
           </div>
         )}
 
         {activeTab === 'students' && (
-          <div className="flex-1 h-full overflow-y-auto bg-slate-50 dark:bg-[#0b0f19]">
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
             <StudentManager
               students={students}
               classes={classes}
               activeClassId={activeClassId}
+              isDarkMode={isDarkMode}
               onAddStudentDetail={addStudentDetail}
               onRemoveStudent={removeStudent}
               onUpdateStudentDetail={updateStudentDetail}

@@ -17,6 +17,8 @@ export interface Question {
   text: string;
   options: string[];
   correctIndex: number;
+  questionType?: 'general' | 'pisa';
+  explanation?: string;
 }
 
 export interface QuizCard {

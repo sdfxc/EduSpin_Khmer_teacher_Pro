@@ -130,7 +130,8 @@ export default function QuizPanel({
         id: `q-added-${Date.now()}-${Math.random()}`,
         text: 'សំណួរថ្មី...',
         options: ['ចម្លើយទី ១', 'ចម្លើយទី ២', 'ចម្លើយទី ៣', 'ចម្លើយទី ៤'],
-        correctIndex: 0
+        correctIndex: 0,
+        questionType: 'general'
       },
       isRevealed: false,
       status: 'idle'
@@ -180,6 +181,21 @@ export default function QuizPanel({
           question: {
             ...card.question,
             correctIndex
+          }
+        };
+      }
+      return card;
+    }));
+  };
+
+  const handleUpdateLocalQuestionType = (questionType: 'general' | 'pisa') => {
+    setLocalEditCards(prev => prev.map((card, idx) => {
+      if (idx === selectedEditIndex) {
+        return {
+          ...card,
+          question: {
+            ...card.question,
+            questionType
           }
         };
       }
@@ -1454,7 +1470,16 @@ export default function QuizPanel({
           >
             <div className="bg-white dark:bg-white border-2 border-slate-200 shadow-md rounded-[2rem] p-10 mb-8 flex-1 flex flex-col items-center justify-center relative overflow-hidden">
               <HelpCircle className="absolute -top-12 -right-12 w-48 h-48 text-indigo-500/5 rotate-12" />
-              <span className="text-xs uppercase font-black tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full mb-4">សំណួរលេខ {activeCard.number}</span>
+              <div className="flex items-center gap-2 mb-4">
+                <span className="text-xs uppercase font-black tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">សំណួរលេខ {activeCard.number}</span>
+                <span className={`text-xs font-black px-3 py-1 rounded-full ${
+                  activeCard.question?.questionType === 'pisa'
+                    ? 'text-indigo-805 bg-indigo-50 border border-indigo-200 text-indigo-600'
+                    : 'text-amber-805 bg-amber-50 border border-amber-200 text-amber-600'
+                }`}>
+                  {activeCard.question?.questionType === 'pisa' ? '🎯 តេស្ត PISA' : '📚 មេរៀនទូទៅ'}
+                </span>
+              </div>
               <h2 className="text-3xl sm:text-4xl font-black text-slate-950 text-center leading-relaxed relative z-10 max-w-2xl break-words whitespace-normal word-break-break-word">
                 <FormulaRenderer text={activeCard.question?.text || ''} />
               </h2>
@@ -1526,6 +1551,18 @@ export default function QuizPanel({
                       </p>
                     </div>
                   )}
+
+                  {activeCard?.question?.explanation && (
+                    <div className="mb-4 p-4 bg-white/40 dark:bg-slate-900/40 border border-white/20 dark:border-slate-800 rounded-2xl max-w-lg text-slate-800 dark:text-slate-200">
+                      <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-700 dark:text-indigo-300 mb-1.5 tracking-wide">
+                        <span>💡 ការពន្យល់ស្ដង់ដា (Standard Explanation)៖</span>
+                      </div>
+                      <p className="text-[12.5px] leading-relaxed font-semibold">
+                        {activeCard.question.explanation}
+                      </p>
+                    </div>
+                  )}
+
                   <button
                     onClick={handleContinue}
                     className={`px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer ${
@@ -2261,9 +2298,18 @@ export default function QuizPanel({
                           }`}>
                             {idx + 1}
                           </span>
-                          <span className="text-xs font-bold truncate pr-1">
-                            {card.question?.text || '(គ្មានសំណួរ)'}
-                          </span>
+                          <div className="min-w-0 flex-1">
+                            <span className="text-xs font-bold truncate pr-1 block">
+                              {card.question?.text || '(គ្មានសំណួរ)'}
+                            </span>
+                            <span className={`inline-block text-[9px] font-black px-1.5 py-0.5 rounded-md mt-1 ${
+                              card.question?.questionType === 'pisa'
+                                ? 'bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/10'
+                                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/10'
+                            }`}>
+                              {card.question?.questionType === 'pisa' ? '🎯 PISA' : '📚 ទូទៅ'}
+                            </span>
+                          </div>
                         </div>
 
                         <button
@@ -2299,7 +2345,7 @@ export default function QuizPanel({
                         </span>
                       </div>
 
-                      {/* Question text */}
+                       {/* Question text */}
                       <div className="space-y-2">
                         <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
                           ខ្លឹមសារសំណួរ៖
@@ -2311,6 +2357,39 @@ export default function QuizPanel({
                           placeholder="បញ្ចូលខ្លឹមសារសំណួរ..."
                           className="w-full px-4 py-3 bg-slate-50 dark:bg-slate-850 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-amber-500 focus:border-amber-500 shadow-sm"
                         />
+                      </div>
+
+                      {/* Question category selector */}
+                      <div className="space-y-2.5">
+                        <label className="text-xs font-bold text-slate-700 dark:text-slate-300 block">
+                          ប្រភេទសំណួរ (Question Category)៖
+                        </label>
+                        <div className="grid grid-cols-2 gap-3">
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLocalQuestionType('general')}
+                            className={`px-4 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center ${
+                              (localEditCards[selectedEditIndex].question?.questionType || 'general') === 'general'
+                                ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-black'
+                                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="text-sm">📚 សំណួរបែបទូទៅនៃមេរៀន</span>
+                            <span className="text-[10px] opacity-75 font-semibold">General Lesson Question</span>
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleUpdateLocalQuestionType('pisa')}
+                            className={`px-4 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center ${
+                              localEditCards[selectedEditIndex].question?.questionType === 'pisa'
+                                ? 'bg-indigo-500/10 border-indigo-505 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-black'
+                                : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                            }`}
+                          >
+                            <span className="text-sm">🎯 សំណួរបែបតេស្ត PISA</span>
+                            <span className="text-[10px] opacity-75 font-semibold">PISA Test Question</span>
+                          </button>
+                        </div>
                       </div>
 
                       {/* Option Inputs */}
