@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye } from 'lucide-react';
+import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye, Pencil } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { Question, QuizCard, Student, QuizRoom, QuizChapter } from '../types';
+import { Question, QuizCard, Student, QuizRoom, QuizChapter, QuizSubject } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
 import { 
   Document, 
@@ -37,6 +37,14 @@ interface QuizPanelProps {
   onDeleteChapter: (chapterId: string) => void;
   isDarkMode?: boolean;
   onUpdateCards?: (updatedCards: QuizCard[]) => void;
+  
+  // Subject properties and callbacks
+  subjects?: QuizSubject[];
+  activeSubjectId?: string | null;
+  onSelectSubject?: (subjectId: string) => void;
+  onCreateSubject?: (name: string) => void;
+  onRenameSubject?: (subjectId: string, name: string) => void;
+  onDeleteSubject?: (subjectId: string) => void;
 }
 
 export const AVAILABLE_FONTS = [
@@ -81,7 +89,13 @@ export default function QuizPanel({
   onRenameChapter,
   onDeleteChapter,
   isDarkMode = false,
-  onUpdateCards
+  onUpdateCards,
+  subjects = [],
+  activeSubjectId = null,
+  onSelectSubject,
+  onCreateSubject,
+  onRenameSubject,
+  onDeleteSubject
 }: QuizPanelProps) {
   const activeRoom = chapters.reduce<QuizRoom | null>((found, ch) => {
     if (found) return found;
@@ -218,6 +232,12 @@ export default function QuizPanel({
   const [isCreatingChapter, setIsCreatingChapter] = useState(false);
   const [newChapterName, setNewChapterName] = useState('');
   const [openChapterDropdownId, setOpenChapterDropdownId] = useState<string | null>(null);
+
+  // Subject local editing states
+  const [isCreatingSubject, setIsCreatingSubject] = useState(false);
+  const [newSubjectName, setNewSubjectName] = useState('');
+  const [editingSubjectId, setEditingSubjectId] = useState<string | null>(null);
+  const [tempSubjectName, setTempSubjectName] = useState('');
 
   // Export & Print state
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
@@ -1913,6 +1933,174 @@ export default function QuizPanel({
                   </button>
                 </div>
               )}
+            </div>
+          </div>
+
+          {/* Subject Selection Section */}
+          <div className="mb-6 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-visible">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div className="space-y-1">
+                <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                  📚 មុខវិជ្ជាសកម្ម (Active Subject) ៖
+                </h4>
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
+                  សូមជ្រើសរើស មុខវិជ្ជាសកម្ម ដើម្បីមើលជំពូក និងមេរៀនរបស់មុខវិជ្ជានោះ។
+                </p>
+              </div>
+
+              {!isCreatingSubject ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setIsCreatingSubject(true);
+                    setNewSubjectName('');
+                  }}
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 flex items-center gap-1.5 shrink-0 self-start md:self-auto"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>បន្ថែមមុខវិជ្ជា</span>
+                </button>
+              ) : (
+                <div className="flex items-center gap-1.5 p-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs animate-in fade-in-25 duration-100 shrink-0">
+                  <input
+                    type="text"
+                    placeholder="ឈ្មោះមុខវិជ្ជាថ្មី..."
+                    value={newSubjectName}
+                    onChange={(e) => setNewSubjectName(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        if (newSubjectName.trim() && onCreateSubject) {
+                          onCreateSubject(newSubjectName.trim());
+                        }
+                        setIsCreatingSubject(false);
+                      }
+                      if (e.key === 'Escape') setIsCreatingSubject(false);
+                    }}
+                    autoFocus
+                    className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 w-36 sm:w-44 font-black"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      if (newSubjectName.trim() && onCreateSubject) {
+                        onCreateSubject(newSubjectName.trim());
+                      }
+                      setIsCreatingSubject(false);
+                    }}
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all active:scale-95"
+                  >
+                    បន្ថែម
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsCreatingSubject(false)}
+                    className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                  >
+                    បោះបង់
+                  </button>
+                </div>
+              )}
+            </div>
+
+            {/* List of subjects as pills */}
+            <div className="mt-4 flex flex-wrap gap-3">
+              {subjects.map((sub) => {
+                const isActive = sub.id === activeSubjectId;
+                const isEditing = editingSubjectId === sub.id;
+
+                if (isEditing) {
+                  return (
+                    <div 
+                      key={sub.id} 
+                      className="flex items-center gap-1.5 p-1 bg-indigo-500/5 border border-indigo-500 rounded-xl animate-in zoom-in-95 duration-100"
+                    >
+                      <input
+                        type="text"
+                        value={tempSubjectName}
+                        onChange={(e) => setTempSubjectName(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            if (tempSubjectName.trim() && onRenameSubject) {
+                              onRenameSubject(sub.id, tempSubjectName.trim());
+                            }
+                            setEditingSubjectId(null);
+                          }
+                          if (e.key === 'Escape') setEditingSubjectId(null);
+                        }}
+                        autoFocus
+                        className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-105 font-bold w-32"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => {
+                          if (tempSubjectName.trim() && onRenameSubject) {
+                            onRenameSubject(sub.id, tempSubjectName.trim());
+                          }
+                          setEditingSubjectId(null);
+                        }}
+                        className="p-1 text-green-600 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 rounded-md cursor-pointer shrink-0 transition-all active:scale-90"
+                      >
+                        <Check className="w-3.5 h-3.5" />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setEditingSubjectId(null)}
+                        className="p-1 text-slate-500 bg-slate-100 dark:bg-slate-800 hover:bg-slate-200 rounded-md cursor-pointer shrink-0 transition-all active:scale-90"
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  );
+                }
+
+                const subEmoji = sub.name === 'រូបវិទ្យា' ? '🧬' : sub.name === 'គីមីវិទ្យា' ? '🧪' : '📚';
+
+                return (
+                  <button
+                    key={sub.id}
+                    type="button"
+                    onClick={() => {
+                      if (!isActive && onSelectSubject) {
+                        onSelectSubject(sub.id);
+                      }
+                    }}
+                    className={`group px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border flex items-center gap-2.5 hover:shadow-xs relative select-none ${
+                      isActive
+                        ? 'bg-indigo-500/10 border-indigo-505 text-indigo-900 dark:text-indigo-305 font-extrabold ring-1 ring-indigo-500/20 shadow-sm'
+                        : 'bg-slate-50 hover:bg-slate-100/80 dark:bg-slate-850 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                    }`}
+                  >
+                    <span>{subEmoji} {sub.name}</span>
+                    
+                    {/* Tiny action block inside pills */}
+                    <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1 pl-1 border-l border-slate-300 dark:border-slate-700">
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setEditingSubjectId(sub.id);
+                          setTempSubjectName(sub.name);
+                        }}
+                        className="p-0.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950 rounded cursor-pointer transition-transform active:scale-90"
+                        title="កែឈ្មោះមុខវិជ្ជា"
+                      >
+                        <Pencil className="w-3 h-3" />
+                      </span>
+                      <span
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (onDeleteSubject) {
+                            onDeleteSubject(sub.id);
+                          }
+                        }}
+                        className="p-0.5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950 rounded cursor-pointer transition-transform active:scale-90"
+                        title="លុបមុខវិជ្ជា"
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </span>
+                    </span>
+                  </button>
+                );
+              })}
             </div>
           </div>
 

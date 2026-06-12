@@ -44,6 +44,13 @@ export interface QuizChapter {
   createdAt: number;
 }
 
+export interface QuizSubject {
+  id: string;
+  name: string;
+  chapters: QuizChapter[];
+  createdAt: number;
+}
+
 export interface ClassInfo {
   id: string;
   name: string;

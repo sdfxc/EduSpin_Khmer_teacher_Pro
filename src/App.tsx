@@ -12,13 +12,63 @@ import TeacherAuthModal from './components/TeacherAuthModal';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
 import StudentManager from './components/StudentManager';
-import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter } from './types';
+import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject } from './types';
 import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
+
+function getMigratedSubjects(loadedChapters: QuizChapter[]): { subjects: QuizSubject[], activeSubjectId: string } {
+  const chaptersToUse = loadedChapters.length > 0 ? loadedChapters : [
+    {
+      id: `chapter-default-${Date.now()}`,
+      name: 'ជំពូកទី១',
+      rooms: [
+        {
+          id: `room-default-${Date.now()}`,
+          name: 'មេរៀនទី១',
+          cards: [],
+          pickedIds: [],
+          createdAt: Date.now()
+        }
+      ],
+      createdAt: Date.now()
+    }
+  ];
+
+  const defaultSubjects: QuizSubject[] = [
+    {
+      id: 'subj-physics',
+      name: 'រូបវិទ្យា',
+      chapters: chaptersToUse,
+      createdAt: Date.now()
+    },
+    {
+      id: 'subj-chemistry',
+      name: 'គីមីវិទ្យា',
+      chapters: [
+        {
+          id: `chapter-chem-${Date.now()}`,
+          name: 'ជំពូកទី១',
+          rooms: [
+            {
+              id: `room-chem-${Date.now()}`,
+              name: 'មេរៀនទី១',
+              cards: [],
+              pickedIds: [],
+              createdAt: Date.now()
+            }
+          ],
+          createdAt: Date.now()
+        }
+      ],
+      createdAt: Date.now()
+    }
+  ];
+  return { subjects: defaultSubjects, activeSubjectId: 'subj-physics' };
+}
 
 const SAMPLE_STUDENTS: Record<string, Student[]> = {
   'class-7a': [
@@ -99,6 +149,8 @@ export default function App() {
 
   const [chapters, setChapters] = useState<QuizChapter[]>([]);
   const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
+  const [subjects, setSubjects] = useState<QuizSubject[]>([]);
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
@@ -192,65 +244,71 @@ export default function App() {
       const loadedStudents = localStorage.getItem(`students_class_${activeClassId}`);
       setStudents(loadedStudents ? JSON.parse(loadedStudents) : (SAMPLE_STUDENTS[activeClassId] || []));
 
-      const loadedChaptersStr = localStorage.getItem(`chapters_class_${activeClassId}`);
+      const loadedSubjectsStr = localStorage.getItem(`subjects_class_${activeClassId}`);
+      let loadedSubjects: QuizSubject[] = [];
+      let loadedActiveSubjectId: string | null = null;
       let loadedChapters: QuizChapter[] = [];
       let loadedActiveRoomId: string | null = null;
 
-      if (loadedChaptersStr) {
-        loadedChapters = JSON.parse(loadedChaptersStr);
-        loadedActiveRoomId = localStorage.getItem(`active_room_id_${activeClassId}`);
-        // Ensure accurate active roomId
-        if (!loadedActiveRoomId && loadedChapters.length > 0) {
-          loadedActiveRoomId = loadedChapters[0].rooms[0]?.id || null;
-        }
-      } else {
-        // Try migrating from legacy rooms
-        const loadedRoomsStr = localStorage.getItem(`rooms_class_${activeClassId}`);
-        if (loadedRoomsStr) {
-          const loadedRooms: QuizRoom[] = JSON.parse(loadedRoomsStr);
-          const defaultChapter: QuizChapter = {
-            id: `chapter-default-${Date.now()}`,
-            name: 'ជំពូកទី១',
-            rooms: loadedRooms,
-            createdAt: Date.now()
-          };
-          loadedChapters = [defaultChapter];
-          loadedActiveRoomId = localStorage.getItem(`active_room_id_${activeClassId}`) || loadedRooms[0]?.id;
-        } else {
-          // Migration of legacy cards data
-          const legacyCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
-          const legacyPickedStr = localStorage.getItem(`picked_students_class_${activeClassId}`);
-          const legacyCards = legacyCardsStr ? JSON.parse(legacyCardsStr) : [];
-          const legacyPicked = legacyPickedStr ? JSON.parse(legacyPickedStr) : [];
-
-          const defaultRoom: QuizRoom = {
-            id: `room-default-${Date.now()}`,
-            name: 'មេរៀនទី១',
-            cards: legacyCards,
-            pickedIds: legacyPicked,
-            createdAt: Date.now()
-          };
-          const defaultChapter: QuizChapter = {
-            id: `chapter-default-${Date.now()}`,
-            name: 'ជំពូកទី១',
-            rooms: [defaultRoom],
-            createdAt: Date.now()
-          };
-          loadedChapters = [defaultChapter];
-          loadedActiveRoomId = defaultRoom.id;
-        }
-        
-        // Save initial migrated chapters
-        localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(loadedChapters));
-        if (loadedActiveRoomId) {
-          localStorage.setItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
-        }
+      if (loadedSubjectsStr) {
+        loadedSubjects = JSON.parse(loadedSubjectsStr);
+        loadedActiveSubjectId = localStorage.getItem(`active_subject_id_${activeClassId}`) || (loadedSubjects[0]?.id || null);
       }
 
-      setChapters(loadedChapters);
-      setActiveRoomId(loadedActiveRoomId);
+      if (loadedSubjects.length === 0) {
+        // Try migrating from chapters
+        const loadedChaptersStr = localStorage.getItem(`chapters_class_${activeClassId}`);
+        let tempChapters: QuizChapter[] = [];
+        if (loadedChaptersStr) {
+          tempChapters = JSON.parse(loadedChaptersStr);
+        } else {
+          // Try migrating from legacy rooms
+          const loadedRoomsStr = localStorage.getItem(`rooms_class_${activeClassId}`);
+          if (loadedRoomsStr) {
+            const loadedRooms: QuizRoom[] = JSON.parse(loadedRoomsStr);
+            tempChapters = [{
+              id: `chapter-default-${Date.now()}`,
+              name: 'ជំពូកទី១',
+              rooms: loadedRooms,
+              createdAt: Date.now()
+            }];
+          } else {
+            // Migration of legacy cards data
+            const legacyCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
+            const legacyPickedStr = localStorage.getItem(`picked_students_class_${activeClassId}`);
+            const legacyCards = legacyCardsStr ? JSON.parse(legacyCardsStr) : [];
+            const legacyPicked = legacyPickedStr ? JSON.parse(legacyPickedStr) : [];
 
-      // Find the active room in any chapter
+            const defaultRoom: QuizRoom = {
+              id: `room-default-${Date.now()}`,
+              name: 'មេរៀនទី១',
+              cards: legacyCards,
+              pickedIds: legacyPicked,
+              createdAt: Date.now()
+            };
+            tempChapters = [{
+              id: `chapter-default-${Date.now()}`,
+              name: 'ជំពូកទី១',
+              rooms: [defaultRoom],
+              createdAt: Date.now()
+            }];
+          }
+        }
+
+        const migration = getMigratedSubjects(tempChapters);
+        loadedSubjects = migration.subjects;
+        loadedActiveSubjectId = migration.activeSubjectId;
+
+        localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(loadedSubjects));
+        localStorage.setItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
+      }
+
+      // Find chapters of currently active subject
+      const activeSub = loadedSubjects.find(s => s.id === loadedActiveSubjectId) || loadedSubjects[0];
+      loadedChapters = activeSub?.chapters || [];
+
+      // Determine active roomId
+      loadedActiveRoomId = localStorage.getItem(`active_room_id_${activeClassId}`);
       let activeRoom: QuizRoom | undefined;
       for (const ch of loadedChapters) {
         activeRoom = ch.rooms.find(r => r.id === loadedActiveRoomId);
@@ -258,7 +316,13 @@ export default function App() {
       }
       if (!activeRoom && loadedChapters.length > 0) {
         activeRoom = loadedChapters[0].rooms[0];
+        loadedActiveRoomId = activeRoom?.id || null;
       }
+
+      setSubjects(loadedSubjects);
+      setActiveSubjectId(loadedActiveSubjectId);
+      setChapters(loadedChapters);
+      setActiveRoomId(loadedActiveRoomId);
 
       setCards(activeRoom?.cards || []);
       setPickedIds(activeRoom?.pickedIds || []);
@@ -273,66 +337,75 @@ export default function App() {
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         const classSnap = await getDoc(classDocRef);
         
+        let loadedSubjects: QuizSubject[] = [];
+        let loadedActiveSubjectId: string | null = null;
         let loadedChapters: QuizChapter[] = [];
         let loadedActiveRoomId: string | null = null;
 
         if (classSnap.exists()) {
           const classData = classSnap.data();
-          if (classData.chapters && classData.chapters.length > 0) {
-            loadedChapters = classData.chapters;
-            loadedActiveRoomId = classData.activeRoomId || loadedChapters[0].rooms[0]?.id || null;
-          } else if (classData.rooms && classData.rooms.length > 0) {
-            // Migrating legacy rooms representation
-            const defaultChapter: QuizChapter = {
-              id: `chapter-default-${Date.now()}`,
-              name: 'ជំពូកទី១',
-              rooms: classData.rooms,
-              createdAt: Date.now()
-            };
-            loadedChapters = [defaultChapter];
-            loadedActiveRoomId = classData.activeRoomId || classData.rooms[0].id;
+          if (classData.subjects && classData.subjects.length > 0) {
+            loadedSubjects = classData.subjects;
+            loadedActiveSubjectId = classData.activeSubjectId || (loadedSubjects[0]?.id || null);
           } else {
-            // Migrating legacy struct
-            const legacyCards = classData.cards || [];
-            const legacyPicked = classData.pickedIds || [];
-            const defaultRoom: QuizRoom = {
-              id: `room-default-${Date.now()}`,
-              name: 'មេរៀនទី១',
-              cards: legacyCards,
-              pickedIds: legacyPicked,
-              createdAt: Date.now()
-            };
-            const defaultChapter: QuizChapter = {
-              id: `chapter-default-${Date.now()}`,
-              name: 'ជំពូកទី១',
-              rooms: [defaultRoom],
-              createdAt: Date.now()
-            };
-            loadedChapters = [defaultChapter];
-            loadedActiveRoomId = defaultRoom.id;
+            // First migrate chapters/rooms/legacy content
+            let tempChapters: QuizChapter[] = [];
+            if (classData.chapters && classData.chapters.length > 0) {
+              tempChapters = classData.chapters;
+            } else if (classData.rooms && classData.rooms.length > 0) {
+              tempChapters = [{
+                id: `chapter-default-${Date.now()}`,
+                name: 'ជំពូកទី១',
+                rooms: classData.rooms,
+                createdAt: Date.now()
+              }];
+            } else {
+              const legacyCards = classData.cards || [];
+              const legacyPicked = classData.pickedIds || [];
+              const defaultRoom: QuizRoom = {
+                id: `room-default-${Date.now()}`,
+                name: 'មេរៀនទី១',
+                cards: legacyCards,
+                pickedIds: legacyPicked,
+                createdAt: Date.now()
+              };
+              tempChapters = [{
+                id: `chapter-default-${Date.now()}`,
+                name: 'ជំពូកទី១',
+                rooms: [defaultRoom],
+                createdAt: Date.now()
+              }];
+            }
+            
+            const migration = getMigratedSubjects(tempChapters);
+            loadedSubjects = migration.subjects;
+            loadedActiveSubjectId = migration.activeSubjectId;
+            
+            // Sync the migrated subjects back to cloud!
+            await setDoc(classDocRef, {
+              subjects: loadedSubjects,
+              activeSubjectId: loadedActiveSubjectId
+            }, { merge: true });
           }
+          loadedActiveRoomId = classData.activeRoomId || null;
         } else {
-          // Empty or new class
-          const defaultRoom: QuizRoom = {
-            id: `room-default-${Date.now()}`,
-            name: 'មេរៀនទី១',
-            cards: [],
-            pickedIds: [],
-            createdAt: Date.now()
-          };
-          const defaultChapter: QuizChapter = {
-            id: `chapter-default-${Date.now()}`,
-            name: 'ជំពូកទី១',
-            rooms: [defaultRoom],
-            createdAt: Date.now()
-          };
-          loadedChapters = [defaultChapter];
-          loadedActiveRoomId = defaultRoom.id;
+          // Empty or new class in cloud
+          const migration = getMigratedSubjects([]);
+          loadedSubjects = migration.subjects;
+          loadedActiveSubjectId = migration.activeSubjectId;
+          
+          await setDoc(classDocRef, {
+            id: activeClassId,
+            subjects: loadedSubjects,
+            activeSubjectId: loadedActiveSubjectId,
+            createdAt: new Date().toISOString()
+          }, { merge: true });
         }
 
-        setChapters(loadedChapters);
-        setActiveRoomId(loadedActiveRoomId);
+        const activeSub = loadedSubjects.find(s => s.id === loadedActiveSubjectId) || loadedSubjects[0];
+        loadedChapters = activeSub?.chapters || [];
 
+        // Determine active roomId
         let activeRoom: QuizRoom | undefined;
         for (const ch of loadedChapters) {
           activeRoom = ch.rooms.find(r => r.id === loadedActiveRoomId);
@@ -340,7 +413,13 @@ export default function App() {
         }
         if (!activeRoom && loadedChapters.length > 0) {
           activeRoom = loadedChapters[0].rooms[0];
+          loadedActiveRoomId = activeRoom?.id || null;
         }
+
+        setSubjects(loadedSubjects);
+        setActiveSubjectId(loadedActiveSubjectId);
+        setChapters(loadedChapters);
+        setActiveRoomId(loadedActiveRoomId);
 
         setCards(activeRoom?.cards || []);
         setPickedIds(activeRoom?.pickedIds || []);
@@ -435,7 +514,7 @@ export default function App() {
 
   // Helper to save class-level states to Firestore
   const saveClassMetadata = useCallback(async (updatedCards: QuizCard[], updatedPickedIds: string[]) => {
-    if (!activeRoomId) return;
+    if (!activeRoomId || !activeSubjectId) return;
 
     const updatedChapters = chapters.map(ch => {
       const updatedRooms = ch.rooms.map(r => {
@@ -453,22 +532,38 @@ export default function App() {
 
     setChapters(updatedChapters);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+
+    setSubjects(updatedSubjects);
+
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       try {
         await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
-          chapters: updatedChapters,
-          activeRoomId: activeRoomId
+          subjects: updatedSubjects,
+          chapters: updatedChapters, // backward compatibility
+          activeRoomId: activeRoomId,
+          activeSubjectId: activeSubjectId
         }, { merge: true });
       } catch (err) {
         console.error('Failed to save class metadata to cloud:', err);
       }
     }
     if (!teacher && activeClassId) {
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters)); // backward compatibility
+      localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
       localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
     }
-  }, [teacher, activeClassId, activeRoomId, chapters]);
+  }, [teacher, activeClassId, activeRoomId, chapters, subjects, activeSubjectId]);
 
   // Helper to save student score updates to Firestore
   const saveStudentScore = useCallback(async (studentId: string, newScore: number) => {
@@ -529,16 +624,29 @@ export default function App() {
     setCards([]);
     setPickedIds([]);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+    setSubjects(updatedSubjects);
+
     if (teacher && activeClassId) {
       setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: newRoom.id
       }, { merge: true }).catch(err => console.error('Failed to save new room to cloud:', err));
     } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
       localStorage.setItem(`active_room_id_${activeClassId}`, newRoom.id);
     }
-  }, [chapters, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
   const handleDeleteRoom = useCallback((roomId: string) => {
     const totalRooms = chapters.reduce((total, ch) => total + ch.rooms.length, 0);
@@ -579,12 +687,25 @@ export default function App() {
     setChapters(updatedChapters);
     setActiveRoomId(nextActiveId);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+    setSubjects(updatedSubjects);
+
     if (teacher && activeClassId) {
       setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: nextActiveId
       }, { merge: true }).catch(err => console.error('Failed to sync room deletion to cloud:', err));
     } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
       if (nextActiveId) {
         localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveId);
@@ -592,7 +713,7 @@ export default function App() {
         localStorage.removeItem(`active_room_id_${activeClassId}`);
       }
     }
-  }, [chapters, activeRoomId, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, activeRoomId, teacher, activeClassId]);
 
   const handleRenameRoom = useCallback((roomId: string, newName: string) => {
     const updatedChapters = chapters.map(ch => {
@@ -607,14 +728,27 @@ export default function App() {
 
     setChapters(updatedChapters);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+    setSubjects(updatedSubjects);
+
     if (teacher && activeClassId) {
       setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to rename room in cloud:', err));
     } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
-  }, [chapters, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
   const handleCreateChapter = useCallback((chapterName: string) => {
     const newChapter: QuizChapter = {
@@ -626,14 +760,27 @@ export default function App() {
     const updatedChapters = [...chapters, newChapter];
     setChapters(updatedChapters);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+    setSubjects(updatedSubjects);
+
     if (teacher && activeClassId) {
       setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to create chapter in cloud:', err));
     } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
-  }, [chapters, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
   const handleRenameChapter = useCallback((chapterId: string, newName: string) => {
     const updatedChapters = chapters.map(ch => {
@@ -644,14 +791,27 @@ export default function App() {
     });
     setChapters(updatedChapters);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+    setSubjects(updatedSubjects);
+
     if (teacher && activeClassId) {
       setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to rename chapter in cloud:', err));
     } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
-  }, [chapters, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
   const handleDeleteChapter = useCallback((chapterId: string) => {
     if (chapters.length <= 1) {
@@ -693,12 +853,25 @@ export default function App() {
 
     setActiveRoomId(nextActiveRoomId);
 
+    const updatedSubjects = subjects.map(sub => {
+      if (sub.id === activeSubjectId) {
+        return {
+          ...sub,
+          chapters: updatedChapters
+        };
+      }
+      return sub;
+    });
+    setSubjects(updatedSubjects);
+
     if (teacher && activeClassId) {
       setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: nextActiveRoomId
       }, { merge: true }).catch(err => console.error('Failed to delete chapter in cloud:', err));
     } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
       if (nextActiveRoomId) {
         localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
@@ -706,7 +879,166 @@ export default function App() {
         localStorage.removeItem(`active_room_id_${activeClassId}`);
       }
     }
-  }, [chapters, activeRoomId, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, activeRoomId, teacher, activeClassId]);
+
+  const handleSelectSubject = useCallback((subjectId: string) => {
+    setActiveSubjectId(subjectId);
+    if (!teacher && activeClassId) {
+      localStorage.setItem(`active_subject_id_${activeClassId}`, subjectId);
+    } else if (teacher && activeClassId) {
+      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        activeSubjectId: subjectId
+      }, { merge: true }).catch(err => console.error('Failed to sync activeSubjectId:', err));
+    }
+
+    const sub = subjects.find(s => s.id === subjectId);
+    if (sub) {
+      setChapters(sub.chapters);
+      if (sub.chapters.length > 0 && sub.chapters[0].rooms.length > 0) {
+        const firstRoom = sub.chapters[0].rooms[0];
+        setActiveRoomId(firstRoom.id);
+        setCards(firstRoom.cards || []);
+        setPickedIds(firstRoom.pickedIds || []);
+        if (!teacher && activeClassId) {
+          localStorage.setItem(`active_room_id_${activeClassId}`, firstRoom.id);
+        } else if (teacher && activeClassId) {
+          setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+            activeRoomId: firstRoom.id
+          }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
+        }
+      } else {
+        setActiveRoomId(null);
+        setCards([]);
+        setPickedIds([]);
+        if (!teacher && activeClassId) {
+          localStorage.removeItem(`active_room_id_${activeClassId}`);
+        } else if (teacher && activeClassId) {
+          setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+            activeRoomId: null
+          }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
+        }
+      }
+    }
+  }, [subjects, teacher, activeClassId]);
+
+  const handleCreateSubject = useCallback((subjectName: string) => {
+    const newSubject: QuizSubject = {
+      id: `subject-${Date.now()}`,
+      name: subjectName,
+      chapters: [
+        {
+          id: `chapter-subj-${Date.now()}`,
+          name: 'ជំពូកទី១',
+          rooms: [
+            {
+              id: `room-subj-${Date.now()}`,
+              name: 'មេរៀនទី១',
+              cards: [],
+              pickedIds: [],
+              createdAt: Date.now()
+            }
+          ],
+          createdAt: Date.now()
+        }
+      ],
+      createdAt: Date.now()
+    };
+    const updatedSubjects = [...subjects, newSubject];
+    setSubjects(updatedSubjects);
+
+    setActiveSubjectId(newSubject.id);
+    setChapters(newSubject.chapters);
+    const defaultRoom = newSubject.chapters[0].rooms[0];
+    setActiveRoomId(defaultRoom.id);
+    setCards([]);
+    setPickedIds([]);
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+        subjects: updatedSubjects,
+        activeSubjectId: newSubject.id,
+        activeRoomId: defaultRoom.id,
+        chapters: newSubject.chapters
+      }, { merge: true }).catch(err => console.error('Failed to create subject in cloud:', err));
+    }
+    if (!teacher && activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`active_subject_id_${activeClassId}`, newSubject.id);
+      localStorage.setItem(`active_room_id_${activeClassId}`, defaultRoom.id);
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(newSubject.chapters));
+    }
+  }, [subjects, teacher, activeClassId]);
+
+  const handleRenameSubject = useCallback((subjectId: string, newName: string) => {
+    const updatedSubjects = subjects.map(s => {
+      if (s.id === subjectId) {
+        return { ...s, name: newName };
+      }
+      return s;
+    });
+    setSubjects(updatedSubjects);
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+        subjects: updatedSubjects
+      }, { merge: true }).catch(err => console.error('Failed to rename subject in cloud:', err));
+    } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+    }
+  }, [subjects, teacher, activeClassId]);
+
+  const handleDeleteSubject = useCallback((subjectId: string) => {
+    if (subjects.length <= 1) {
+      alert('មិនអាចលុបមុខវិជ្ជាទាំងអស់បានទេ! ត្រូវតែមានយ៉ាងហោចណាស់មុខវិជ្ជាសកម្មមួយ។');
+      return;
+    }
+    if (!window.confirm('តើអ្នកពិតជាចង់លុបមុខវិជ្ជានេះមែនទេ?​ ជំពូក មេរៀន និងគំនូសសកម្មភាពទាំងអស់នឹងត្រូវបាត់បង់ទាំងអស់។')) {
+      return;
+    }
+
+    const updatedSubjects = subjects.filter(s => s.id !== subjectId);
+    setSubjects(updatedSubjects);
+
+    let nextSubjectId = activeSubjectId;
+    let nextChapters = chapters;
+    let nextActiveRoomId = activeRoomId;
+
+    if (activeSubjectId === subjectId) {
+      const fallbackSubject = updatedSubjects[0];
+      nextSubjectId = fallbackSubject.id;
+      nextChapters = fallbackSubject.chapters;
+      
+      const activeRoom = nextChapters.length > 0 && nextChapters[0].rooms.length > 0 ? nextChapters[0].rooms[0] : null;
+      nextActiveRoomId = activeRoom ? activeRoom.id : null;
+      setChapters(nextChapters);
+      setActiveRoomId(nextActiveRoomId);
+      setCards(activeRoom ? activeRoom.cards || [] : []);
+      setPickedIds(activeRoom ? activeRoom.pickedIds || [] : []);
+    }
+
+    setActiveSubjectId(nextSubjectId);
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+        subjects: updatedSubjects,
+        activeSubjectId: nextSubjectId,
+        activeRoomId: nextActiveRoomId,
+        chapters: nextChapters
+      }, { merge: true }).catch(err => console.error('Failed to delete subject in cloud:', err));
+    } else if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      if (nextSubjectId) {
+        localStorage.setItem(`active_subject_id_${activeClassId}`, nextSubjectId);
+      }
+      if (nextActiveRoomId) {
+        localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
+      }
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(nextChapters));
+    }
+  }, [subjects, activeSubjectId, chapters, activeRoomId, teacher, activeClassId]);
 
   // Handler for switching class
   const handleSwitchClass = (classId: string) => {
@@ -1352,6 +1684,12 @@ export default function App() {
                 onDeleteChapter={handleDeleteChapter}
                 isDarkMode={isDarkMode}
                 onUpdateCards={handleUpdateCards}
+                subjects={subjects}
+                activeSubjectId={activeSubjectId}
+                onSelectSubject={handleSelectSubject}
+                onCreateSubject={handleCreateSubject}
+                onRenameSubject={handleRenameSubject}
+                onDeleteSubject={handleDeleteSubject}
               />
             </section>
           </>
