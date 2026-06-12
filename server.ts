@@ -169,7 +169,7 @@ const ai = new GoogleGenAI({
 
 // API route to proxy Gemini API call
 app.post("/api/generate-questions", async (req, res) => {
-  const { lessonText, count, images, pdfs, officeFiles, questionType } = req.body;
+  const { lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage = 'khmer' } = req.body;
   
   const hasText = lessonText && lessonText.trim().length > 0;
   const hasImages = images && Array.isArray(images) && images.length > 0;
@@ -229,9 +229,30 @@ app.post("/api/generate-questions", async (req, res) => {
   }
 
   const isPisa = questionType === 'pisa';
-  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${count || 25} multiple-choice questions for students in Khmer language. 
+  const isBilingual = pisaLanguage === 'bilingual';
+  const isEnglish = pisaLanguage === 'english';
+
+  let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the theme of the material.`;
+  if (isEnglish) {
+    languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST be written entirely in English language because this is an international standard evaluation. Do not use Khmer. Everything must be high-quality, clear, correct academic English translation.`;
+  } else if (isBilingual) {
+    languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST have both Khmer and English side-by-side (English support) because this is an international standard evaluation. For every question text, each option, and explanation text, write the Khmer text first, immediately followed by the English translation in parentheses. Example format:
+- Question: "តើអ្វីទៅជាប្រភពថាមពលចម្បងរបស់ផែនដី? (What is the main energy source of the Earth?)"
+- Options:
+  1. "ព្រះអាទិត្យ (The Sun)"
+  2. "ធ្យូងថ្ម (Coal)"
+  3. "ខ្យល់ (Wind)"
+  4. "ប្រេងកាត (Petroleum)"
+- Explanation: "ព្រះអាទិត្យគឺជាប្រភពថាមពលចម្បងដោយសារ... (The sun is the main source of energy because...)"
+Make sure everything including the options represents exact equivalent translations so that students can understand both Khmer and English.`;
+  }
+
+  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${count || 25} multiple-choice questions for students. 
 Each question should be high-quality and have exactly 4 options.
-The language of the output questions and options must be in Khmer language, matching the theme of the material.
+
+${languagePrompt}
+
+${!isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. However, mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions (e.g. if count is 10, around 2 of them should apply the formulas/theories to daily life scenarios, while the other 8 focus directly on the core lesson contents).` : ''}
 
 ${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
 
@@ -334,14 +355,14 @@ Provide the response in JSON format.`;
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      text: { type: Type.STRING, description: "The question text, written in Khmer" },
+                      text: { type: Type.STRING, description: "The question text, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" },
                       options: { 
                         type: Type.ARRAY, 
                         items: { type: Type.STRING },
-                        description: "Exactly 4 multiple choice options, written in Khmer"
+                        description: "Exactly 4 multiple choice options, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)"
                       },
                       correctIndex: { type: Type.INTEGER, description: "The 0-based index of the correct option" },
-                      explanation: { type: Type.STRING, description: "Detailed explanation of why the correct option is right of the scenario and step-by-step reasoning in Khmer" }
+                      explanation: { type: Type.STRING, description: "Detailed explanation of why the correct option is right of the scenario and step-by-step reasoning in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" }
                     },
                     required: ["text", "options", "correctIndex"]
                   }

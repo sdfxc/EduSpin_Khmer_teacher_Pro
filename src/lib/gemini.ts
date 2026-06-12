@@ -150,7 +150,8 @@ export async function generateQuestions(
   images: FileData[] = [],
   pdfs: FileData[] = [],
   officeFiles: FileData[] = [],
-  questionType: 'general' | 'pisa' = 'general'
+  questionType: 'general' | 'pisa' = 'general',
+  pisaLanguage: 'khmer' | 'english' | 'bilingual' = 'khmer'
 ): Promise<Question[]> {
   try {
     // 1. First, try to request the custom backend server proxy
@@ -160,7 +161,7 @@ export async function generateQuestions(
         headers: {
           "Content-Type": "application/json"
         },
-        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles, questionType })
+        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage })
       });
 
       if (response.ok) {
@@ -219,23 +220,42 @@ export async function generateQuestions(
           const txt = await extractClientDocx(of.data);
           extractedClientText += `\n[Word Document: ${name}]\n${txt}\n`;
         } else if (name.toLowerCase().endsWith(".pptx") || rawType.includes("presentationml")) {
-          const txt = await extractClientPptx(of.data);
-          extractedClientText += `\n[PowerPoint Presentation: ${name}]\n${txt}\n`;
-        } else if (name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".csv") || rawType.includes("spreadsheet") || rawType.includes("excel")) {
+          const txt = await extractClientPptx(of.data);        } else if (name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".csv") || rawType.includes("spreadsheet") || rawType.includes("excel")) {
           const txt = extractClientExcel(of.data);
           extractedClientText += `\n[Excel Sheet: ${name}]\n${txt}\n`;
         }
       }
 
       const isPisa = questionType === 'pisa';
-      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${count} multiple-choice questions for students in Khmer language. 
+      const isBilingual = pisaLanguage === 'bilingual';
+      const isEnglish = pisaLanguage === 'english';
+      
+      let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the theme.`;
+      if (isEnglish) {
+        languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST be written entirely in English language because this is an international standard evaluation. Do not use Khmer. Everything must be high-quality, clear, correct academic English translation.`;
+      } else if (isBilingual) {
+        languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST have both Khmer and English side-by-side (English support) because this is an international standard evaluation. For every question text, each option, and explanation text, write the Khmer text first, immediately followed by the English translation in parentheses. Example format:
+- Question: "តើអ្វីទៅជាប្រភពថាមពលចម្បងរបស់ផែនដី? (What is the main energy source of the Earth?)"
+- Options:
+  1. "ព្រះអាទិត្យ (The Sun)"
+  2. "ធ្យូងថ្ម (Coal)"
+  3. "ខ្យល់ (Wind)"
+  4. "ប្រេងកាត (Petroleum)"
+- Explanation: "ព្រះអាទិត្យគឺជាប្រភពថាមពលចម្បងដោយសារ... (The sun is the main source of energy because...)"
+Make sure everything including the options represents exact equivalent translations so that students can understand both Khmer and English.`;
+      }
+
+      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${count} multiple-choice questions for students. 
 Each question should be high-quality and have exactly 4 options.
-The language of the output questions and options must be in Khmer language, matching the theme.
+
+${languagePrompt}
+
+${!isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. However, mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions (e.g. if count is 10, around 2 of them should apply the formulas/theories to daily life scenarios, while the other 8 focus directly on the core lesson contents).` : ''}
 
 ${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
 
 === គំរូ Prompt 01 (PISA Structure & Context) ===
-- តម្រូវឱ្យបង្កើតសំណួរបែប PISA សមស្របទៅតាមមុខវិជ្ជា (គណិតវិទ្យា/វិទ្យាសាស្ត្រ/អំណាន) និងកម្រិតថ្នាក់របស់សិស្ស។
+- តម្រូវឱ្យបង្កើតសំណួរបែប PISA សមស្របទៅតាមមុខវិជ្ជា (គណិតវិទ្យា/វិទ្យាសាស្រ្ដ/អំណាន) និងកម្រិតថ្នាក់របស់សិស្ស។
 - សំណួរត្រូវតែផ្អែកលើស្ថានភាពជីវិតពិតជាក់ស្ដែង (Real-life situation) ហើយតម្រូវឱ្យមានការវិភាគវែកញែករកហេតុផល (Reasoning) មិនមែនគ្រាន់តែរំលឹកទ្រឹស្ដី ឬរូបមន្តមេរៀនឡើងវិញនោះទេ។
 - ក្នុងសំណួរនីមួយៗត្រូវរួមបញ្ចូល៖
   * បរិបទ ឬ សេណារីយ៉ូខ្លីមួយ (Context/Scenario) សម្រាប់ឱ្យសិស្សអាននិងយល់។
@@ -318,13 +338,14 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
                   items: {
                     type: "OBJECT",
                     properties: {
-                      text: { type: "STRING", description: "The question text, written in Khmer" },
+                      text: { type: "STRING", description: "The question text, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" },
                       options: { 
                         type: "ARRAY", 
                         items: { type: "STRING" },
-                        description: "Exactly 4 multiple choice options, written in Khmer"
+                        description: "Exactly 4 multiple choice options, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)"
                       },
-                      correctIndex: { type: "INTEGER", description: "The 0-based index of the correct option" }
+                      correctIndex: { type: "INTEGER", description: "The 0-based index of the correct option" },
+                      explanation: { type: "STRING", description: "Detailed explanation of why the correct option is right in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" }
                     },
                     required: ["text", "options", "correctIndex"]
                   }
@@ -381,7 +402,7 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
         throw new Error(errMsg);
       }
 
-      const jsonResult = await directRes.ok ? await directRes.json() : {};
+      const jsonResult = await directRes.json();
       const textContent = jsonResult.candidates?.[0]?.content?.parts?.[0]?.text;
       if (!textContent) {
         throw new Error("គ្មានទិន្នន័យត្រឡប់មកវិញពី Gemini API ទេ។");

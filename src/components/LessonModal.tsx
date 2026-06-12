@@ -39,6 +39,7 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
   const [showKeyInput, setShowKeyInput] = useState(false);
   const [errorMsg, setErrorMsg] = useState('');
   const [generationType, setGenerationType] = useState<'general' | 'pisa'>('general');
+  const [pisaLanguage, setPisaLanguage] = useState<'khmer' | 'english' | 'bilingual'>('khmer');
   
   // States for files
   const [uploadedImages, setUploadedImages] = useState<FileData[]>([]);
@@ -153,7 +154,7 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
     setLoading(true);
     setErrorMsg('');
     try {
-      const questions = await generateQuestions(text, count, uploadedImages, uploadedPdfs, uploadedOfficeFiles, generationType);
+      const questions = await generateQuestions(text, count, uploadedImages, uploadedPdfs, uploadedOfficeFiles, generationType, pisaLanguage);
       onQuestionsGenerated(questions);
       // Clean up inputs on success
       setText('');
@@ -321,10 +322,59 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                     <span className="text-[10px] opacity-75 font-semibold">PISA Evaluation Standards</span>
                   </button>
                 </div>
+                <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
+                  <label className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 mb-2 tracking-wide">
+                    🌐 ជម្រើសភាសានៃសំណួរ (Question Language Option)៖
+                  </label>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <button
+                      type="button"
+                      onClick={() => setPisaLanguage('khmer')}
+                      className={`p-3 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center min-h-[72px] ${
+                        pisaLanguage === 'khmer'
+                          ? generationType === 'general'
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
+                            : 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
+                          : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <span className="text-[12px] font-bold">🇰🇭 ភាសាខ្មែរ (Khmer Only)</span>
+                      <span className="text-[9px] opacity-75 font-semibold">1. សំណួរចម្លើយជាភាសាខ្មែរ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPisaLanguage('english')}
+                      className={`p-3 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center min-h-[72px] ${
+                        pisaLanguage === 'english'
+                          ? generationType === 'general'
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
+                            : 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
+                          : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <span className="text-[12px] font-bold">🇬🇧 ភាសាអង់គ្លេស (English Only)</span>
+                      <span className="text-[9px] opacity-75 font-semibold">2. សំណួរចម្លើយជាភាសាអង់គ្លេស</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setPisaLanguage('bilingual')}
+                      className={`p-3 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center min-h-[72px] ${
+                        pisaLanguage === 'bilingual'
+                          ? generationType === 'general'
+                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
+                            : 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
+                          : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                      }`}
+                    >
+                      <span className="text-[12px] font-bold">🇬🇧+🇰🇭 មានភាសាអង់គ្លេសអម</span>
+                      <span className="text-[9px] opacity-75 font-semibold">3. With English Support</span>
+                    </button>
+                  </div>
+                </div>
                 <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 leading-relaxed font-semibold">
                   {generationType === 'pisa' 
                     ? '🎯 សំណួរបែបតេស្ត PISA៖ ផ្ដោតទៅលើការដោះស្រាយបញ្ហាក្នុងជីវភាពរស់នៅជាក់ស្ដែង ការវិភាគវែកញែកស៊ីជម្រៅ និងការប្រើប្រាស់ការគិតបែបស៊ីជម្រៅ (Critical Thinking) ស្របតាមស្ដង់ដាអន្តរជាតិ។'
-                    : '📚 សំណួរបែបទូទៅនៃមេរៀន៖ បង្កើតសំណួរដែលសួរទាក់ទងនឹងនិយមន័យ រូបមន្ត ទ្រឹស្ដី ឬចំណុចសំខាន់ៗដែលមានចែងផ្ទាល់នៅក្នុងមេរៀន។'}
+                    : '📚 សំណួរបែបទូទៅនៃមេរៀន៖ បង្កើតសំណួរដែលសួរទាក់ទងនឹងនិយមន័យ រូបមន្ត ទ្រឹស្ដី ឬចំណុចសំខាន់ៗដែលមានចែងផ្ទាល់នៅក្នុងមេរៀន លាយខ្លះៗអំពីជីវភាពរស់នៅប្រចាំថ្ងៃ 20% នៃសំណួរសរុប100%។'}
                 </p>
               </div>
 
