@@ -171,9 +171,33 @@ const SAMPLE_STUDENTS: Record<string, Student[]> = {
 };
 
 const DEFAULT_CLASSES: ClassInfo[] = [
+  { id: 'class-7a', name: 'ថ្នាក់ទី៧ក' },
   { id: 'class-8a', name: 'ថ្នាក់ទី៨ក' },
   { id: 'class-9a', name: 'ថ្នាក់ទី៩ក' }
 ];
+
+const PINNED_CLASS_NAMES = ['ថ្នាក់ទី៧ក', 'ថ្នាក់ទី៨ក', 'ថ្នាក់ទី៩ក'];
+const isPinnedClass = (classId: string, className: string): boolean => {
+  const name = className ? className.trim() : '';
+  return ['class-7a', 'class-8a', 'class-9a'].includes(classId) || PINNED_CLASS_NAMES.includes(name);
+};
+
+const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
+  const clean = classList.filter(c => c && c.name && c.name.trim() !== '');
+  const uniqueIds = new Set<string>();
+  const uniqueNames = new Set<string>();
+  const filtered = clean.filter(c => {
+    const trimmedName = c.name.trim();
+    if (uniqueIds.has(c.id) || uniqueNames.has(trimmedName)) return false;
+    uniqueIds.add(c.id);
+    uniqueNames.add(trimmedName);
+    return true;
+  });
+
+  const pinned = filtered.filter(c => isPinnedClass(c.id, c.name));
+  const others = filtered.filter(c => !isPinnedClass(c.id, c.name));
+  return [...pinned, ...others];
+};
 
 export default function App() {
   const [studentMode] = useState<boolean>(() => {
@@ -196,43 +220,35 @@ export default function App() {
 
   const [classes, setClasses] = useState<ClassInfo[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    let rawClasses: ClassInfo[] = [];
     if (savedTeacherObj === null) {
       const saved = localStorage.getItem('khmer_teacher_classes');
-      const parsed = saved ? JSON.parse(saved) as ClassInfo[] : DEFAULT_CLASSES;
-      const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
-      let found7a = false;
-      return clean.filter(c => {
-        if (c.name.trim() === 'ថ្នាក់ទី៧ក') {
-          if (found7a) return false;
-          found7a = true;
-        }
-        return true;
-      });
+      rawClasses = saved ? JSON.parse(saved) as ClassInfo[] : DEFAULT_CLASSES;
     } else {
       try {
         const teacherObj = JSON.parse(savedTeacherObj);
         const saved = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`);
-        const parsed = saved ? JSON.parse(saved) as ClassInfo[] : [];
-        const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
-        let found7a = false;
-        return clean.filter(c => {
-          if (c.name.trim() === 'ថ្នាក់ទី៧ក') {
-            if (found7a) return false;
-            found7a = true;
-          }
-          return true;
-        });
+        rawClasses = saved ? JSON.parse(saved) as ClassInfo[] : DEFAULT_CLASSES;
       } catch (e) {
-        return [];
+        rawClasses = DEFAULT_CLASSES;
       }
     }
+
+    const merged = [...rawClasses];
+    DEFAULT_CLASSES.forEach(pc => {
+      if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
+        merged.push(pc);
+      }
+    });
+
+    return sortClasses(merged);
   });
 
   const [activeClassId, setActiveClassId] = useState<string>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
     if (savedTeacherObj === null) {
       const saved = localStorage.getItem('khmer_teacher_active_class_id');
-      return saved || 'class-8a';
+      return saved || 'class-7a';
     } else {
       try {
         const teacherObj = JSON.parse(savedTeacherObj);
@@ -243,23 +259,36 @@ export default function App() {
         if (savedClasses) {
           const parsed = JSON.parse(savedClasses) as ClassInfo[];
           const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
-          let found7a = false;
-          availableClasses = clean.filter(c => {
-            if (c.name.trim() === 'ថ្នាក់ទី៧ក') {
-              if (found7a) return false;
-              found7a = true;
-            }
-            return true;
-          });
+          availableClasses = clean;
+        } else {
+          availableClasses = DEFAULT_CLASSES;
         }
         
-        if (savedActiveId && availableClasses.some(c => c.id === savedActiveId)) {
+        const merged = [...availableClasses];
+        DEFAULT_CLASSES.forEach(pc => {
+          if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
+            merged.push(pc);
+          }
+        });
+
+        const uniqueIds = new Set<string>();
+        const uniqueNames = new Set<string>();
+        const cleanAvailable = merged.filter(c => {
+          if (!c || !c.name) return false;
+          const trimmedName = c.name.trim();
+          if (uniqueIds.has(c.id) || uniqueNames.has(trimmedName)) return false;
+          uniqueIds.add(c.id);
+          uniqueNames.add(trimmedName);
+          return true;
+        });
+
+        if (savedActiveId && cleanAvailable.some(c => c.id === savedActiveId)) {
           return savedActiveId;
         }
-        if (availableClasses.length > 0) return availableClasses[0].id;
-        return '';
+        if (cleanAvailable.length > 0) return cleanAvailable[0].id;
+        return 'class-7a';
       } catch (e) {
-        return '';
+        return 'class-7a';
       }
     }
   });
@@ -267,7 +296,7 @@ export default function App() {
   const [students, setStudents] = useState<Student[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
     if (savedTeacherObj === null) {
-      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
       const saved = localStorage.getItem(`students_class_${activeId}`);
       return saved ? JSON.parse(saved) : (SAMPLE_STUDENTS[activeId] || []);
     } else {
@@ -286,7 +315,7 @@ export default function App() {
   const [cards, setCards] = useState<QuizCard[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
     if (savedTeacherObj === null) {
-      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
       const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
       return saved ? JSON.parse(saved) : [];
     } else {
@@ -305,7 +334,7 @@ export default function App() {
   const [pickedIds, setPickedIds] = useState<string[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
     if (savedTeacherObj === null) {
-      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
       const saved = localStorage.getItem(`picked_students_class_${activeId}`);
       return saved ? JSON.parse(saved) : [];
     } else {
@@ -356,9 +385,9 @@ export default function App() {
   useEffect(() => {
     if (!teacher) {
       const savedClasses = localStorage.getItem('khmer_teacher_classes');
-      setClasses(savedClasses ? JSON.parse(savedClasses) : DEFAULT_CLASSES);
+      setClasses(sortClasses(savedClasses ? JSON.parse(savedClasses) : DEFAULT_CLASSES));
       
-      const savedActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const savedActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
       setActiveClassId(savedActiveId);
       return;
     }
@@ -479,8 +508,15 @@ export default function App() {
          }
 
         // Do not seed or pin DEFAULT_CLASSES when registering/logging in! Let newly registered accounts be clean.
-        setClasses(fetchedClasses);
-        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(fetchedClasses));
+        const merged = [...fetchedClasses];
+        DEFAULT_CLASSES.forEach(pc => {
+          if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
+            merged.push(pc);
+          }
+        });
+        const sortedCloudClasses = sortClasses(merged);
+        setClasses(sortedCloudClasses);
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
         
         const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || (fetchedClasses[0]?.id || '');
         const exists = fetchedClasses.some(c => c.id === lastActiveId);
@@ -1395,12 +1431,12 @@ export default function App() {
         }
       }
       
-      const updatedClasses = [...classes, newClass];
-      setClasses(updatedClasses);
+      const sortedClasses = sortClasses([...classes, newClass]);
+      setClasses(sortedClasses);
       if (teacher) {
-        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(updatedClasses));
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
       } else {
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(updatedClasses));
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       }
       
       handleSwitchClass(newClassId);
@@ -1423,11 +1459,12 @@ export default function App() {
         console.error(err);
       }
       
-      setClasses(updatedClasses);
+      const sortedClasses = sortClasses(updatedClasses);
+      setClasses(sortedClasses);
       if (teacher) {
-        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(updatedClasses));
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
       } else {
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(updatedClasses));
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       }
 
       localStorage.removeItem(`students_class_${classId}`);
@@ -1446,12 +1483,13 @@ export default function App() {
     if (newName && newName.trim() && newName.trim() !== currentName) {
       const trimmedName = newName.trim();
       const updatedClasses = classes.map(c => c.id === classId ? { ...c, name: trimmedName } : c);
-      setClasses(updatedClasses);
+      const sortedClasses = sortClasses(updatedClasses);
+      setClasses(sortedClasses);
       
       if (teacher) {
-        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(updatedClasses));
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
       } else {
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(updatedClasses));
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       }
       
       const currentTeacherId = teacher?.id || 'local';
@@ -1722,7 +1760,7 @@ export default function App() {
       setActiveCardId(null);
       setTeacher(null);
       setClasses(DEFAULT_CLASSES);
-      setActiveClassId('class-8a');
+      setActiveClassId('class-7a');
     }
   }, []);
 
@@ -1751,7 +1789,7 @@ export default function App() {
       // Reset application states back to fresh template
       setTeacher(null);
       setClasses(DEFAULT_CLASSES);
-      setActiveClassId('class-8a');
+      setActiveClassId('class-7a');
       setStudents([]);
       setCards([]);
       setPickedIds([]);
