@@ -263,6 +263,7 @@ export default function QuizPanel({
   const [examName, setExamName] = useState('...................................');
   const [gradeNumber, setGradeNumber] = useState('..................');
   const [examSession, setExamSession] = useState('......../......../........');
+  const [studentName, setStudentName] = useState('.......................');
   const [durationTime, setDurationTime] = useState('................ នាទី');
   const [totalScore, setTotalScore] = useState('...... ពិន្ទុ');
   
@@ -511,16 +512,12 @@ export default function QuizPanel({
               <div class="school-title">${logoText1}</div>
               <div style="font-size: 9pt; margin-top: 2px;">${logoText2}</div>
             </td>
-            <td class="header-cell" style="width: 23%; text-align: left; padding-left: 10px;">
+            <td class="header-cell" style="width: 38%; text-align: left; padding-left: 10px;">
               <div>ប្រឡង៖ <span class="bold-text">${examName}</span></div>
               <div style="margin-top: 6px;">ថ្នាក់ទី៖ <span class="bold-text">${gradeNumber}</span></div>
               <div style="margin-top: 6px;">សម័យប្រឡង៖ <span class="bold-text">${examSession}</span></div>
-              <div style="margin-top: 6px;">រយៈពេល៖ <span class="bold-text">${durationTime}</span> <span style="font-size: 9pt;">(${totalScore})</span></div>
-            </td>
-            <td class="header-cell" style="width: 15%; text-align: center; vertical-align: bottom; padding-bottom: 0px;">
-              <div style="border: 3px double #000000; border-radius: 25px; width: 85px; height: 65px; text-align: center; display: inline-block; margin-top: 25px;">
-                <div style="border-top: 1px dashed #000000; margin-top: 32px; width: 55px; margin-left: auto; margin-right: auto;"></div>
-              </div>
+              <div style="margin-top: 6px;">ឈ្មោះ៖ <span class="bold-text">${studentName}</span></div>
+              <div style="margin-top: 6px;">រយៈពេល៖ <span class="bold-text">${durationTime}</span> ${totalScore ? `<span style="font-size: 9pt;">(${totalScore})</span>` : ''}</div>
             </td>
           </tr>
         </table>
@@ -1024,8 +1021,12 @@ export default function QuizPanel({
         spacing: { after: 120 },
         children: [
           new TextRun({ text: "ប្រឡង៖ ", font: selectedHeaderFontObj.name, size: headerFontSize * 2, bold: true }),
-          new TextRun({ text: examName || "..................", font: selectedHeaderFontObj.name, size: headerFontSize * 2 }),
-          new TextRun({ text: "  ", font: selectedHeaderFontObj.name, size: headerFontSize * 2 }),
+          new TextRun({ text: examName || "..................", font: selectedHeaderFontObj.name, size: headerFontSize * 2 })
+        ]
+      }),
+      new Paragraph({
+        spacing: { after: 120 },
+        children: [
           new TextRun({ text: "ថ្នាក់ទី៖ ", font: selectedHeaderFontObj.name, size: headerFontSize * 2, bold: true }),
           new TextRun({ text: gradeNumber || "...............", font: selectedHeaderFontObj.name, size: headerFontSize * 2 })
         ]
@@ -1038,6 +1039,13 @@ export default function QuizPanel({
         ]
       }),
       new Paragraph({
+        spacing: { after: 120 },
+        children: [
+          new TextRun({ text: "ឈ្មោះ៖ ", font: selectedHeaderFontObj.name, size: headerFontSize * 2, bold: true }),
+          new TextRun({ text: studentName || ".......................", font: selectedHeaderFontObj.name, size: headerFontSize * 2 })
+        ]
+      }),
+      new Paragraph({
         children: [
           new TextRun({ text: "រយៈពេល៖ ", font: selectedHeaderFontObj.name, size: headerFontSize * 2, bold: true }),
           new TextRun({ text: durationTime ? `${durationTime}` : "................ នាទី", font: selectedHeaderFontObj.name, size: headerFontSize * 2 }),
@@ -1045,42 +1053,6 @@ export default function QuizPanel({
         ]
       })
     ];
-
-    const scoreCell = new TableCell({
-      width: { size: pctScore, type: WidthType.PERCENTAGE },
-      borders: {
-        top: { style: BorderStyle.DOUBLE, size: 24, color: "000000" },
-        bottom: { style: BorderStyle.DOUBLE, size: 24, color: "000000" },
-        left: { style: BorderStyle.DOUBLE, size: 24, color: "000000" },
-        right: { style: BorderStyle.DOUBLE, size: 24, color: "000000" },
-      },
-      verticalAlign: VerticalAlign.CENTER,
-      children: [
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          children: [
-            new TextRun({
-              text: "ពិន្ទុ",
-              font: selectedHeaderFontObj.name,
-              size: 20,
-              bold: true,
-            })
-          ]
-        }),
-        new Paragraph({
-          alignment: AlignmentType.CENTER,
-          spacing: { before: 40 },
-          children: [
-            new TextRun({
-              text: ".......",
-              font: selectedHeaderFontObj.name,
-              size: 20,
-              bold: true,
-            })
-          ]
-        })
-      ]
-    });
 
     const headerTable = new Table({
       width: { size: 100, type: WidthType.PERCENTAGE },
@@ -1099,12 +1071,11 @@ export default function QuizPanel({
               children: centerCellChildren,
             }),
             new TableCell({
-              width: { size: pctRight, type: WidthType.PERCENTAGE },
+              width: { size: pctRight + pctScore, type: WidthType.PERCENTAGE },
               borders: tableBordersNone,
               margins: { left: 200 },
               children: rightCellChildren,
-            }),
-            scoreCell
+            })
           ]
         })
       ]
@@ -2790,6 +2761,15 @@ export default function QuizPanel({
                           />
                         </div>
                         <div>
+                          <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">ឈ្មោះ</label>
+                          <input
+                            type="text"
+                            value={studentName}
+                            onChange={(e) => setStudentName(e.target.value)}
+                            className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                          />
+                        </div>
+                        <div>
                           <label className="block text-[10px] font-bold text-slate-500 dark:text-slate-400 mb-1">រយៈពេល & ពិន្ទុ</label>
                           <div className="flex gap-1.5">
                             <input
@@ -2878,7 +2858,7 @@ export default function QuizPanel({
                                 }
                               }}
                             />
-                            <label
+                             <label
                               htmlFor="custom-logo-uploader"
                               className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 border border-indigo-150 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black rounded-lg cursor-pointer transition-all active:scale-95 uppercase tracking-wide"
                             >
@@ -2972,8 +2952,6 @@ export default function QuizPanel({
                       </label>
                     </div>
                   </div>
-
-                  {/* Page Size & Margins Settings Card */}
                   <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
                     <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
                       <Layers className="w-4 h-4 text-purple-500" />
@@ -3018,14 +2996,16 @@ export default function QuizPanel({
                                 setMarginRight(1.5);
                               }
                             }}
-                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-750 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
+                            className="w-full px-3 py-2 border border-slate-200 dark:border-slate-755 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 rounded-xl font-medium focus:ring-1 focus:ring-indigo-500 outline-none cursor-pointer"
                           >
                             <option value="cm" className="bg-white text-black dark:bg-slate-900 dark:text-white">សង់ទីម៉ែត្រ (cm)</option>
                             <option value="in" className="bg-white text-black dark:bg-slate-900 dark:text-white">អ៊ីញ (inches)</option>
                           </select>
                         </div>
+                      </div>
 
-                        {/* Header Layout type selector */}
+                      {/* Header Layout Choice */}
+                      <div className="grid grid-cols-2 gap-4">
                         <div className="space-y-2 col-span-2">
                           <label className="font-bold text-slate-700 dark:text-slate-300">ប្លង់ក្បាលសន្លឹកកិច្ចការ (Header Layout)៖</label>
                           <select
@@ -3141,6 +3121,8 @@ export default function QuizPanel({
                     </div>
                   </div>
 
+
+
                   {/* Font & Font Size Configurations */}
                   <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 shadow-xs space-y-4">
                     <div className="flex items-center gap-1.5 border-b border-slate-100 dark:border-slate-800 pb-2">
@@ -3149,6 +3131,7 @@ export default function QuizPanel({
                     </div>
 
                     <div className="grid grid-cols-2 gap-4 text-xs">
+
                       {/* Header Font and Size */}
                       <div className="space-y-2">
                         <label className="font-bold text-slate-700 dark:text-slate-300">ពុម្ពអក្សរក្បាលលើ (Header Font)៖</label>
@@ -3205,7 +3188,6 @@ export default function QuizPanel({
                     </div>
                   </div>
                 </div>
-
 
 
                 {/* Right page visual preview panel */}

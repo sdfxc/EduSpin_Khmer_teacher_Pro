@@ -22,6 +22,57 @@
   .custom-scrollbar::-webkit-scrollbar-thumb {
     @apply bg-slate-200 rounded-full hover:bg-slate-300 transition-colors;
   }
+  
+  /* Gemini-style color wave flow animation */
+  @keyframes geminiWave {
+    0% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+    100% { background-position: 0% 50%; }
+  }
+
+  .btn-orange-gemini {
+    background: linear-gradient(135deg, #f97316, #ea580c) !important;
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-orange-gemini:active {
+    background: linear-gradient(270deg, #22c55e, #f97316, #ef4444, #3b82f6, #22c55e) !important;
+    background-size: 400% 400% !important;
+    animation: geminiWave 1s linear infinite !important;
+    box-shadow: 0 0 25px rgba(34, 197, 94, 0.4), 0 0 12px rgba(249, 115, 22, 0.4), 0 0 12px rgba(239, 68, 68, 0.4), 0 0 12px rgba(59, 130, 246, 0.4) !important;
+    transform: scale(0.95) translateY(1.5px);
+  }
+
+  /* Make Sparkles spin like crazy when held down */
+  .btn-orange-gemini:active svg {
+    animation: spin 1s linear infinite;
+    color: #fca5a5 !important;
+  }
+
+  /* .btn-add-class-gemini with green/orange/blue active effect */
+  .btn-add-class-gemini {
+    transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  }
+
+  .btn-add-class-gemini:active {
+    background: linear-gradient(270deg, #22c55e, #f97316, #3b82f6, #22c55e) !important;
+    background-size: 300% 300% !important;
+    animation: geminiWave 1s linear infinite !important;
+    color: white !important;
+    border-color: transparent !important;
+    box-shadow: 0 0 20px rgba(34, 197, 94, 0.45), 0 0 10px rgba(249, 115, 22, 0.4), 0 0 10px rgba(59, 130, 246, 0.4) !important;
+    transform: scale(0.95);
+  }
+
+  .btn-add-class-gemini:active svg {
+    animation: spin 1s linear infinite;
+    color: white !important;
+  }
+
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
 }
 
 /* Print Stylesheet for Exam PDF */

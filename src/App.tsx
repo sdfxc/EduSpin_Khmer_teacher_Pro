@@ -18,6 +18,82 @@ import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 
+const SovannaphumiLogo = ({ className = "w-12 h-12" }: { className?: string }) => {
+  const angles = [0, 45, 90, 135, 180, 225, 270, 315];
+  return (
+    <svg viewBox="0 0 120 120" className={`${className} pointer-events-none select-none`} xmlns="http://www.w3.org/2000/svg">
+      <defs>
+        <path id="curve-top-header" d="M 24,60 A 36,36 0 0,1 96,60" fill="none" />
+        <path id="curve-bottom-header" d="M 96,60 A 36,36 0 0,1 24,60" fill="none" />
+      </defs>
+      
+      {/* 8-petal blue scalloped border */}
+      {/* Draw gold background to act as outline */}
+      {angles.map((angle, idx) => {
+        const rad = (angle * Math.PI) / 180;
+        const cx = 60 + 22 * Math.cos(rad);
+        const cy = 60 + 22 * Math.sin(rad);
+        return <circle key={`gold-${idx}`} cx={cx} cy={cy} r={24.5} fill="#f59e0b" />;
+      })}
+      
+      {/* Draw blue petals inside */}
+      {angles.map((angle, idx) => {
+        const rad = (angle * Math.PI) / 180;
+        const cx = 60 + 22 * Math.cos(rad);
+        const cy = 60 + 22 * Math.sin(rad);
+        return <circle key={`blue-${idx}`} cx={cx} cy={cy} r={23} fill="#0ea5e9" />;
+      })}
+
+      {/* Outer separator line of blue band */}
+      <circle cx="60" cy="60" r="41" fill="none" stroke="#f59e0b" strokeWidth="1.2" />
+      
+      {/* Decorative golden diamonds on left/right */}
+      <polygon points="17,60 20,57 23,60 20,63" fill="#f59e0b" />
+      <polygon points="103,60 100,57 97,60 100,63" fill="#f59e0b" />
+
+      {/* Inner circle border */}
+      <circle cx="60" cy="60" r="31.5" fill="none" stroke="#f59e0b" strokeWidth="1.2" />
+      
+      {/* Inner Red circular background */}
+      <circle cx="60" cy="60" r="30" fill="#dc2626" stroke="#ffffff" strokeWidth="1" />
+      
+      {/* Altar / sacred pedestal */}
+      {/* Pedestal Base */}
+      <path d="M 45,74 L 75,74 L 71,78 L 49,78 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
+      <path d="M 49,74 L 71,74 L 67,66 L 53,66 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
+      {/* Pedestal Bowl */}
+      <path d="M 44,65 C 44,65 50,71 60,71 C 70,71 76,65 76,65 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
+      
+      {/* Sacred Book on pedestal */}
+      <path d="M 44,65 C 51,63 58,63 60,66 C 62,63 69,63 76,65 L 73,61 C 68,59 62,59 60,62 C 58,59 52,59 47,61 Z" fill="#ffffff" stroke="#1e293b" strokeWidth="0.5" />
+      {/* Bookmark Ribbon */}
+      <path d="M 60,65 L 60,70" stroke="#dc2626" strokeWidth="1" />
+      
+      {/* Golden crown / Angkor symbol inside the cup */}
+      <path d="M 52,59 L 54,49 L 57,52 L 60,43 L 63,52 L 66,49 L 68,59 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
+      
+      {/* Laurel Wreath surrounding bottom of red circle */}
+      <path d="M 40,68 C 42,76 50,79 60,79 C 70,79 78,76 80,68 C 76,73 70,75 60,75 C 50,75 44,73 40,68 Z" fill="#eab308" />
+
+      {/* Abbreviation Text inside crown/vase */}
+      <text x="60" y="57" fontSize="3.2" fontWeight="bold" fill="#dc2626" textAnchor="middle" fontFamily="sans-serif">S.P.S</text>
+
+      {/* SVG Curved Text inside the blue band using textPath */}
+      <text fill="#ffffff" fontSize="4.5" fontWeight="black" fontFamily="'Khmer OS Siemreap', 'Siemreap', sans-serif">
+        <textPath href="#curve-top-header" startOffset="50%" textAnchor="middle">
+          សាលារៀនសុវណ្ណភូមិ
+        </textPath>
+      </text>
+      
+      <text fill="#ffffff" fontSize="4.2" fontWeight="black" fontFamily="sans-serif">
+        <textPath href="#curve-bottom-header" startOffset="50%" textAnchor="middle">
+          SOVANNAPHUMI SCHOOL
+        </textPath>
+      </text>
+    </svg>
+  );
+};
+
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
 function getMigratedSubjects(loadedChapters: QuizChapter[]): { subjects: QuizSubject[], activeSubjectId: string } {
@@ -1386,9 +1462,13 @@ export default function App() {
       <header className={`h-20 flex items-center justify-between px-8 shrink-0 z-20 border-b ${
         isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
       }`}>
-        <div className="flex items-center gap-4">
-          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-lg shadow-indigo-500/20">
-            <LayoutGrid className="w-5 h-5" />
+        <div 
+          onClick={() => setActiveTab('wheel')}
+          className="flex items-center gap-4 cursor-pointer hover:opacity-90 active:scale-98 transition-all select-none"
+          title="ត្រឡប់ទៅទំព័រដើម (Home)"
+        >
+          <div className="w-12 h-12 flex items-center justify-center relative">
+            <SovannaphumiLogo className="w-12 h-12" />
           </div>
           <div>
             <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
@@ -1396,7 +1476,7 @@ export default function App() {
               <span className="text-xs px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-full">Edu_Pro</span>
             </h1>
             <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none flex items-center gap-2 flex-wrap">
-              <span>{teacher ? `សាលារៀន៖ ${teacher.schoolName}` : 'ប្រព័ន្ធសិក្សាអន្តរកម្មសម្រាប់គ្រូបង្រៀន'}</span>
+              <span>សាលារៀន៖ {teacher ? teacher.schoolName : 'សាលាសុវណ្ណភូមិ សាខាផ្សារដីហុយ'}</span>
               {loadingCloudData && (
                 <span className="inline-flex items-center gap-1.5 text-indigo-500 dark:text-indigo-400 animate-pulse font-black text-[9px] uppercase ml-1.5">
                   <Loader2 className="w-3 h-3 animate-spin" />
@@ -1539,9 +1619,9 @@ export default function App() {
           {/* Create Questions Button */}
           <button
             onClick={() => setIsLessonModalOpen(true)}
-            className="px-5 py-2.5 bg-indigo-600 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-700 transition-all shadow-md shadow-indigo-500/10 group active:scale-95"
+            className="px-5 py-2.5 btn-orange-gemini text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md hover:shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 group cursor-pointer select-none"
           >
-            <Sparkles className="w-4 h-4 text-indigo-200 group-hover:rotate-12 transition-transform" />
+            <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform" />
             <span>បង្កើតសំណួរ</span>
           </button>
         </div>
@@ -1597,7 +1677,7 @@ export default function App() {
           ))}
           <button
             onClick={handleAddClass}
-            className={`px-3 py-1 bg-transparent border-2 border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all ${
+            className={`px-3 py-1 bg-transparent border-2 border-dashed rounded-xl text-xs font-bold flex items-center gap-1 btn-add-class-gemini ${
               isDarkMode 
                 ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-500' 
                 : 'border-slate-300 hover:border-indigo-500 hover:text-indigo-600 text-slate-400'
