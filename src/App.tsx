@@ -171,7 +171,6 @@ const SAMPLE_STUDENTS: Record<string, Student[]> = {
 };
 
 const DEFAULT_CLASSES: ClassInfo[] = [
-  { id: 'class-7a', name: 'ថ្នាក់ទី៧ក' },
   { id: 'class-8a', name: 'ថ្នាក់ទី៨ក' },
   { id: 'class-9a', name: 'ថ្នាក់ទី៩ក' }
 ];
@@ -196,31 +195,130 @@ export default function App() {
   });
 
   const [classes, setClasses] = useState<ClassInfo[]>(() => {
-    const saved = localStorage.getItem('khmer_teacher_classes');
-    return saved ? JSON.parse(saved) : DEFAULT_CLASSES;
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    if (savedTeacherObj === null) {
+      const saved = localStorage.getItem('khmer_teacher_classes');
+      const parsed = saved ? JSON.parse(saved) as ClassInfo[] : DEFAULT_CLASSES;
+      const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
+      let found7a = false;
+      return clean.filter(c => {
+        if (c.name.trim() === 'ថ្នាក់ទី៧ក') {
+          if (found7a) return false;
+          found7a = true;
+        }
+        return true;
+      });
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        const saved = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`);
+        const parsed = saved ? JSON.parse(saved) as ClassInfo[] : [];
+        const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
+        let found7a = false;
+        return clean.filter(c => {
+          if (c.name.trim() === 'ថ្នាក់ទី៧ក') {
+            if (found7a) return false;
+            found7a = true;
+          }
+          return true;
+        });
+      } catch (e) {
+        return [];
+      }
+    }
   });
 
   const [activeClassId, setActiveClassId] = useState<string>(() => {
-    const saved = localStorage.getItem('khmer_teacher_active_class_id');
-    return saved || 'class-7a';
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    if (savedTeacherObj === null) {
+      const saved = localStorage.getItem('khmer_teacher_active_class_id');
+      return saved || 'class-8a';
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        const savedActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`);
+        
+        let availableClasses: ClassInfo[] = [];
+        const savedClasses = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`);
+        if (savedClasses) {
+          const parsed = JSON.parse(savedClasses) as ClassInfo[];
+          const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
+          let found7a = false;
+          availableClasses = clean.filter(c => {
+            if (c.name.trim() === 'ថ្នាក់ទី៧ក') {
+              if (found7a) return false;
+              found7a = true;
+            }
+            return true;
+          });
+        }
+        
+        if (savedActiveId && availableClasses.some(c => c.id === savedActiveId)) {
+          return savedActiveId;
+        }
+        if (availableClasses.length > 0) return availableClasses[0].id;
+        return '';
+      } catch (e) {
+        return '';
+      }
+    }
   });
 
   const [students, setStudents] = useState<Student[]>(() => {
-    const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    const saved = localStorage.getItem(`students_class_${activeId}`);
-    return saved ? JSON.parse(saved) : (SAMPLE_STUDENTS[activeId] || []);
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    if (savedTeacherObj === null) {
+      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const saved = localStorage.getItem(`students_class_${activeId}`);
+      return saved ? JSON.parse(saved) : (SAMPLE_STUDENTS[activeId] || []);
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+        if (!activeId) return [];
+        const saved = localStorage.getItem(`students_class_${activeId}`);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
   });
   
   const [cards, setCards] = useState<QuizCard[]>(() => {
-    const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
-    return saved ? JSON.parse(saved) : [];
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    if (savedTeacherObj === null) {
+      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
+      return saved ? JSON.parse(saved) : [];
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+        if (!activeId) return [];
+        const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
   });
 
   const [pickedIds, setPickedIds] = useState<string[]>(() => {
-    const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    const saved = localStorage.getItem(`picked_students_class_${activeId}`);
-    return saved ? JSON.parse(saved) : [];
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    if (savedTeacherObj === null) {
+      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
+      const saved = localStorage.getItem(`picked_students_class_${activeId}`);
+      return saved ? JSON.parse(saved) : [];
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+        if (!activeId) return [];
+        const saved = localStorage.getItem(`picked_students_class_${activeId}`);
+        return saved ? JSON.parse(saved) : [];
+      } catch (e) {
+        return [];
+      }
+    }
   });
 
   const [chapters, setChapters] = useState<QuizChapter[]>([]);
@@ -260,7 +358,7 @@ export default function App() {
       const savedClasses = localStorage.getItem('khmer_teacher_classes');
       setClasses(savedClasses ? JSON.parse(savedClasses) : DEFAULT_CLASSES);
       
-      const savedActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+      const savedActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-8a';
       setActiveClassId(savedActiveId);
       return;
     }
@@ -271,30 +369,42 @@ export default function App() {
         const classesCollRef = collection(db, 'teachers', teacher.id, 'classes');
         const classesSnap = await getDocs(classesCollRef);
         
-        let fetchedClasses: ClassInfo[] = [];
-        classesSnap.forEach(docSnap => {
-          fetchedClasses.push(docSnap.data() as ClassInfo);
-        });
+         let fetchedClasses: ClassInfo[] = [];
+         let classesToDelete: string[] = [];
+         let found7a = false;
+         
+         classesSnap.forEach(docSnap => {
+           const clsData = docSnap.data() as ClassInfo;
+           if (clsData && clsData.name && clsData.name.trim() !== '') {
+             if (clsData.name.trim() === 'ថ្នាក់ទី៧ក') {
+               if (found7a) {
+                 classesToDelete.push(docSnap.id);
+                 return;
+               }
+               found7a = true;
+             }
+             fetchedClasses.push(clsData);
+           } else {
+             classesToDelete.push(docSnap.id);
+           }
+         });
+ 
+         // Clean up empty or duplicate classes right away in Firestore
+         for (const classId of classesToDelete) {
+           try {
+             await deleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
+           } catch (deleteErr) {
+             console.error(`Failed to delete nameless or duplicate class ${classId}:`, deleteErr);
+           }
+         }
 
-        if (fetchedClasses.length === 0) {
-          // Newly registered teacher. Seed with DEFAULT_CLASSES in Firestore
-          for (const cls of DEFAULT_CLASSES) {
-            await setDoc(doc(db, 'teachers', teacher.id, 'classes', cls.id), {
-              id: cls.id,
-              name: cls.name,
-              pickedIds: [],
-              cards: [],
-              createdAt: new Date().toISOString()
-            });
-            fetchedClasses.push(cls);
-          }
-        }
-        
+        // Do not seed or pin DEFAULT_CLASSES when registering/logging in! Let newly registered accounts be clean.
         setClasses(fetchedClasses);
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(fetchedClasses));
         
-        const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || fetchedClasses[0]?.id;
+        const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || (fetchedClasses[0]?.id || '');
         const exists = fetchedClasses.some(c => c.id === lastActiveId);
-        setActiveClassId(exists ? lastActiveId : fetchedClasses[0]?.id);
+        setActiveClassId(exists ? lastActiveId : (fetchedClasses[0]?.id || ''));
       } catch (err) {
         console.error('Failed to load classes from cloud Firestore:', err);
       } finally {
@@ -470,8 +580,12 @@ export default function App() {
           loadedSubjects = migration.subjects;
           loadedActiveSubjectId = migration.activeSubjectId;
           
+          const localClassObj = classes.find(c => c.id === activeClassId);
+          const classNameToSave = localClassObj?.name || 'ថ្នាក់ថ្មី';
+          
           await setDoc(classDocRef, {
             id: activeClassId,
+            name: classNameToSave,
             subjects: loadedSubjects,
             activeSubjectId: loadedActiveSubjectId,
             createdAt: new Date().toISOString()
@@ -563,30 +677,32 @@ export default function App() {
     syncClassInfo();
   }, [activeClassId, activeCardId, activeRoomId, activeTab, activeCardState, teacher, cards]);
 
-  // Save changes to localStorage on states update as fallback for offline use
+  // Save changes to localStorage on states update as fallback for offline use and fast initial load
   useEffect(() => {
-    if (!teacher) {
+    if (teacher) {
+      localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(classes));
+    } else {
       localStorage.setItem('khmer_teacher_classes', JSON.stringify(classes));
     }
   }, [classes, teacher]);
 
   useEffect(() => {
-    if (activeClassId && !teacher) {
+    if (activeClassId) {
       localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(students));
     }
-  }, [students, activeClassId, teacher]);
+  }, [students, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && !teacher) {
+    if (activeClassId) {
       localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
     }
-  }, [cards, activeClassId, teacher]);
+  }, [cards, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && !teacher) {
+    if (activeClassId) {
       localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
     }
-  }, [pickedIds, activeClassId, teacher]);
+  }, [pickedIds, activeClassId]);
 
   // Helper to save class-level states to Firestore
   const saveClassMetadata = useCallback(async (updatedCards: QuizCard[], updatedPickedIds: string[]) => {
@@ -1414,7 +1530,7 @@ export default function App() {
       setActiveCardId(null);
       setTeacher(null);
       setClasses(DEFAULT_CLASSES);
-      setActiveClassId('class-7a');
+      setActiveClassId('class-8a');
     }
   }, []);
 
@@ -1443,7 +1559,7 @@ export default function App() {
       // Reset application states back to fresh template
       setTeacher(null);
       setClasses(DEFAULT_CLASSES);
-      setActiveClassId('class-7a');
+      setActiveClassId('class-8a');
       setStudents([]);
       setCards([]);
       setPickedIds([]);
