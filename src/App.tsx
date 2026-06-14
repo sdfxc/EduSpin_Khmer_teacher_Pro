@@ -398,6 +398,86 @@ export default function App() {
            }
          }
 
+         // If the cloud account has 0 classes, migrate local classes that the user added previously to their cloud account
+         if (fetchedClasses.length === 0) {
+           const localClassesStr = localStorage.getItem('khmer_teacher_classes');
+           if (localClassesStr) {
+             try {
+               const localClasses = JSON.parse(localClassesStr) as ClassInfo[];
+               const validLocalClasses = localClasses.filter(c => c && c.name && c.name.trim() !== '');
+               
+               if (validLocalClasses.length > 0) {
+                 for (const lc of validLocalClasses) {
+                   // 1. Load subjects, activeSubjectId, activeRoomId
+                   const localSubjectsStr = localStorage.getItem(`subjects_class_${lc.id}`);
+                   let finalSubjects: QuizSubject[] = [];
+                   let finalActiveSubjectId: string | null = null;
+                   let finalActiveRoomId: string | null = null;
+                   
+                   if (localSubjectsStr) {
+                     finalSubjects = JSON.parse(localSubjectsStr);
+                     finalActiveSubjectId = localStorage.getItem(`active_subject_id_${lc.id}`) || (finalSubjects[0]?.id || null);
+                     finalActiveRoomId = localStorage.getItem(`active_room_id_${lc.id}`);
+                   } else {
+                     // Fallback migration of chapters
+                     const localChaptersStr = localStorage.getItem(`chapters_class_${lc.id}`);
+                     let tempChapters: QuizChapter[] = [];
+                     if (localChaptersStr) {
+                       tempChapters = JSON.parse(localChaptersStr);
+                     } else {
+                       const localCardsStr = localStorage.getItem(`quiz_cards_class_${lc.id}`);
+                       const localPickedStr = localStorage.getItem(`picked_students_class_${lc.id}`);
+                       const localCards = localCardsStr ? JSON.parse(localCardsStr) : [];
+                       const localPicked = localPickedStr ? JSON.parse(localPickedStr) : [];
+                       const defaultRoom: QuizRoom = {
+                         id: `room-default-${Date.now()}`,
+                         name: 'មេរៀនទី១',
+                         cards: localCards,
+                         pickedIds: localPicked,
+                         createdAt: Date.now()
+                       };
+                       tempChapters = [{
+                         id: `chapter-default-${Date.now()}`,
+                         name: 'ជំពូកទី១',
+                         rooms: [defaultRoom],
+                         createdAt: Date.now()
+                       }];
+                     }
+                     const migrationObj = getMigratedSubjects(tempChapters);
+                     finalSubjects = migrationObj.subjects;
+                     finalActiveSubjectId = migrationObj.activeSubjectId;
+                   }
+                   
+                   // Write Class Metadata to Cloud
+                   await setDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
+                     id: lc.id,
+                     name: lc.name.trim(),
+                     subjects: finalSubjects,
+                     activeSubjectId: finalActiveSubjectId,
+                     activeRoomId: finalActiveRoomId,
+                     createdAt: new Date().toISOString()
+                   });
+                   
+                   // 2. Load and write students
+                   const localStudentsStr = localStorage.getItem(`students_class_${lc.id}`);
+                   if (localStudentsStr) {
+                     const localStudents = JSON.parse(localStudentsStr) as Student[];
+                     for (const std of localStudents) {
+                       if (std && std.id) {
+                         await setDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id, 'students', std.id), std);
+                       }
+                     }
+                   }
+                   
+                   fetchedClasses.push(lc);
+                 }
+               }
+             } catch (syncErr) {
+               console.error('Failed to migrate local classes directly to cloud account:', syncErr);
+             }
+           }
+         }
+
         // Do not seed or pin DEFAULT_CLASSES when registering/logging in! Let newly registered accounts be clean.
         setClasses(fetchedClasses);
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(fetchedClasses));
@@ -770,6 +850,50 @@ export default function App() {
       }
     }
   }, [teacher, activeClassId]);
+
+  // Helper to save pickedIds updates to Firestore immediately when wheel or panel changes it
+  const handleSetPickedIds = useCallback((updater: string[] | ((prev: string[]) => string[])) => {
+    setPickedIds(prev => {
+      const next = typeof updater === 'function' ? updater(prev) : updater;
+      
+      const currentTeacherId = teacher?.id || 'local';
+      if (activeClassId && activeRoomId && activeSubjectId) {
+        const updatedChapters = chapters.map(ch => {
+          const updatedRooms = ch.rooms.map(r => {
+            if (r.id === activeRoomId) {
+              return {
+                ...r,
+                pickedIds: next
+              };
+            }
+            return r;
+          });
+          return { ...ch, rooms: updatedRooms };
+        });
+
+        const updatedSubjects = subjects.map(sub => {
+          if (sub.id === activeSubjectId) {
+            return {
+              ...sub,
+              chapters: updatedChapters
+            };
+          }
+          return sub;
+        });
+
+        setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+          subjects: updatedSubjects,
+          chapters: updatedChapters,
+          activeRoomId: activeRoomId,
+          activeSubjectId: activeSubjectId,
+          pickedIds: next
+        }, { merge: true }).catch(err => {
+          console.error('Failed to sync pickedIds on updates in cloud:', err);
+        });
+      }
+      return next;
+    });
+  }, [teacher, activeClassId, activeRoomId, activeSubjectId, chapters, subjects]);
 
   const handleSelectRoom = useCallback((roomId: string) => {
     setActiveRoomId(roomId);
@@ -1245,11 +1369,17 @@ export default function App() {
       const newClassId = `class-${Date.now()}`;
       const newClass = { id: newClassId, name: className.trim() };
       
+      const { subjects: defaultSubjects, activeSubjectId: defaultActiveSubjectId } = getMigratedSubjects([]);
+      const defaultActiveRoomId = defaultSubjects[0]?.chapters[0]?.rooms[0]?.id || null;
+
       if (teacher) {
         try {
           await setDoc(doc(db, 'teachers', teacher.id, 'classes', newClassId), {
             id: newClassId,
             name: className.trim(),
+            subjects: defaultSubjects,
+            activeSubjectId: defaultActiveSubjectId,
+            activeRoomId: defaultActiveRoomId,
             pickedIds: [],
             cards: [],
             createdAt: new Date().toISOString()
@@ -1257,9 +1387,22 @@ export default function App() {
         } catch (err) {
           handleFirestoreError(err, OperationType.CREATE, `teachers/${teacher.id}/classes/${newClassId}`);
         }
+      } else {
+        localStorage.setItem(`subjects_class_${newClassId}`, JSON.stringify(defaultSubjects));
+        localStorage.setItem(`active_subject_id_${newClassId}`, defaultActiveSubjectId || '');
+        if (defaultActiveRoomId) {
+          localStorage.setItem(`active_room_id_${newClassId}`, defaultActiveRoomId);
+        }
       }
       
-      setClasses(prev => [...prev, newClass]);
+      const updatedClasses = [...classes, newClass];
+      setClasses(updatedClasses);
+      if (teacher) {
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(updatedClasses));
+      } else {
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(updatedClasses));
+      }
+      
       handleSwitchClass(newClassId);
     }
   };
@@ -1281,6 +1424,12 @@ export default function App() {
       }
       
       setClasses(updatedClasses);
+      if (teacher) {
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(updatedClasses));
+      } else {
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(updatedClasses));
+      }
+
       localStorage.removeItem(`students_class_${classId}`);
       localStorage.removeItem(`quiz_cards_class_${classId}`);
       localStorage.removeItem(`picked_students_class_${classId}`);
@@ -1298,6 +1447,12 @@ export default function App() {
       const trimmedName = newName.trim();
       const updatedClasses = classes.map(c => c.id === classId ? { ...c, name: trimmedName } : c);
       setClasses(updatedClasses);
+      
+      if (teacher) {
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(updatedClasses));
+      } else {
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(updatedClasses));
+      }
       
       const currentTeacherId = teacher?.id || 'local';
       try {
@@ -1330,7 +1485,10 @@ export default function App() {
       console.error(err);
     }
 
-    setStudents(prev => [...prev, newStudent]);
+    setStudents(prev => {
+      if (prev.some(s => s.id === newStudent.id)) return prev;
+      return [...prev, newStudent];
+    });
   }, [activeClassId, teacher]);
 
   const addStudentDetail = useCallback(async (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => {
@@ -1352,7 +1510,10 @@ export default function App() {
       } catch (err) {
         console.error(err);
       }
-      setStudents(prev => [...prev, newStudent]);
+      setStudents(prev => {
+        if (prev.some(s => s.id === newStudent.id)) return prev;
+        return [...prev, newStudent];
+      });
     } else {
       try {
         await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', fields.classId, 'students', newStudent.id), newStudent);
@@ -1366,6 +1527,37 @@ export default function App() {
       localStorage.setItem(savedKey, JSON.stringify(savedList));
       alert(`បានរក្សាទុកសិស្ស «${fields.name}» ទៅកាន់ថ្នាក់ផ្សេងជោគជ័យ!`);
     }
+  }, [activeClassId, teacher]);
+
+  const handleBulkAddStudents = useCallback(async (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[]) => {
+    const randomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+    const newStudents: Student[] = list.map(item => ({
+      id: `s-${Date.now()}-${Math.random()}`,
+      name: item.name,
+      score: 0,
+      emoji: randomEmoji(),
+      gender: item.gender,
+      status: item.status,
+      classId: activeClassId
+    }));
+
+    const currentTeacherId = teacher?.id || 'local';
+    try {
+      await Promise.all(
+        newStudents.map(student => 
+          setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', student.id), student)
+        )
+      );
+    } catch (err) {
+      console.error(err);
+    }
+
+    setStudents(prev => {
+      const existingIds = new Set(prev.map(s => s.id));
+      const uniqueNew = newStudents.filter(s => !existingIds.has(s.id));
+      if (uniqueNew.length === 0) return prev;
+      return [...prev, ...uniqueNew];
+    });
   }, [activeClassId, teacher]);
 
   const updateStudentDetail = useCallback(async (id: string, fields: Partial<Student>) => {
@@ -1814,10 +2006,11 @@ export default function App() {
               <SpinningWheel
                 students={students}
                 pickedIds={pickedIds}
-                onSetPickedIds={setPickedIds}
+                onSetPickedIds={handleSetPickedIds}
                 onSelectStudent={(s) => setSelectedStudentId(s.id)}
                 selectedStudent={selectedStudent}
                 onAddStudent={addStudent}
+                onBulkAddStudents={handleBulkAddStudents}
                 showBulkInput={showWheelBulk}
                 setShowBulkInput={setShowWheelBulk}
                 isDarkMode={isDarkMode}
@@ -1828,7 +2021,7 @@ export default function App() {
               <StudentPanel
                 students={students}
                 pickedIds={pickedIds}
-                onSetPickedIds={setPickedIds}
+                onSetPickedIds={handleSetPickedIds}
                 onAddStudent={addStudent}
                 onRemoveStudent={removeStudent}
                 onClearStudents={clearStudents}
@@ -1913,33 +2106,7 @@ export default function App() {
               onAddStudentDetail={addStudentDetail}
               onRemoveStudent={removeStudent}
               onUpdateStudentDetail={updateStudentDetail}
-              onBulkAddStudents={async (list) => {
-                const randomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
-                const newStudents: Student[] = list.map(item => ({
-                  id: `s-${Date.now()}-${Math.random()}`,
-                  name: item.name,
-                  score: 0,
-                  emoji: randomEmoji(),
-                  gender: item.gender,
-                  status: item.status,
-                  classId: activeClassId
-                }));
-
-                if (teacher) {
-                  try {
-                    // Upload all raw students to Firestore for this class
-                    await Promise.all(
-                      newStudents.map(student => 
-                        setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', student.id), student)
-                      )
-                    );
-                  } catch (err) {
-                    handleFirestoreError(err, OperationType.CREATE, `teachers/${teacher.id}/classes/${activeClassId}/students`);
-                  }
-                }
-
-                setStudents(prev => [...prev, ...newStudents]);
-              }}
+              onBulkAddStudents={handleBulkAddStudents}
             />
           </div>
         )}
