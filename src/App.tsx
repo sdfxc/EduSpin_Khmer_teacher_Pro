@@ -3,7 +3,7 @@
  * SPDX-License-Identifier: Apache-2.0
  */
 
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
@@ -218,6 +218,8 @@ export default function App() {
     return saved === 'true';
   });
 
+  const lastLoadedClassId = useRef<string>('');
+
   const [classes, setClasses] = useState<ClassInfo[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
     let rawClasses: ClassInfo[] = [];
@@ -350,10 +352,63 @@ export default function App() {
     }
   });
 
-  const [chapters, setChapters] = useState<QuizChapter[]>([]);
-  const [activeRoomId, setActiveRoomId] = useState<string | null>(null);
-  const [subjects, setSubjects] = useState<QuizSubject[]>([]);
-  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(null);
+  const [subjects, setSubjects] = useState<QuizSubject[]>(() => {
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    let activeId = 'class-7a';
+    if (savedTeacherObj === null) {
+      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
+      } catch (e) {}
+    }
+    const saved = localStorage.getItem(`subjects_class_${activeId}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [activeSubjectId, setActiveSubjectId] = useState<string | null>(() => {
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    let activeId = 'class-7a';
+    if (savedTeacherObj === null) {
+      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
+      } catch (e) {}
+    }
+    return localStorage.getItem(`active_subject_id_${activeId}`);
+  });
+
+  const [chapters, setChapters] = useState<QuizChapter[]>(() => {
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    let activeId = 'class-7a';
+    if (savedTeacherObj === null) {
+      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
+      } catch (e) {}
+    }
+    const saved = localStorage.getItem(`chapters_class_${activeId}`);
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  const [activeRoomId, setActiveRoomId] = useState<string | null>(() => {
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    let activeId = 'class-7a';
+    if (savedTeacherObj === null) {
+      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+    } else {
+      try {
+        const teacherObj = JSON.parse(savedTeacherObj);
+        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
+      } catch (e) {}
+    }
+    return localStorage.getItem(`active_room_id_${activeId}`);
+  });
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [activeCardId, setActiveCardId] = useState<string | null>(null);
@@ -404,6 +459,7 @@ export default function App() {
          
          classesSnap.forEach(docSnap => {
            const clsData = docSnap.data() as ClassInfo;
+           clsData.id = clsData.id || docSnap.id;
            if (clsData && clsData.name && clsData.name.trim() !== '') {
              if (clsData.name.trim() === 'ថ្នាក់ទី៧ក') {
                if (found7a) {
@@ -428,8 +484,8 @@ export default function App() {
          }
 
          // If the cloud account has 0 classes, migrate local classes that the user added previously to their cloud account
-         if (fetchedClasses.length === 0) {
-           const localClassesStr = localStorage.getItem('khmer_teacher_classes');
+         if (true) {
+           const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
            if (localClassesStr) {
              try {
                const localClasses = JSON.parse(localClassesStr) as ClassInfo[];
@@ -437,6 +493,10 @@ export default function App() {
                
                if (validLocalClasses.length > 0) {
                  for (const lc of validLocalClasses) {
+                   try {
+                     if (fetchedClasses.some(fc => fc.id === lc.id)) {
+                       continue;
+                     }
                    // 1. Load subjects, activeSubjectId, activeRoomId
                    const localSubjectsStr = localStorage.getItem(`subjects_class_${lc.id}`);
                    let finalSubjects: QuizSubject[] = [];
@@ -499,8 +559,11 @@ export default function App() {
                    }
                    
                    fetchedClasses.push(lc);
+                 } catch (classSyncErr) {
+                   console.error(`Failed to migrate local class ${lc.name || lc.id}:`, classSyncErr);
                  }
                }
+             }
              } catch (syncErr) {
                console.error('Failed to migrate local classes directly to cloud account:', syncErr);
              }
@@ -628,6 +691,7 @@ export default function App() {
 
       setCards(activeRoom?.cards || []);
       setPickedIds(activeRoom?.pickedIds || []);
+      lastLoadedClassId.current = activeClassId;
       return;
     }
 
@@ -691,10 +755,24 @@ export default function App() {
           }
           loadedActiveRoomId = classData.activeRoomId || null;
         } else {
-          // Empty or new class in cloud
-          const migration = getMigratedSubjects([]);
-          loadedSubjects = migration.subjects;
-          loadedActiveSubjectId = migration.activeSubjectId;
+          // Empty or new class in cloud – check local storage fallback first to prevent overwriting local guest data
+          const localSubjectsStr = localStorage.getItem(`subjects_class_${activeClassId}`);
+          if (localSubjectsStr) {
+            try {
+              loadedSubjects = JSON.parse(localSubjectsStr);
+              loadedActiveSubjectId = localStorage.getItem(`active_subject_id_${activeClassId}`) || (loadedSubjects[0]?.id || null);
+              loadedActiveRoomId = localStorage.getItem(`active_room_id_${activeClassId}`);
+            } catch (err) {
+              console.error('Failed to parse local subjects fallback:', err);
+              const migration = getMigratedSubjects([]);
+              loadedSubjects = migration.subjects;
+              loadedActiveSubjectId = migration.activeSubjectId;
+            }
+          } else {
+            const migration = getMigratedSubjects([]);
+            loadedSubjects = migration.subjects;
+            loadedActiveSubjectId = migration.activeSubjectId;
+          }
           
           const localClassObj = classes.find(c => c.id === activeClassId);
           const classNameToSave = localClassObj?.name || 'ថ្នាក់ថ្មី';
@@ -704,6 +782,7 @@ export default function App() {
             name: classNameToSave,
             subjects: loadedSubjects,
             activeSubjectId: loadedActiveSubjectId,
+            activeRoomId: loadedActiveRoomId,
             createdAt: new Date().toISOString()
           }, { merge: true });
         }
@@ -738,7 +817,29 @@ export default function App() {
         studentsSnap.forEach(docSnap => {
           loadedStudents.push(docSnap.data() as Student);
         });
+        
+        // Fallback to local guest data if cloud has 0 students to prevent overwriting newly added local students
+        if (loadedStudents.length === 0) {
+          const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
+          if (localStudentsStr) {
+            try {
+              const localStudents = JSON.parse(localStudentsStr) as Student[];
+              if (localStudents.length > 0) {
+                loadedStudents = localStudents;
+                // Upload local students to cloud Firestore so they persist on cloud too
+                for (const std of localStudents) {
+                  if (std && std.id) {
+                    await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Failed to parse local students fallback:', err);
+            }
+          }
+        }
         setStudents(loadedStudents);
+        lastLoadedClassId.current = activeClassId;
       } catch (err) {
         console.error('Failed to load class details from Firestore:', err);
       } finally {
@@ -749,13 +850,30 @@ export default function App() {
     loadClassDetails();
   }, [activeClassId, teacher]);
 
-  // Real-time Student Synchronization for cloud sessions
+  // Real-time Student Synchronization for cloud sessions (only for logged-in teachers)
   useEffect(() => {
-    if (!activeClassId) return;
-    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId || !teacher) return;
 
-    const studentsCollRef = collection(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students');
+    const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
     const unsubscribe = onSnapshot(studentsCollRef, (snapshot) => {
+      if (snapshot.empty) {
+        // Fallback to local storage of students to avoid overwriting rich state with empty array
+        const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
+        if (localStudentsStr) {
+          try {
+            const localStudents = JSON.parse(localStudentsStr) as Student[];
+            if (localStudents.length > 0) {
+              setStudents(localStudents);
+              return;
+            }
+          } catch (e) {
+            console.error('Failed to parse local students fallback in onSnapshot:', e);
+          }
+        }
+        setStudents([]);
+        return;
+      }
+
       let loadedStudents: Student[] = [];
       snapshot.forEach(docSnap => {
         loadedStudents.push(docSnap.data() as Student);
@@ -803,22 +921,50 @@ export default function App() {
   }, [classes, teacher]);
 
   useEffect(() => {
-    if (activeClassId) {
+    if (activeClassId && activeClassId === lastLoadedClassId.current) {
       localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(students));
     }
   }, [students, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId) {
+    if (activeClassId && activeClassId === lastLoadedClassId.current) {
       localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
     }
   }, [cards, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId) {
+    if (activeClassId && activeClassId === lastLoadedClassId.current) {
       localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
     }
   }, [pickedIds, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(subjects));
+    }
+  }, [subjects, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(chapters));
+    }
+  }, [chapters, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && activeSubjectId && activeClassId === lastLoadedClassId.current) {
+      localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
+    }
+  }, [activeSubjectId, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+      if (activeRoomId) {
+        localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
+      } else if (activeRoomId === null) {
+        localStorage.removeItem(`active_room_id_${activeClassId}`);
+      }
+    }
+  }, [activeRoomId, activeClassId]);
 
   // Helper to save class-level states to Firestore
   const saveClassMetadata = useCallback(async (updatedCards: QuizCard[], updatedPickedIds: string[]) => {
