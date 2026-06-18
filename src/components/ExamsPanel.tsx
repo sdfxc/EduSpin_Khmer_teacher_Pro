@@ -335,6 +335,137 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
     }
   }, [activeExam?.id, activeSubject?.id, activeClassName]);
 
+  // Reload exams from localStorage whenever activeClassId changes to keep each classroom separate
+  useEffect(() => {
+    const saved = localStorage.getItem(`khmer_exams_${activeClassId || 'general'}`);
+    let loadedExams: ExamPaper[] = [];
+    if (saved) {
+      try {
+        loadedExams = JSON.parse(saved);
+      } catch (e) {
+        console.error("Failed to parse exams, using defaults", e);
+        loadedExams = JSON.parse(JSON.stringify(DEFAULT_EXAMS));
+      }
+    } else {
+      loadedExams = JSON.parse(JSON.stringify(DEFAULT_EXAMS));
+    }
+    setExams(loadedExams);
+    
+    // Auto select corresponding exam paper
+    const matched = loadedExams.filter(e => e.type === activeType);
+    if (matched.length > 0) {
+      setSelectedExamId(matched[0].id);
+    } else if (loadedExams.length > 0) {
+      setSelectedExamId(loadedExams[0].id);
+    } else {
+      setSelectedExamId('');
+    }
+  }, [activeClassId]);
+
+  // expert AI states
+  const [isExpertAiModalOpen, setIsExpertAiModalOpen] = useState(false);
+  const [expertAiSubject, setExpertAiSubject] = useState('គណិតវិទ្យា');
+  const [expertAiCount, setExpertAiCount] = useState(10);
+  const [expertAiExamType, setExpertAiExamType] = useState('monthly');
+  const [expertAiInstructions, setExpertAiInstructions] = useState('សូមបង្កើតប្រធានវិញ្ញាសាល្អៗទៅតាមការណែនាំរបស់អ្នកជំនាញ');
+  const [isExpertGenerating, setIsExpertGenerating] = useState(false);
+
+  const handleExpertAiGenerate = async () => {
+    if (!activeExam) {
+      alert("សូមជ្រើសរើស ឬបង្កើតវិញ្ញាសារប្រឡងជាមុនសិន!");
+      return;
+    }
+    setIsExpertGenerating(true);
+    try {
+      const gPreset = `Act as an expert high school and Grade 9 diploma curriculum developer in Cambodia.
+Generate exactly ${expertAiCount} high-quality, professional, academic exam questions with four multiple choice options in Khmer language.
+Make sure the questions follow standard educational guidelines for Grade 9 students in Cambodia, prioritizing rigorous logic, clear scenarios, and appropriate level of difficulty.
+
+Subject: ${expertAiSubject}
+Exam Type: ${expertAiExamType === 'monthly' ? 'វិញ្ញាសាប្រលងប្រចាំខែ (Monthly Exam)' : 'វិញ្ញាសាប្រឡងឆមាស (Semester Exam)'}
+Class Level: ${activeClassName}
+Custom user instructions: ${expertAiInstructions}
+
+CRITICAL FORMAT REQUIREMENT for formulas and notations (Mathematics, Physics, Chemistry):
+- Use standard HTML/CSS compatible math annotations so they can be processed and rendered beautifully on search/web/PDF previews:
+  - Exponents (powers): use "^" (e.g. "x^2", "10^{-5}", "y^{2x}").
+  - Subscripts (molecular indices): use "_" (e.g. "H_2O", "CO_2", "x_i", "C_nH_{2n+2}").
+  - Fractions: use LaTeX formatting style "\\frac{numerator}{denominator}" (e.g. "\\frac{d}{t}", "\\frac{1}{2}").
+  - Square roots: use "\\sqrt{expression}" (e.g. "\\sqrt{64}", "\\sqrt{x}").
+  - Reactant arrow: write using "->" or "-->" or "\\rightarrow" (e.g., "HCl + NaOH -> NaCl + H_2O").
+  - Symbols: use standard math equivalents: "\\pm" for ±, "\\times" for ×, "\\div" for ÷, "\\le" for ≤, "\\ge" for ≥, "\\pi" for π, "\\Delta" for Δ, "\\alpha" for α, "\\beta" for β, "\\theta" for θ.
+
+SUBJECT SPECIFIC DIRECTIVES:
+- If គណិតវិទ្យា (Mathematics): design equations, geometry, fractions, formulas, and logical reasoning exercises.
+- If រូបវិទ្យា (Physics): design problems evaluating laws of mechanics, Ohm's law, heat, force, electrical resistivity calculations.
+- If គីមីវិទ្យា (Chemistry): design chemical reactions, atoms structure, indicator solutions, valency, acid-base-salt chemical equations.
+- If ជីវវិទ្យា (Biology): design cell organelles, DNA/Mitosis concepts, plant reproduction, human respiration or blood systems, digestive organs.
+- If ផែនដីវិទ្យា (Earth Science): geological rock cycles, volcano styles, ocean floor features, atmosphere layers, climate zones, orbital dynamics.
+- If ភាសាខ្មែរ (Khmer): focus on grammatical particles, spellings, author analysis, comprehension, syntax, vocabulary.
+- If តែងសេចក្ដី (Essay Writing): create prompt scenarios about describing scenes, analyzing national achievements, morality values, explaining proverbs (e.g. ស្វ័យសិក្សា, សាមគ្គីភាព) with structured options determining correct composition parts or paragraph organization styles.
+- If សរសេរតាមអាន (Dictation): test homophones, silent letters, correct syllable spellings, vocabulary errors.
+- If ភូមិវិទ្យា (Geography): test borders of Cambodia, agricultural crops, weather patterns, regions, major rivers (Mekong, Tonle Sap), natural resources of Cambodia.
+- If ប្រវត្តិវិទ្យា (History): test prehistory of Cambodia, Funan, Chenla, Angkorian peak rulers (Suryavarman II, Jayavarman VII), post-Angkorian era treaties, independence movement.
+- If សីលធម៌-ពលរដ្ឋ (Moral-Civic): ethical behaviors, traffic laws, rights, duties, constitutional articles, traditional respect.
+- If គេហវិទ្យា (Home Economics): hygiene, culinary techniques, family budget allocation, clothing maintenance, domestic care.
+- If ភាសាអង់គ្លេស (English): test common prepositions, reading comprehension, grammar tenses (present perfect, simple past), spelling.
+- If ភាសាបារាំង (French): basic conjugations (être, avoir, premier groupe), singular/plural adjectives, common dialogues.
+
+Output the response in JSON format.`;
+
+      const generated = await generateQuestions(gPreset, expertAiCount, [], [], [], 'general', 'khmer');
+      
+      if (generated && generated.length > 0) {
+        const mappedQuestions: ExamQuestion[] = generated.map((g, idx) => ({
+          id: `eq-ai-expert-${Date.now()}-${idx}-${Math.random()}`,
+          text: g.text,
+          options: g.options,
+          correctIndex: g.correctIndex,
+          explanation: g.explanation || "",
+          points: 2
+        }));
+
+        const updatedExams = exams.map(e => {
+          if (e.id === activeExam.id) {
+            const subjectIdx = e.subjects.findIndex(s => s.name === expertAiSubject);
+            let updatedSubjects = [...e.subjects];
+
+            if (subjectIdx !== -1) {
+              updatedSubjects[subjectIdx] = {
+                ...updatedSubjects[subjectIdx],
+                questions: [...updatedSubjects[subjectIdx].questions, ...mappedQuestions]
+              };
+            } else {
+              const newSub: ExamSubject = {
+                id: `sub-ai-${Date.now()}`,
+                name: expertAiSubject,
+                questions: mappedQuestions
+              };
+              updatedSubjects.push(newSub);
+            }
+
+            return {
+              ...e,
+              subjects: updatedSubjects
+            };
+          }
+          return e;
+        });
+
+        saveState(updatedExams);
+        alert(`សំណួរជំនាញ AI ចំនួន ${mappedQuestions.length} ត្រូវ​បាន​បង្កើត និង​បញ្ចូល​ទៅ​ក្នុង​មុខ​វិជ្ជា ${expertAiSubject} នៃវិញ្ញាសាឡើយជោគជ័យ!`);
+        setIsExpertAiModalOpen(false);
+      } else {
+        throw new Error("No questions returned");
+      }
+    } catch (err: any) {
+      console.error(err);
+      alert(`កំហុសក្នុងការបង្កើត៖ ${err?.message || "សូមពិនិត្យមើលការភ្ជាប់ ឬ សោ API Key!"}`);
+    } finally {
+      setIsExpertGenerating(false);
+    }
+  };
+
   // Gemini AI state
   const [isAiGenerating, setIsAiGenerating] = useState(false);
   const [aiApiKeyInput, setAiApiKeyInput] = useState(getSavedApiKey() || '');
@@ -1815,134 +1946,145 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
             }`}>
               
               {/* Header inside specific Exam detailed workspace */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b pb-4 dark:border-slate-800/80">
-                <div className="text-left min-w-0 flex-1">
-                  {isEditingMeta ? (
-                    <div className="space-y-3">
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400">ឈ្មោះខែ/វិញ្ញាសា</label>
-                          <input
-                            type="text"
-                            value={editTitle}
-                            onChange={(e) => setEditTitle(e.target.value)}
-                            className="w-full mt-1 px-3 py-1.5 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400">ឈ្មោះសាលា</label>
-                          <input
-                            type="text"
-                            value={editSchool}
-                            onChange={(e) => setEditSchool(e.target.value)}
-                            className="w-full mt-1 px-3 py-1.5 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400">រយៈពេលប្រឡង</label>
-                          <input
-                            type="text"
-                            value={editTime}
-                            onChange={(e) => setEditTime(e.target.value)}
-                            className="w-full mt-1 px-3 py-1.5 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                          />
-                        </div>
-                        <div>
-                          <label className="text-[10px] font-bold text-slate-400">កាលបរិច្ឆេទ</label>
-                          <input
-                            type="date"
-                            value={editDate}
-                            onChange={(e) => setEditDate(e.target.value)}
-                            className="w-full mt-1 px-3 py-1.5 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                          />
-                        </div>
+              {isEditingMeta ? (
+                <div className="border-b pb-5 dark:border-slate-800/80 w-full">
+                  <div className="bg-slate-50 dark:bg-slate-900/60 p-5 rounded-2xl border border-slate-200/80 dark:border-slate-800 space-y-4 w-full text-left">
+                    <h3 className="font-sans font-bold text-xs sm:text-sm text-indigo-600 dark:text-indigo-400">
+                      កែសម្រួលព័ត៌មានទូទៅនៃវិញ្ញាសា (Edit Exam Metadata)
+                    </h3>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 w-full">
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">ឈ្មោះខែ/វិញ្ញាសា</label>
+                        <input
+                          type="text"
+                          value={editTitle}
+                          onChange={(e) => setEditTitle(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs font-bold dark:text-white outline-indigo-500"
+                        />
                       </div>
-                      <div className="flex items-center gap-2">
-                        <button
-                          type="button"
-                          onClick={saveMetaEdits}
-                          className="flex items-center gap-1 px-3 py-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-[11px] rounded-lg transition-all cursor-pointer border-none"
-                        >
-                          <Check className="w-3.5 h-3.5" />
-                          រក្សាទុក
-                        </button>
-                        <button
-                          type="button"
-                          onClick={() => setIsEditingMeta(false)}
-                          className="flex items-center gap-1 px-3 py-1 bg-slate-300 hover:bg-slate-400 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-extrabold text-[11px] rounded-lg transition-all cursor-pointer border-none"
-                        >
-                          <X className="w-3.5 h-3.5" />
-                          បោះបង់
-                        </button>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">ឈ្មោះសាលា</label>
+                        <input
+                          type="text"
+                          value={editSchool}
+                          onChange={(e) => setEditSchool(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs font-bold dark:text-white outline-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">រយៈពេលប្រឡង</label>
+                        <input
+                          type="text"
+                          value={editTime}
+                          onChange={(e) => setEditTime(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs font-bold dark:text-white outline-indigo-500"
+                        />
+                      </div>
+                      <div className="space-y-1">
+                        <label className="text-[11px] font-bold text-slate-400 dark:text-slate-500 uppercase">កាលបរិច្ឆេទ</label>
+                        <input
+                          type="date"
+                          value={editDate}
+                          onChange={(e) => setEditDate(e.target.value)}
+                          className="w-full px-3 py-2 bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl text-xs font-bold dark:text-white outline-indigo-500"
+                        />
                       </div>
                     </div>
-                  ) : (
-                    <>
-                      <div className="flex items-center gap-2">
-                        <h2 className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400 truncate">
-                          {activeExam.title} 
-                        </h2>
-                        <button
-                          type="button"
-                          onClick={startEditingMeta}
-                          title="កែសម្រួលឈ្មោះខែ ឬឈ្មោះកម្មវិធីប្រឡង"
-                          className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 text-indigo-500 hover:text-indigo-650 transition-all border-none cursor-pointer"
-                        >
-                          <Edit3 className="w-3.5 h-3.5" />
-                        </button>
-                      </div>
-                      
-                      {/* Meta lists in Cambodian row pattern */}
-                      <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 mt-2 text-[11px] font-bold text-slate-400 dark:text-slate-500">
-                        <span className="flex items-center gap-1">
-                          <School className="w-3 h-3 text-indigo-500" />
-                          {activeExam.schoolName}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-3 h-3 text-indigo-500" />
-                          រយៈពេល៖ {activeExam.timeLimit}
-                        </span>
-                        <span>•</span>
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-3 h-3 text-indigo-500" />
-                          កាលបរិច្ឆេទ៖ {activeExam.examDate}
-                        </span>
-                      </div>
-                    </>
-                  )}
+                    <div className="flex items-center gap-2 pt-2 justify-end">
+                      <button
+                        type="button"
+                        onClick={() => setIsEditingMeta(false)}
+                        className="flex items-center gap-1 px-4 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer border-none shadow-none"
+                      >
+                        <X className="w-4 h-4" />
+                        បោះបង់
+                      </button>
+                      <button
+                        type="button"
+                        onClick={saveMetaEdits}
+                        className="flex items-center gap-1 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs rounded-xl transition-all cursor-pointer border-none shadow-sm shadow-emerald-500/10"
+                      >
+                        <Check className="w-4 h-4" />
+                        រក្សាទុក
+                      </button>
+                    </div>
+                  </div>
                 </div>
+              ) : (
+                <div className="flex flex-col xl:flex-row xl:items-center justify-between gap-4 border-b pb-4 dark:border-slate-800/80">
+                  <div className="text-left min-w-0 flex-1">
+                    <div className="flex items-center gap-2">
+                      <h2 className="text-base sm:text-lg font-black text-indigo-600 dark:text-indigo-400 truncate">
+                        {activeExam.title} 
+                      </h2>
+                      <button
+                        type="button"
+                        onClick={startEditingMeta}
+                        title="កែសម្រួលឈ្មោះខែ ឬឈ្មោះកម្មវិធីប្រឡង"
+                        className="p-1 rounded bg-slate-100 hover:bg-slate-200 dark:bg-slate-900 dark:hover:bg-slate-850 text-indigo-500 hover:text-indigo-650 transition-all border-none cursor-pointer"
+                      >
+                        <Edit3 className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                    
+                    {/* Meta lists in Cambodian row pattern */}
+                    <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 mt-2 text-[11px] font-bold text-slate-400 dark:text-slate-500">
+                      <span className="flex items-center gap-1">
+                        <School className="w-3 h-3 text-indigo-500" />
+                        {activeExam.schoolName}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Clock className="w-3 h-3 text-indigo-505" />
+                        រយៈពេល៖ {activeExam.timeLimit}
+                      </span>
+                      <span>•</span>
+                      <span className="flex items-center gap-1">
+                        <Calendar className="w-3 h-3 text-indigo-505" />
+                        កាលបរិច្ឆេទ៖ {activeExam.examDate}
+                      </span>
+                    </div>
+                  </div>
 
-                <div className="flex items-center gap-2 shrink-0">
-                  <button
-                    type="button"
-                    onClick={openQuestionsEditor}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-purple-650 hover:bg-purple-750 text-white rounded-xl font-bold text-xs shadow-md shadow-purple-650/10 cursor-pointer active:scale-95 transition-all outline-none border-none bg-purple-600 hover:bg-purple-700"
-                  >
-                    <Plus className="w-3.5 h-3.5" />
-                    <span>បង្កើតសំណួរវិញ្ញាសារ</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={openQuestionsEditor}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 transition-all outline-none border-none"
-                  >
-                    <Edit3 className="w-3.5 h-3.5" />
-                    <span>កែសម្រួលសំណួរ & ចម្លើយ</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setIsPrintPreviewOpen(true);
-                      window.scrollTo({ top: 300, behavior: 'smooth' });
-                    }}
-                    className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/10 cursor-pointer active:scale-95 transition-all outline-none border-none"
-                  >
-                    <Printer className="w-3.5 h-3.5" />
-                    <span>ទម្រង់ព្រីនរៀបចំវិញ្ញាសារ</span>
-                  </button>
+                  <div className="flex flex-col gap-2.5 w-full sm:w-80 xl:w-96 shrink-0 self-stretch">
+                    <button
+                      type="button"
+                      onClick={() => setIsExpertAiModalOpen(true)}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-amber-650 hover:bg-amber-750 text-white rounded-xl font-black text-xs sm:text-sm shadow-md shadow-amber-500/15 cursor-pointer active:scale-95 transition-all outline-none border-none bg-amber-600 hover:bg-amber-700"
+                    >
+                      <Sparkles className="w-4 h-4 animate-pulse shrink-0" />
+                      <span className="truncate">បង្កើតសំណួរវិញ្ញាសារ (AI Expert)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openQuestionsEditor}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-purple-650 hover:bg-purple-750 text-white rounded-xl font-black text-xs sm:text-sm shadow-md shadow-purple-650/15 cursor-pointer active:scale-95 transition-all outline-none border-none bg-purple-600 hover:bg-purple-700"
+                    >
+                      <Plus className="w-4 h-4 shrink-0" />
+                      <span className="truncate">បង្កើតសំណួរវិញ្ញាសារ (ធម្មតា)</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={openQuestionsEditor}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-black text-xs sm:text-sm shadow-md shadow-amber-500/15 cursor-pointer active:scale-95 transition-all outline-none border-none"
+                    >
+                      <Edit3 className="w-4 h-4 shrink-0" />
+                      <span className="truncate">កែសម្រួលសំណួរ & ចម្លើយ</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setIsPrintPreviewOpen(true);
+                        window.scrollTo({ top: 300, behavior: 'smooth' });
+                      }}
+                      className="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-black text-xs sm:text-sm shadow-md shadow-indigo-600/15 cursor-pointer active:scale-95 transition-all outline-none border-none"
+                    >
+                      <Printer className="w-4 h-4 shrink-0" />
+                      <span className="truncate">ទម្រង់ព្រីនរៀបចំវិញ្ញាសារ</span>
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
 
               {/* Subject Tabs - រៀបចំវិញ្ញាសារ */}
               <div className="space-y-3">
@@ -2667,6 +2809,152 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
         )}
       </AnimatePresence>
 
+      {/* MODAL 3: Expert AI Questions Builder Modal */}
+      <AnimatePresence>
+        {isExpertAiModalOpen && (
+          <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-55 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden text-left p-6 ${
+                isDarkMode ? 'bg-[#121829] border border-indigo-950/80 text-white' : 'bg-white border text-slate-850'
+              }`}
+            >
+              <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
+                    <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
+                  </div>
+                  <div>
+                    <h3 className="font-black font-sans text-xs sm:text-sm">រៀបចំវិញ្ញាសារដោយ AI Expert</h3>
+                    <p className="text-[10px] text-slate-400">បង្កើតប្រធានវិញ្ញាសាតាមស្តង់ដារក្រសួងអប់រំ និងកម្មវិធីសិក្សាជាតិ</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsExpertAiModalOpen(false)}
+                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 border-none cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">មុខវិជ្ជាប្រឡង (Subject)</label>
+                    <select
+                      value={expertAiSubject}
+                      onChange={(e) => setExpertAiSubject(e.target.value)}
+                      className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
+                    >
+                      <optgroup label="វិទ្យាសាស្ត្រពិត (Science)">
+                        <option value="គណិតវិទ្យា">គណិតវិទ្យា (Mathematics)</option>
+                        <option value="រូបវិទ្យា">រូបវិទ្យា (Physics)</option>
+                        <option value="គីមីវិទ្យា">គីមីវិទ្យា (Chemistry)</option>
+                        <option value="ជីវវិទ្យា">ជីវវិទ្យា (Biology)</option>
+                        <option value="ផែនដីវិទ្យា">ផែនដីវិទ្យា (Earth Science)</option>
+                      </optgroup>
+                      <optgroup label="វិទ្យាសាស្ត្រសង្គម (Social Science)">
+                        <option value="ភាសាខ្មែរ">ភាសាខ្មែរ (Khmer Language)</option>
+                        <option value="តែងសេចក្ដី">តែងសេចក្ដី (Essay Writing)</option>
+                        <option value="សរសេរតាមអាន">សរសេរតាមអាន (Dictation)</option>
+                        <option value="ភូមិវិទ្យា">ភូមិវិទ្យា (Geography)</option>
+                        <option value="ប្រវត្តិវិទ្យា">ប្រវត្តិវិទ្យា (History)</option>
+                        <option value="សីលធម៌-ពលរដ្ឋ">សីលធម៌-ពលរដ្ឋ (Moral-Civic)</option>
+                        <option value="គេហវិទ្យា">គេហវិទ្យា (Home Economics)</option>
+                      </optgroup>
+                      <optgroup label="ភាសាបរទេស (Foreign Language)">
+                        <option value="ភាសាអង់គ្លេស">ភាសាអង់គ្លេស (English)</option>
+                        <option value="ភាសាបារាំង">ភាសាបារាំង (French)</option>
+                      </optgroup>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">ប្រភេទវិញ្ញាសា (Exam Type)</label>
+                    <select
+                      value={expertAiExamType}
+                      onChange={(e) => setExpertAiExamType(e.target.value)}
+                      className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
+                    >
+                      <option value="monthly">វិញ្ញាសាប្រលងប្រចាំខែ (Monthly Exam)</option>
+                      <option value="semester">វិញ្ញាសាប្រឡងឆមាស (Semester Exam)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">កម្រិតសិក្សា (Class Level)</label>
+                    <div className="w-full mt-1.5 px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-xl text-xs font-black border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-300 truncate">
+                      {activeClassName || "ទូទៅ"}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">ចំនួនសំណួរដែលត្រូវការ</label>
+                    <select
+                      value={expertAiCount}
+                      onChange={(e) => setExpertAiCount(Number(e.target.value))}
+                      className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
+                    >
+                      <option value={5}>៥ សំណួរ (5 Questions)</option>
+                      <option value={10}>១០ សំណួរ (10 Questions)</option>
+                      <option value={15}>១៥ សំណួរ (15 Questions)</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">សេចក្ដីណែនាំគន្លឹះបន្ថែមរបស់លោកគ្រូ អ្នកគ្រូ</label>
+                  <textarea
+                    rows={3}
+                    placeholder="ឧ. សង្កត់ធ្ងន់មេរៀន សន្ទស្សន៍ចំណាំងពន្លឺ ឬ សមីការគីមី... ឬ ជម្រើសចម្លើយដែលមានភាពស៊ីជម្រៅ"
+                    value={expertAiInstructions}
+                    onChange={(e) => setExpertAiInstructions(e.target.value)}
+                    className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-semibold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
+                  />
+                </div>
+
+                <div className="p-3 bg-amber-500/5 rounded-2xl border border-dashed border-amber-500/20 text-[10px] text-amber-600 dark:text-amber-400 font-medium leading-relaxed">
+                  💡 <strong>បញ្ជាក់៖</strong> សំណួរដែលបង្កើតដោយ AI Expert នឹងត្រូវបញ្ចូលទៅក្នុងមុខវិជ្ជា និងវិញ្ញាសារសន្លឹកកិច្ចការដែលកំពុងបើកស្រាប់នេះភ្លាមៗ។ ប្រសិនបើពុំទាន់មានមុខវិជ្ជានោះនៅក្នុងសន្លឹកកិច្ចការទេ ប្រព័ន្ធនឹងស្វ័យប្រវត្តបង្កើតមុខវិជ្ជាថ្មីឱ្យតែម្ដង។
+                </div>
+
+                <div className="flex items-center justify-end gap-2 border-t pt-4 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpertAiModalOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white border-none cursor-pointer"
+                  >
+                    បិទ
+                  </button>
+                  <button
+                    type="button"
+                    disabled={isExpertGenerating}
+                    onClick={handleExpertAiGenerate}
+                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-2xl text-xs font-extrabold cursor-pointer active:scale-95 transition-all outline-none border-none flex items-center gap-1.5 shadow-md shadow-amber-500/10"
+                  >
+                    {isExpertGenerating ? (
+                      <>
+                        <span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                        <span>កំពុងវិនិច្ឆ័យ & បង្កើត...</span>
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="w-3.5 h-3.5 text-white" />
+                        <span>✨ ចាប់ផ្ដើមបង្កើតសំណួរ</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
+
       {/* Export & Print Preview Modal */}
       <AnimatePresence>
         {isExportModalOpen && (
@@ -3022,6 +3310,15 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
                     បោះបង់
                   </button>
                   
+                  <button
+                    type="button"
+                    onClick={() => setIsExpertAiModalOpen(true)}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl font-bold text-xs shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 transition-all outline-none border-none"
+                  >
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>បង្កើតសំណួរវិញ្ញាសារ (AI Expert)</span>
+                  </button>
+
                   <button
                     type="button"
                     onClick={() => {
