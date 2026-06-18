@@ -36,6 +36,13 @@ export default function GroupDivider({
   const [groupScoreInputs, setGroupScoreInputs] = useState<Record<number, string>>({});
   const [isCloudLoading, setIsCloudLoading] = useState(false);
   const [cloudSynced, setCloudSynced] = useState(false);
+  const [shuffleStats, setShuffleStats] = useState<{
+    combinationsTested: number;
+    fairPermutationsCount: number;
+    boysRange: string;
+    girlsRange: string;
+    showNotification: boolean;
+  } | null>(null);
 
   // Load saved state from local storage and firestore when activeClassId changes
   useEffect(() => {
@@ -148,119 +155,163 @@ export default function GroupDivider({
 
     const G = Math.min(numGroups, students.length);
 
-    // 1. Categorize students by active status for proportional distribution
-    const outstanding: Student[] = [];
-    const active: Student[] = [];
-    const improving: Student[] = [];
-    const attention: Student[] = [];
+    // 1. Group students by gender & academic status for highly diverse randomized distribution
+    const getStatusWeight = (status?: string) => {
+      if (status === 'ឆ្នើម') return 4;
+      if (status === 'សកម្ម') return 3;
+      if (status === 'គួរឲ្យបារម្ភ') return 1;
+      return 2; // កំពុងរីកចម្រើន
+    };
 
-    students.forEach(s => {
-      const status = s.status || 'កំពុងរីកចម្រើន';
-      if (status === 'ឆ្នើម') {
-        outstanding.push(s);
-      } else if (status === 'សកម្ម') {
-        active.push(s);
-      } else if (status === 'គួរឲ្យបារម្ភ') {
-        attention.push(s);
-      } else {
-        improving.push(s);
+    const boysHigh = students.filter(s => s.gender === 'ប្រុស' && getStatusWeight(s.status) >= 3);
+    const boysLow = students.filter(s => s.gender === 'ប្រុស' && getStatusWeight(s.status) <= 2);
+    const girlsHigh = students.filter(s => s.gender === 'ស្រី' && getStatusWeight(s.status) >= 3);
+    const girlsLow = students.filter(s => s.gender === 'ស្រី' && getStatusWeight(s.status) <= 2);
+    const others = students.filter(s => s.gender !== 'ប្រុស' && s.gender !== 'ស្រី');
+
+    // Shuffle helper
+    const shuffleArray = <T,>(arr: T[]): T[] => {
+      const copy = [...arr];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy;
+    };
+
+    // Ideal bounds for sizes and genders
+    const idealSizeMin = Math.floor(students.length / G);
+    const idealSizeMax = Math.ceil(students.length / G);
+
+    const totalBoys = students.filter(s => s.gender === 'ប្រុស').length;
+    const totalGirls = students.filter(s => s.gender === 'ស្រី').length;
+    const idealBoysMin = Math.floor(totalBoys / G);
+    const idealBoysMax = Math.ceil(totalBoys / G);
+    const idealGirlsMin = Math.floor(totalGirls / G);
+    const idealGirlsMax = Math.ceil(totalGirls / G);
+
+    const totalAcademicWeight = students.reduce((sum, s) => sum + getStatusWeight(s.status), 0);
+    const targetAcademicPerGroup = totalAcademicWeight / G;
+
+    // Generate candidates
+    const CANDIDATES_COUNT = 2000;
+    const candidates: { groups: GroupMember[][]; penalty: number }[] = [];
+
+    for (let c = 0; c < CANDIDATES_COUNT; c++) {
+      const shufBoysHigh = shuffleArray(boysHigh);
+      const shufBoysLow = shuffleArray(boysLow);
+      const shufGirlsHigh = shuffleArray(girlsHigh);
+      const shufGirlsLow = shuffleArray(girlsLow);
+      const shufOthers = shuffleArray(others);
+
+      const candidateGroups: GroupMember[][] = Array.from({ length: G }, () => []);
+
+      // Distribute pools with random group-offsets to prevent systematic bias
+      let idx1 = Math.floor(Math.random() * G);
+      shufBoysHigh.forEach((s) => {
+        candidateGroups[idx1 % G].push({ ...s, groupScore: 0 });
+        idx1++;
+      });
+
+      let idx2 = Math.floor(Math.random() * G);
+      shufBoysLow.forEach((s) => {
+        candidateGroups[idx2 % G].push({ ...s, groupScore: 0 });
+        idx2++;
+      });
+
+      let idx3 = Math.floor(Math.random() * G);
+      shufGirlsHigh.forEach((s) => {
+        candidateGroups[idx3 % G].push({ ...s, groupScore: 0 });
+        idx3++;
+      });
+
+      let idx4 = Math.floor(Math.random() * G);
+      shufGirlsLow.forEach((s) => {
+        candidateGroups[idx4 % G].push({ ...s, groupScore: 0 });
+        idx4++;
+      });
+
+      let idx5 = Math.floor(Math.random() * G);
+      shufOthers.forEach((s) => {
+        candidateGroups[idx5 % G].push({ ...s, groupScore: 0 });
+        idx5++;
+      });
+
+      // Calculate penalties
+      let penalty = 0;
+
+      // 1. Group Size Constraint
+      candidateGroups.forEach(g => {
+        const size = g.length;
+        if (size < idealSizeMin || size > idealSizeMax) {
+          penalty += 10000; // heavy size mismatch penalty
+        }
+      });
+
+      // 2. Gender Balance Constraint
+      candidateGroups.forEach(g => {
+        const boysCount = g.filter(m => m.gender === 'ប្រុស').length;
+        const girlsCount = g.filter(m => m.gender === 'ស្រី').length;
+
+        if (boysCount < idealBoysMin || boysCount > idealBoysMax) {
+          penalty += 200 * Math.pow(Math.abs(boysCount - (totalBoys / G)), 2);
+        }
+        if (girlsCount < idealGirlsMin || girlsCount > idealGirlsMax) {
+          penalty += 200 * Math.pow(Math.abs(girlsCount - (totalGirls / G)), 2);
+        }
+      });
+
+      // 3. Academic Balanced Proportions Constraint
+      let academicVariance = 0;
+      candidateGroups.forEach(g => {
+        const gWeight = g.reduce((sum, m) => sum + getStatusWeight(m.status), 0);
+        academicVariance += Math.pow(gWeight - targetAcademicPerGroup, 2);
+
+        // Mix Guard: A group should not have 0 high-capability or 0 low-capability students if they are enough to go around
+        const smarts = g.filter(m => getStatusWeight(m.status) >= 3).length;
+        const weaks = g.filter(m => getStatusWeight(m.status) <= 2).length;
+
+        const totalSmarts = boysHigh.length + girlsHigh.length;
+        const totalWeaks = boysLow.length + girlsLow.length;
+
+        if (totalSmarts >= G && smarts === 0) {
+          penalty += 1000; 
+        }
+        if (totalWeaks >= G && weaks === 0) {
+          penalty += 1000;
+        }
+      });
+
+      penalty += academicVariance * 10;
+      candidates.push({ groups: candidateGroups, penalty });
+    }
+
+    // 2. Find minimum penalty score
+    let minPenalty = Infinity;
+    candidates.forEach(c => {
+      if (c.penalty < minPenalty) {
+        minPenalty = c.penalty;
       }
     });
 
-    // Helper function to weave genders alternatingly (ប្រុស, ស្រី) to balance male and female distribution
-    const weaveGenders = (arr: Student[]): Student[] => {
-      const boys = arr.filter(s => s.gender === 'ប្រុស');
-      const girls = arr.filter(s => s.gender === 'ស្រី');
-      const others = arr.filter(s => s.gender !== 'ប្រុស' && s.gender !== 'ស្រី');
+    // 3. Keep candidates with optimal penalty (allow small tolerance for high diversity)
+    const threshold = minPenalty + 0.1;
+    const bestCandidates = candidates.filter(c => c.penalty <= threshold);
 
-      // Shuffle pools first to ensure fair random selection
-      const shuffle = (list: Student[]) => {
-        for (let i = list.length - 1; i > 0; i--) {
-          const j = Math.floor(Math.random() * (i + 1));
-          [list[i], list[j]] = [list[j], list[i]];
-        }
-      };
+    // Pick one candidate from the best ones!
+    const selectedIndex = Math.floor(Math.random() * bestCandidates.length);
+    const selectedCandidate = bestCandidates[selectedIndex];
+    const finalGroupsMembers = selectedCandidate.groups;
 
-      shuffle(boys);
-      shuffle(girls);
-      shuffle(others);
-
-      const weaved: Student[] = [];
-      let bIdx = 0;
-      let gIdx = 0;
-
-      // Start with whichever gender has more students left to maximize alternating success
-      let preferBoy = boys.length >= girls.length;
-
-      while (bIdx < boys.length || gIdx < girls.length) {
-        if (preferBoy) {
-          if (bIdx < boys.length) {
-            weaved.push(boys[bIdx++]);
-          }
-          preferBoy = false;
-        } else {
-          if (gIdx < girls.length) {
-            weaved.push(girls[gIdx++]);
-          }
-          preferBoy = true;
-        }
-
-        // Keep alternating if possible, or deplete remaining
-        if (bIdx >= boys.length && gIdx < girls.length) {
-          preferBoy = false;
-        } else if (gIdx >= girls.length && bIdx < boys.length) {
-          preferBoy = true;
-        }
-      }
-
-      return [...weaved, ...others];
-    };
-
-    const weavedOutstanding = weaveGenders(outstanding);
-    const weavedActive = weaveGenders(active);
-    const weavedImproving = weaveGenders(improving);
-    const weavedAttention = weaveGenders(attention);
-
-    // Create G initial groups
+    // Create final mapped result groups
     const resultGroups: Group[] = Array.from({ length: G }, (_, idx) => ({
       id: idx + 1,
       name: `ក្រុមទី${idx + 1}`,
-      members: []
+      members: finalGroupsMembers[idx]
     }));
 
-    // 3. Proportional round-robin distribution category by category
-    // Crucially use a continuous index to distribute members perfectly and equally across G groups!
-    let globalIdx = 0;
-
-    weavedOutstanding.forEach((student) => {
-      resultGroups[globalIdx % G].members.push({ ...student, groupScore: 0 });
-      globalIdx++;
-    });
-
-    weavedActive.forEach((student) => {
-      resultGroups[globalIdx % G].members.push({ ...student, groupScore: 0 });
-      globalIdx++;
-    });
-
-    weavedImproving.forEach((student) => {
-      resultGroups[globalIdx % G].members.push({ ...student, groupScore: 0 });
-      globalIdx++;
-    });
-
-    weavedAttention.forEach((student) => {
-      resultGroups[globalIdx % G].members.push({ ...student, groupScore: 0 });
-      globalIdx++;
-    });
-
-    // 4. Assign roles inside each group
+    // 4. Sort and Assign Roles inside each group
     resultGroups.forEach(group => {
-      const getStatusWeight = (status?: string) => {
-        if (status === 'ឆ្នើម') return 4;
-        if (status === 'សកម្ម') return 3;
-        if (status === 'គួរឲ្យបារម្ភ') return 1;
-        return 2; // កំពុងរីកចម្រើន
-      };
-
       // Sort by status weight descending
       group.members.sort((a, b) => getStatusWeight(b.status) - getStatusWeight(a.status));
 
@@ -274,6 +325,26 @@ export default function GroupDivider({
           member.assignedRole = 'សមាជិក';
         }
       });
+    });
+
+    // Compute actual gender limits inside the chosen grouping for statistics
+    let maxB = 0, minB = Infinity;
+    let maxG = 0, minG = Infinity;
+    resultGroups.forEach(g => {
+      const bCount = g.members.filter(m => m.gender === 'ប្រុស').length;
+      const gCount = g.members.filter(m => m.gender === 'ស្រី').length;
+      if (bCount > maxB) maxB = bCount;
+      if (bCount < minB) minB = bCount;
+      if (gCount > maxG) maxG = gCount;
+      if (gCount < minG) minG = gCount;
+    });
+
+    setShuffleStats({
+      combinationsTested: CANDIDATES_COUNT,
+      fairPermutationsCount: bestCandidates.length,
+      boysRange: `${minB} - ${maxB}`,
+      girlsRange: `${minG} - ${maxG}`,
+      showNotification: true
     });
 
     setGroups(resultGroups);
@@ -486,6 +557,33 @@ export default function GroupDivider({
         </div>
       </div>
 
+      {shuffleStats && (
+        <div className={`p-4 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-4 duration-300 ${
+          isDarkMode ? 'bg-indigo-950/20 border-indigo-505/20 border-indigo-500/10 text-slate-350' : 'bg-indigo-500/5 border-indigo-100/50 text-slate-700'
+        }`}>
+          <div className="flex items-center gap-3">
+            <span className="text-xl shrink-0">✨</span>
+            <div className="text-left">
+              <p className="text-xs font-bold font-sans">
+                វិភាគជម្រើសចម្លាស់៖ <span className="font-extrabold text-indigo-550 dark:text-indigo-400">{shuffleStats.combinationsTested.toLocaleString()} របៀប</span> • 
+                ប្រភេទចម្លាស់ស្មើភាពខ្ពស់រកឃើញ៖ <span className="font-extrabold text-indigo-600 dark:text-indigo-300">{shuffleStats.fairPermutationsCount} ជម្រើសផ្សេងគ្នា</span>
+              </p>
+              <p className="text-[11px] mt-0.5 opacity-80 leading-relaxed font-semibold">
+                ប្រព័ន្ធលាយឡំសិទ្ធសកម្ម/ខ្សោយ និងជម្រើសប្រុស-ស្រីឱ្យមានតុល្យភាពស្មើភាពគ្នាល្អបំផុត ដើម្បីលុបបំបាត់ភាពលម្អៀង។
+              </p>
+            </div>
+          </div>
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            <span className="text-[10px] font-extrabold font-mono px-2.5 py-1 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+              ប្រុសក្នុងក្រុម៖ {shuffleStats.boysRange} នាក់
+            </span>
+            <span className="text-[10px] font-extrabold font-mono px-2.5 py-1 rounded-xl bg-pink-500/10 text-pink-600 dark:text-pink-400">
+              ស្រីក្នុងក្រុម៖ {shuffleStats.girlsRange} នាក់
+            </span>
+          </div>
+        </div>
+      )}
+
       {/* Divided Groups Content Grid */}
       {groups.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
@@ -497,7 +595,7 @@ export default function GroupDivider({
               }`}
             >
               {/* Group Title and Info */}
-              <div className={`flex items-center justify-between border-b pb-3 mb-4 transition-all duration-300 ${
+              <div className={`flex items-center justify-between border-b pb-3 mb-2 transition-all duration-300 ${
                 isDarkMode ? 'border-slate-800/80 border-indigo-950/30' : 'border-slate-100'
               }`}>
                 <div className="flex items-center gap-2">
@@ -515,6 +613,15 @@ export default function GroupDivider({
                 }`}>
                   {group.members.length} នាក់
                 </span>
+              </div>
+
+              {/* Group Metrics Bar (Genders Ratio) */}
+              <div className="flex items-center justify-between mb-4 text-[11px] font-extrabold">
+                <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1 rounded-xl border border-slate-100 dark:border-slate-800/40">
+                  <span className="text-blue-500 flex items-center gap-0.5">♂ {group.members.filter(m => m.gender === 'ប្រុស').length} នាក់</span>
+                  <span className="text-slate-300 dark:text-slate-800">|</span>
+                  <span className="text-pink-500 flex items-center gap-0.5">♀ {group.members.filter(m => m.gender === 'ស្រី').length} នាក់</span>
+                </div>
               </div>
 
               {/* Score Group Interface */}
