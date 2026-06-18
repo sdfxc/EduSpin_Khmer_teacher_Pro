@@ -823,24 +823,16 @@ Output the response in JSON format.`;
       }
     });
 
-    const showSections = 
-      grouped.matching.length > 0 || 
-      grouped.fill_blank.length > 0 || 
-      grouped.theory.length > 0 || 
-      grouped.exercise.length > 0;
-
     let globalIdx = 0;
     let questionsHtml = '';
 
     // 1. Choice Section
     if (grouped.choice.length > 0) {
-      if (showSections) {
-        questionsHtml += `
-          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-            ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
-          </div>
-        `;
-      }
+      questionsHtml += `
+        <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+          ផ្នែកទី ១៖ សំណួរ គូសធីក ចំនួន ${grouped.choice.length}
+        </div>
+      `;
       grouped.choice.forEach((card) => {
         globalIdx++;
         let optionsHtml = '';
@@ -890,13 +882,11 @@ Output the response in JSON format.`;
 
     // 2. Matching Section
     if (grouped.matching.length > 0) {
-      if (showSections) {
-        questionsHtml += `
-          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-            ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
-          </div>
-        `;
-      }
+      questionsHtml += `
+        <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+          ផ្នែកទី ២៖ ផ្គូផ្គង សំណួរ-ចម្លើយ ចំនួន ${grouped.matching.length} សំណួរ
+        </div>
+      `;
       grouped.matching.forEach((card) => {
         globalIdx++;
         questionsHtml += `
@@ -923,13 +913,11 @@ Output the response in JSON format.`;
 
     // 3. Fill Blank Section
     if (grouped.fill_blank.length > 0) {
-      if (showSections) {
-        questionsHtml += `
-          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-            ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
-          </div>
-        `;
-      }
+      questionsHtml += `
+        <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+          ផ្នែកទី ៣៖ សំណួរ បំពេញចន្លោះ ចំនួន ${grouped.fill_blank.length}
+        </div>
+      `;
       grouped.fill_blank.forEach((card) => {
         globalIdx++;
         questionsHtml += `
@@ -942,13 +930,11 @@ Output the response in JSON format.`;
 
     // 4. Theory Section
     if (grouped.theory.length > 0) {
-      if (showSections) {
-        questionsHtml += `
-          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-            ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
-          </div>
-        `;
-      }
+      questionsHtml += `
+        <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+          ផ្នែកទី ៤៖ សំណួរ ទូទៅទ្រឹស្ដី និងការរស់នៅអំពីមេរៀន ចំនួន ${grouped.theory.length}
+        </div>
+      `;
       grouped.theory.forEach((card) => {
         globalIdx++;
         questionsHtml += `
@@ -968,13 +954,11 @@ Output the response in JSON format.`;
 
     // 5. Exercise Section
     if (grouped.exercise.length > 0) {
-      if (showSections) {
-        questionsHtml += `
-          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-            ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
-          </div>
-        `;
-      }
+      questionsHtml += `
+        <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+          ផ្នែកទី ៥៖ លំហាត់ ចំនួន ${grouped.exercise.length}
+        </div>
+      `;
       grouped.exercise.forEach((card) => {
         globalIdx++;
         questionsHtml += `
@@ -1218,7 +1202,9 @@ Output the response in JSON format.`;
       question: {
         text: q.text,
         options: q.options,
-        correctIndex: q.correctIndex
+        correctIndex: q.correctIndex,
+        category: q.category,
+        points: q.points
       }
     }));
 
@@ -1800,54 +1786,83 @@ Output the response in JSON format.`;
       ...titleParas
     ];
 
-    questionCards.forEach((card, qIdx) => {
-      // Question block
-      childrenElements.push(
-        new Paragraph({
-          spacing: { before: 240, after: 120 },
-          keepNext: true,
-          children: [
-            new TextRun({
-              text: `សំណួរទី ${qIdx + 1}៖ `,
-              font: selectedBodyFontObj.name,
-              size: bodyFontSize * 2,
-              bold: true,
-            }),
-            ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize)
-          ]
-        })
-      );
+    const grouped = {
+      choice: [] as any[],
+      matching: [] as any[],
+      fill_blank: [] as any[],
+      theory: [] as any[],
+      exercise: [] as any[],
+    };
 
-      // Options block
-      if (optionsLayout === 'inline') {
-        const rows: TableRow[] = [];
-        for (let i = 0; i < card.question.options.length; i += 2) {
-          const opt1 = card.question.options[i];
-          const opt2 = card.question.options[i + 1];
+    questionCards.forEach(card => {
+      const q = card.question;
+      const cat = q.category || 'choice';
+      if (grouped[cat]) {
+        grouped[cat].push(card);
+      } else {
+        grouped['choice'].push(card);
+      }
+    });
 
-          const cells = [
-            new TableCell({
-              width: { size: 50, type: WidthType.PERCENTAGE },
-              borders: tableBordersNone,
-              children: [
-                new Paragraph({
-                  spacing: { before: 40, after: 40 },
-                  children: [
-                    new TextRun({
-                      text: `${getOptionPrefix(i)}. `,
-                      font: selectedBodyFontObj.name,
-                      size: bodyFontSize * 2,
-                      bold: true,
-                    }),
-                    ...convertHtmlToTextRuns(opt1, selectedBodyFontObj.name, bodyFontSize)
-                  ]
-                })
-              ]
-            })
-          ];
+    let globalIdx = 0;
 
-          if (opt2 !== undefined) {
-            cells.push(
+    const createSectionHeader = (title: string) => {
+      return new Paragraph({
+        spacing: { before: 300, after: 120 },
+        keepNext: true,
+        border: {
+          bottom: {
+            style: BorderStyle.SINGLE,
+            size: 12,
+            space: 4,
+            color: "000000",
+          }
+        },
+        children: [
+          new TextRun({
+            text: title,
+            font: selectedHeaderFontObj.name,
+            size: (bodyFontSize + 1) * 2,
+            bold: true,
+          })
+        ]
+      });
+    };
+
+    // 1. Choice Section
+    if (grouped.choice.length > 0) {
+      childrenElements.push(createSectionHeader(`ផ្នែកទី ១៖ សំណួរ គូសធីក ចំនួន ${grouped.choice.length}`));
+      grouped.choice.forEach((card) => {
+        globalIdx++;
+        childrenElements.push(
+          new Paragraph({
+            spacing: { before: 240, after: 120 },
+            keepNext: true,
+            children: [
+              new TextRun({
+                text: `សំណួរទី ${globalIdx}៖ `,
+                font: selectedBodyFontObj.name,
+                size: bodyFontSize * 2,
+                bold: true,
+              }),
+              ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize),
+              new TextRun({
+                text: ` (${card.question.points || 2} ពិន្ទុ)`,
+                font: selectedBodyFontObj.name,
+                size: (bodyFontSize - 1) * 2,
+                color: "555555",
+              })
+            ]
+          })
+        );
+
+        if (optionsLayout === 'inline') {
+          const rows: TableRow[] = [];
+          for (let i = 0; i < card.question.options.length; i += 2) {
+            const opt1 = card.question.options[i];
+            const opt2 = card.question.options[i + 1];
+
+            const cells = [
               new TableCell({
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: tableBordersNone,
@@ -1856,50 +1871,318 @@ Output the response in JSON format.`;
                     spacing: { before: 40, after: 40 },
                     children: [
                       new TextRun({
-                        text: `${getOptionPrefix(i + 1)}. `,
+                        text: `${getOptionPrefix(i)}. `,
                         font: selectedBodyFontObj.name,
                         size: bodyFontSize * 2,
                         bold: true,
                       }),
-                      ...convertHtmlToTextRuns(opt2, selectedBodyFontObj.name, bodyFontSize)
+                      ...convertHtmlToTextRuns(opt1, selectedBodyFontObj.name, bodyFontSize)
                     ]
                   })
                 ]
               })
-            );
+            ];
+
+            if (opt2 !== undefined) {
+              cells.push(
+                new TableCell({
+                  width: { size: 50, type: WidthType.PERCENTAGE },
+                  borders: tableBordersNone,
+                  children: [
+                    new Paragraph({
+                      spacing: { before: 40, after: 40 },
+                      children: [
+                        new TextRun({
+                          text: `${getOptionPrefix(i + 1)}. `,
+                          font: selectedBodyFontObj.name,
+                          size: bodyFontSize * 2,
+                          bold: true,
+                        }),
+                        ...convertHtmlToTextRuns(opt2, selectedBodyFontObj.name, bodyFontSize)
+                      ]
+                    })
+                  ]
+                })
+              );
+            }
+
+            rows.push(new TableRow({ children: cells }));
           }
 
-          rows.push(new TableRow({ children: cells }));
+          childrenElements.push(
+            new Table({
+              width: { size: 100, type: WidthType.PERCENTAGE },
+              borders: tableBordersNone,
+              margins: { left: 450 },
+              rows,
+            })
+          );
+        } else {
+          card.question.options.forEach((opt: string, oIdx: number) => {
+            childrenElements.push(
+              new Paragraph({
+                indent: { left: 450 },
+                spacing: { before: 40, after: 40 },
+                children: [
+                  new TextRun({
+                    text: `${getOptionPrefix(oIdx)}. `,
+                    font: selectedBodyFontObj.name,
+                    size: bodyFontSize * 2,
+                    bold: true,
+                  }),
+                  ...convertHtmlToTextRuns(opt, selectedBodyFontObj.name, bodyFontSize)
+                ]
+              })
+            );
+          });
         }
+      });
+    }
+
+    // 2. Matching Section
+    if (grouped.matching.length > 0) {
+      childrenElements.push(createSectionHeader(`ផ្នែកទី ២៖ ផ្គូផ្គង សំណួរ-ចម្លើយ ចំនួន ${grouped.matching.length} សំណួរ`));
+      grouped.matching.forEach((card) => {
+        globalIdx++;
+        childrenElements.push(
+          new Paragraph({
+            spacing: { before: 240, after: 120 },
+            keepNext: true,
+            children: [
+              new TextRun({
+                text: `សំណួរទី ${globalIdx}៖ `,
+                font: selectedBodyFontObj.name,
+                size: bodyFontSize * 2,
+                bold: true,
+              }),
+              ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize),
+              new TextRun({
+                text: ` (${card.question.points || 2} ពិន្ទុ)`,
+                font: selectedBodyFontObj.name,
+                size: (bodyFontSize - 1) * 2,
+                color: "555555",
+              })
+            ]
+          })
+        );
 
         childrenElements.push(
           new Table({
-            width: { size: 100, type: WidthType.PERCENTAGE },
-            borders: tableBordersNone,
-            margins: { left: 450 },
-            rows,
+            width: { size: 80, type: WidthType.PERCENTAGE },
+            alignment: AlignmentType.CENTER,
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
+              bottom: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
+              left: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
+              right: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
+              insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "auto" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
+            },
+            rows: [
+              new TableRow({
+                children: [
+                  new TableCell({
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
+                        children: [
+                          new TextRun({
+                            text: "កូនផ្នែក A",
+                            font: selectedBodyFontObj.name,
+                            size: (bodyFontSize - 0.5) * 2,
+                            bold: true,
+                            color: "555555",
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        spacing: { after: 60 },
+                        children: [
+                          new TextRun({
+                            text: `១. ${card.question.options[0] || ".........."}`,
+                            font: selectedBodyFontObj.name,
+                            size: (bodyFontSize - 0.5) * 2,
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: `២. ${card.question.options[1] || ".........."}`,
+                            font: selectedBodyFontObj.name,
+                            size: (bodyFontSize - 0.5) * 2,
+                          })
+                        ]
+                      })
+                    ],
+                    margins: { top: 120, bottom: 120, left: 160, right: 160 }
+                  }),
+                  new TableCell({
+                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    children: [
+                      new Paragraph({
+                        alignment: AlignmentType.CENTER,
+                        spacing: { after: 100 },
+                        children: [
+                          new TextRun({
+                            text: "កូនផ្នែក B",
+                            font: selectedBodyFontObj.name,
+                            size: (bodyFontSize - 0.5) * 2,
+                            bold: true,
+                            color: "555555",
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        spacing: { after: 60 },
+                        children: [
+                          new TextRun({
+                            text: `ក. ${card.question.options[2] || ".........."}`,
+                            font: selectedBodyFontObj.name,
+                            size: (bodyFontSize - 0.5) * 2,
+                          })
+                        ]
+                      }),
+                      new Paragraph({
+                        children: [
+                          new TextRun({
+                            text: `ខ. ${card.question.options[3] || ".........."}`,
+                            font: selectedBodyFontObj.name,
+                            size: (bodyFontSize - 0.5) * 2,
+                          })
+                        ]
+                      })
+                    ],
+                    margins: { top: 120, bottom: 120, left: 160, right: 160 }
+                  })
+                ]
+              })
+            ]
           })
         );
-      } else {
-        card.question.options.forEach((opt: string, oIdx: number) => {
+      });
+    }
+
+    // 3. Fill Blank Section
+    if (grouped.fill_blank.length > 0) {
+      childrenElements.push(createSectionHeader(`ផ្នែកទី ៣៖ សំណួរ បំពេញចន្លោះ ចំនួន ${grouped.fill_blank.length}`));
+      grouped.fill_blank.forEach((card) => {
+        globalIdx++;
+        childrenElements.push(
+          new Paragraph({
+            spacing: { before: 240, after: 120 },
+            keepNext: true,
+            children: [
+              new TextRun({
+                text: `សំណួរទី ${globalIdx}៖ `,
+                font: selectedBodyFontObj.name,
+                size: bodyFontSize * 2,
+                bold: true,
+              }),
+              ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize),
+              new TextRun({
+                text: ` (${card.question.points || 2} ពិន្ទុ)`,
+                font: selectedBodyFontObj.name,
+                size: (bodyFontSize - 1) * 2,
+                color: "555555",
+              })
+            ]
+          })
+        );
+      });
+    }
+
+    // 4. Theory Section
+    if (grouped.theory.length > 0) {
+      childrenElements.push(createSectionHeader(`ផ្នែកទី ៤៖ សំណួរ ទូទៅទ្រឹស្ដី និងការរស់នៅអំពីមេរៀន ចំនួន ${grouped.theory.length}`));
+      grouped.theory.forEach((card) => {
+        globalIdx++;
+        childrenElements.push(
+          new Paragraph({
+            spacing: { before: 240, after: 120 },
+            keepNext: true,
+            children: [
+              new TextRun({
+                text: `សំណួរទី ${globalIdx}៖ `,
+                font: selectedBodyFontObj.name,
+                size: bodyFontSize * 2,
+                bold: true,
+              }),
+              ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize),
+              new TextRun({
+                text: ` (${card.question.points || 2} ពិន្ទុ)`,
+                font: selectedBodyFontObj.name,
+                size: (bodyFontSize - 1) * 2,
+                color: "555555",
+              })
+            ]
+          })
+        );
+
+        for (let l = 0; l < 5; l++) {
           childrenElements.push(
             new Paragraph({
-              indent: { left: 450 },
-              spacing: { before: 40, after: 40 },
+              spacing: { before: 120, after: 120 },
               children: [
                 new TextRun({
-                  text: `${getOptionPrefix(oIdx)}. `,
+                  text: "............................................................................................................................................................................",
                   font: selectedBodyFontObj.name,
-                  size: bodyFontSize * 2,
-                  bold: true,
-                }),
-                ...convertHtmlToTextRuns(opt, selectedBodyFontObj.name, bodyFontSize)
+                  size: (bodyFontSize - 1) * 2,
+                  color: "888888",
+                })
               ]
             })
           );
-        });
-      }
-    });
+        }
+      });
+    }
+
+    // 5. Exercise Section
+    if (grouped.exercise.length > 0) {
+      childrenElements.push(createSectionHeader(`ផ្នែកទី ៥៖ លំហាត់ ចំនួន ${grouped.exercise.length}`));
+      grouped.exercise.forEach((card) => {
+        globalIdx++;
+        childrenElements.push(
+          new Paragraph({
+            spacing: { before: 240, after: 120 },
+            keepNext: true,
+            children: [
+              new TextRun({
+                text: `សំណួរទី ${globalIdx}៖ `,
+                font: selectedBodyFontObj.name,
+                size: bodyFontSize * 2,
+                bold: true,
+              }),
+              ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize),
+              new TextRun({
+                text: ` (${card.question.points || 2} ពិន្ទុ)`,
+                font: selectedBodyFontObj.name,
+                size: (bodyFontSize - 1) * 2,
+                color: "555555",
+              })
+            ]
+          })
+        );
+
+        for (let l = 0; l < 8; l++) {
+          childrenElements.push(
+            new Paragraph({
+              spacing: { before: 120, after: 120 },
+              children: [
+                new TextRun({
+                  text: "............................................................................................................................................................................",
+                  font: selectedBodyFontObj.name,
+                  size: (bodyFontSize - 1) * 2,
+                  color: "888888",
+                })
+              ]
+            })
+          );
+        }
+      });
+    }
 
     const doc = new Document({
       sections: [{
