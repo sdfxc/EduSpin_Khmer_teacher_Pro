@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil } from 'lucide-react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
@@ -194,9 +194,19 @@ const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
     return true;
   });
 
+  // If there is an 'order' property on the classes, sort by that!
+  const hasOrder = filtered.some(c => typeof c.order === 'number');
+  if (hasOrder) {
+    return [...filtered].sort((a, b) => {
+      const orderA = typeof a.order === 'number' ? a.order : 999;
+      const orderB = typeof b.order === 'number' ? b.order : 999;
+      return orderA - orderB;
+    });
+  }
+
   const pinned = filtered.filter(c => isPinnedClass(c.id, c.name));
   const others = filtered.filter(c => !isPinnedClass(c.id, c.name));
-  return [...pinned, ...others];
+  return [...pinned, ...others].map((c, idx) => ({ ...c, order: idx }));
 };
 
 export default function App() {
@@ -435,6 +445,83 @@ export default function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [isDarkMode]);
+
+  const [draggedClassIndex, setDraggedClassIndex] = useState<number | null>(null);
+  const [canDrag, setCanDrag] = useState<boolean>(false);
+
+  const handleClassDragStart = (e: React.DragEvent, index: number) => {
+    setDraggedClassIndex(index);
+    e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', index.toString());
+  };
+
+  const handleClassDragOver = (e: React.DragEvent, index: number) => {
+    e.preventDefault();
+    if (draggedClassIndex === null || draggedClassIndex === index) return;
+    
+    const updated = [...classes];
+    const draggedItem = updated[draggedClassIndex];
+    updated.splice(draggedClassIndex, 1);
+    updated.splice(index, 0, draggedItem);
+    
+    setDraggedClassIndex(index);
+    setClasses(updated);
+  };
+
+  const handleClassDragEnd = async () => {
+    setDraggedClassIndex(null);
+    setCanDrag(false);
+    const finalizedClasses = classes.map((c, idx) => ({ ...c, order: idx }));
+    setClasses(finalizedClasses);
+    
+    const currentTeacherId = teacher?.id || null;
+    if (currentTeacherId) {
+      localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
+      try {
+        for (let i = 0; i < finalizedClasses.length; i++) {
+          const cls = finalizedClasses[i];
+          await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+            order: i
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.error("Failed to save reordered classes to Firestore:", err);
+      }
+    } else {
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
+    }
+  };
+
+  const handleMoveClass = async (e: React.MouseEvent, index: number, direction: 'left' | 'right') => {
+    e.stopPropagation();
+    const targetIndex = direction === 'left' ? index - 1 : index + 1;
+    if (targetIndex < 0 || targetIndex >= classes.length) return;
+
+    const updated = [...classes];
+    const temp = updated[index];
+    updated[index] = updated[targetIndex];
+    updated[targetIndex] = temp;
+
+    const finalizedClasses = updated.map((c, idx) => ({ ...c, order: idx }));
+    setClasses(finalizedClasses);
+
+    const currentTeacherId = teacher?.id || null;
+    if (currentTeacherId) {
+      localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
+      try {
+        for (let i = 0; i < finalizedClasses.length; i++) {
+          const cls = finalizedClasses[i];
+          await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+            order: i
+          }, { merge: true });
+        }
+      } catch (err) {
+        console.error("Failed to save reordered classes to Firestore:", err);
+      }
+    } else {
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
+    }
+  };
 
   // Load teacher classes from Cloud when logged in
   useEffect(() => {
@@ -2130,16 +2217,61 @@ export default function App() {
             <div 
               key={cls.id ? `class-${cls.id}-${idx}` : `class-idx-${idx}`}
               onClick={() => handleSwitchClass(cls.id)}
-              className={`px-4 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all select-none border ${
-                activeClassId === cls.id 
-                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/10 scale-102' 
-                  : isDarkMode 
-                    ? 'bg-slate-800 text-slate-300 border-slate-700 hover:bg-slate-700' 
-                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-100 shadow-sm'
+              draggable={canDrag}
+              onDragStart={(e) => handleClassDragStart(e, idx)}
+              onDragOver={(e) => handleClassDragOver(e, idx)}
+              onDragEnd={handleClassDragEnd}
+              onMouseLeave={() => setCanDrag(false)}
+              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all select-none border group/item ${
+                draggedClassIndex === idx
+                  ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50 dark:bg-slate-800 scale-95'
+                  : activeClassId === cls.id 
+                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/10 scale-102 cursor-default' 
+                    : isDarkMode 
+                      ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white hover:border-slate-600 shadow-sm' 
+                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-950 hover:border-slate-300 shadow-sm'
               }`}
             >
-              <span>{cls.name}</span>
+              <div
+                onMouseDown={() => setCanDrag(true)}
+                onTouchStart={() => setCanDrag(true)}
+                onMouseUp={() => setCanDrag(false)}
+                onTouchEnd={() => setCanDrag(false)}
+                className="cursor-grab active:cursor-grabbing p-1 -m-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 flex items-center justify-center"
+                title="អូសដើម្បីប្ដូរទីតាំង"
+              >
+                <GripVertical className={`w-3.5 h-3.5 opacity-30 group-hover/item:opacity-80 transition-opacity shrink-0 ${
+                  activeClassId === cls.id ? 'text-white' : 'text-slate-400 dark:text-slate-500'
+                }`} />
+              </div>
+              <span className="cursor-pointer">{cls.name}</span>
               <div className="flex items-center gap-1 shrink-0">
+                {idx > 0 && (
+                  <button
+                    onClick={(e) => handleMoveClass(e, idx, 'left')}
+                    className={`p-0.5 rounded-md transition-colors ${
+                      activeClassId === cls.id 
+                        ? 'hover:bg-white/20 text-white hover:text-indigo-200' 
+                        : 'hover:text-indigo-500 hover:bg-slate-500/10 text-slate-400 dark:text-slate-400'
+                    }`}
+                    title="រំកិលទៅឆ្វេង"
+                  >
+                    <ChevronLeft className="w-3 h-3" />
+                  </button>
+                )}
+                {idx < classes.length - 1 && (
+                  <button
+                    onClick={(e) => handleMoveClass(e, idx, 'right')}
+                    className={`p-0.5 rounded-md transition-colors ${
+                      activeClassId === cls.id 
+                        ? 'hover:bg-white/20 text-white hover:text-indigo-200' 
+                        : 'hover:text-indigo-500 hover:bg-slate-500/10 text-slate-400 dark:text-slate-400'
+                    }`}
+                    title="រំកិលទៅស្ដាំ"
+                  >
+                    <ChevronRight className="w-3 h-3" />
+                  </button>
+                )}
                 <button
                   onClick={(e) => handleRenameClass(e, cls.id, cls.name)}
                   className={`p-0.5 rounded-md transition-colors ${

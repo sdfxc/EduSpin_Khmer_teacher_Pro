@@ -54,6 +54,7 @@ export interface QuizSubject {
 export interface ClassInfo {
   id: string;
   name: string;
+  order?: number;
 }
 
 export interface TeacherAccount {
