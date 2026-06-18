@@ -3350,6 +3350,18 @@ export default function QuizPanel({
                   >
                     បោះបង់
                   </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsExportModalOpen(false);
+                      setIsEditQuestionsModalOpen(true);
+                    }}
+                    className="flex items-center gap-1.5 px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl font-bold text-xs shadow-md shadow-purple-500/10 cursor-pointer active:scale-95 transition-all"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>បង្កើតសំណួរវិញ្ញាសារ</span>
+                  </button>
                   
                   <button
                     type="button"

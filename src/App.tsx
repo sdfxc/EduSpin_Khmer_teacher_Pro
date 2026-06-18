@@ -17,6 +17,7 @@ import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot } from 
 import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
+import ExamsPanel from './components/ExamsPanel';
 
 const SovannaphumiLogo = ({ className = "w-12 h-12" }: { className?: string }) => {
   const angles = [0, 45, 90, 135, 180, 225, 270, 315];
@@ -219,7 +220,7 @@ export default function App() {
     return <StudentPlayView />;
   }
 
-  const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'students' | 'student-lobby'>('wheel');
+  const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'students' | 'student-lobby' | 'exams-room'>('wheel');
   const [showWheelBulk, setShowWheelBulk] = useState(false);
   const [loadingCloudData, setLoadingCloudData] = useState(false);
 
@@ -2123,6 +2124,18 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setActiveTab('exams-room')}
+            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none ${
+              activeTab === 'exams-room'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
+            }`}
+          >
+            <GraduationCap className="w-4 h-4" />
+            <span>បន្ទប់វិញ្ញាសាប្រឡង</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('student-lobby')}
             className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none relative overflow-hidden ${
               activeTab === 'student-lobby'
@@ -2441,6 +2454,17 @@ export default function App() {
             activeCardState={activeCardState}
             setActiveCardState={setActiveCardState}
           />
+        )}
+
+        {activeTab === 'exams-room' && (
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+            <ExamsPanel
+              activeClassId={activeClassId || ''}
+              activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+              isDarkMode={isDarkMode}
+              teacher={teacher}
+            />
+          </div>
         )}
       </main>
 
