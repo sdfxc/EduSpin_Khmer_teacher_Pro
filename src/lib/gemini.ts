@@ -4,18 +4,20 @@ import * as XLSX from "xlsx";
 
 export function getSavedApiKey(): string {
   if (typeof window === "undefined") return "";
-  return localStorage.getItem("GEMINI_API_KEY") || ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || "";
+  return localStorage.getItem("GEMINI_API_KEY") || localStorage.getItem("gemini_api_key") || ((import.meta as any).env?.VITE_GEMINI_API_KEY as string) || "";
 }
 
 export function saveApiKey(key: string) {
   if (typeof window !== "undefined") {
     localStorage.setItem("GEMINI_API_KEY", key);
+    localStorage.setItem("gemini_api_key", key);
   }
 }
 
 export function removeApiKey() {
   if (typeof window !== "undefined") {
     localStorage.removeItem("GEMINI_API_KEY");
+    localStorage.removeItem("gemini_api_key");
   }
 }
 
@@ -151,7 +153,8 @@ export async function generateQuestions(
   pdfs: FileData[] = [],
   officeFiles: FileData[] = [],
   questionType: 'general' | 'pisa' = 'general',
-  pisaLanguage: 'khmer' | 'english' | 'bilingual' = 'khmer'
+  pisaLanguage: 'khmer' | 'english' | 'bilingual' = 'khmer',
+  categoryCounts?: { choice: number; matching: number; fill_blank: number; theory: number; exercise: number }
 ): Promise<Question[]> {
   try {
     // 1. First, try to request the custom backend server proxy
@@ -159,9 +162,10 @@ export async function generateQuestions(
       const response = await fetch("/api/generate-questions", {
         method: "POST",
         headers: {
-          "Content-Type": "application/json"
+          "Content-Type": "application/json",
+          "x-api-key": getSavedApiKey()
         },
-        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage })
+        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage, categoryCounts })
       });
 
       if (response.ok) {
@@ -178,6 +182,7 @@ export async function generateQuestions(
           correctIndex: q.correctIndex,
           id: `q-${i}-${Date.now()}`,
           questionType: q.questionType || questionType,
+          category: q.category || 'choice',
           explanation: q.explanation || ""
         }));
       }
@@ -245,12 +250,32 @@ export async function generateQuestions(
 Make sure everything including the options represents exact equivalent translations so that students can understand both Khmer and English.`;
       }
 
-      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${count} multiple-choice questions for students. 
+      let categoryRatiosPrompt = "";
+      let totalRequestedCount = count;
+
+      if (categoryCounts) {
+        const { choice = 0, matching = 0, fill_blank = 0, theory = 0, exercise = 0 } = categoryCounts;
+        totalRequestedCount = choice + matching + fill_blank + theory + exercise;
+        categoryRatiosPrompt = `
+CRITICAL QUANTITY AND CATEGORY REQUIREMENTS:
+You MUST generate exactly:
+- Choice: ${choice} questions
+- Matching: ${matching} questions
+- Fill Blank: ${fill_blank} questions
+- Theory: ${theory} questions
+- Exercise: ${exercise} questions
+
+For each question, "category" field MUST be "choice", "matching", "fill_blank", "theory", or "exercise".`;
+      }
+
+      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${totalRequestedCount} multiple-choice questions for students. 
 Each question should be high-quality and have exactly 4 options.
 
 ${languagePrompt}
 
-${!isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. However, mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions (e.g. if count is 10, around 2 of them should apply the formulas/theories to daily life scenarios, while the other 8 focus directly on the core lesson contents).` : ''}
+${categoryRatiosPrompt}
+
+${!isPisa && !categoryCounts ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. However, mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions (e.g. if count is 10, around 2 of them should apply the formulas/theories to daily life scenarios, while the other 8 focus directly on the core lesson contents).` : ''}
 
 ${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
 
@@ -345,9 +370,10 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
                         description: "Exactly 4 multiple choice options, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)"
                       },
                       correctIndex: { type: "INTEGER", description: "The 0-based index of the correct option" },
+                      category: { type: "STRING", description: "The precise category of the question: choice, matching, fill_blank, theory, or exercise" },
                       explanation: { type: "STRING", description: "Detailed explanation of why the correct option is right in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" }
                     },
-                    required: ["text", "options", "correctIndex"]
+                    required: ["text", "options", "correctIndex", "category"]
                   }
                 }
               }
@@ -415,6 +441,7 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
         correctIndex: q.correctIndex,
         id: `q-${i}-${Date.now()}`,
         questionType: questionType,
+        category: q.category || 'choice',
         explanation: q.explanation || ""
       }));
     }

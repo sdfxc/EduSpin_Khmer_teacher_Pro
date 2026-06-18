@@ -24,7 +24,7 @@ import {
   Eye,
   Layers
 } from 'lucide-react';
-import { generateQuestions, getSavedApiKey } from '../lib/gemini';
+import { generateQuestions, getSavedApiKey, saveApiKey } from '../lib/gemini';
 import { PREBUILT_LESSONS } from '../lib/templates';
 import { Question } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
@@ -40,7 +40,8 @@ import {
   BorderStyle, 
   WidthType, 
   VerticalAlign,
-  ImageRun
+  ImageRun,
+  UnderlineType
 } from 'docx';
 
 export const AVAILABLE_FONTS = [
@@ -74,6 +75,7 @@ export interface ExamQuestion {
   options: string[];
   correctIndex: number;
   questionType?: 'general' | 'pisa';
+  category?: 'choice' | 'matching' | 'fill_blank' | 'theory' | 'exercise';
   explanation?: string;
   points?: number;
 }
@@ -365,7 +367,11 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
   // expert AI states
   const [isExpertAiModalOpen, setIsExpertAiModalOpen] = useState(false);
   const [expertAiSubject, setExpertAiSubject] = useState('គណិតវិទ្យា');
-  const [expertAiCount, setExpertAiCount] = useState(10);
+  const [expertAiCountChoice, setExpertAiCountChoice] = useState(5);
+  const [expertAiCountMatching, setExpertAiCountMatching] = useState(2);
+  const [expertAiCountFillBlank, setExpertAiCountFillBlank] = useState(2);
+  const [expertAiCountTheory, setExpertAiCountTheory] = useState(2);
+  const [expertAiCountExercise, setExpertAiCountExercise] = useState(1);
   const [expertAiExamType, setExpertAiExamType] = useState('monthly');
   const [expertAiInstructions, setExpertAiInstructions] = useState('សូមបង្កើតប្រធានវិញ្ញាសាល្អៗទៅតាមការណែនាំរបស់អ្នកជំនាញ');
   const [isExpertGenerating, setIsExpertGenerating] = useState(false);
@@ -375,11 +381,16 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
       alert("សូមជ្រើសរើស ឬបង្កើតវិញ្ញាសារប្រឡងជាមុនសិន!");
       return;
     }
+    const totalCount = expertAiCountChoice + expertAiCountMatching + expertAiCountFillBlank + expertAiCountTheory + expertAiCountExercise;
+    if (totalCount === 0) {
+      alert("សូមជ្រើសរើសបរិមាណសំណួរយ៉ាងហោចណាស់មួយប្រភេទ!");
+      return;
+    }
     setIsExpertGenerating(true);
     try {
       const gPreset = `Act as an expert high school and Grade 9 diploma curriculum developer in Cambodia.
-Generate exactly ${expertAiCount} high-quality, professional, academic exam questions with four multiple choice options in Khmer language.
-Make sure the questions follow standard educational guidelines for Grade 9 students in Cambodia, prioritizing rigorous logic, clear scenarios, and appropriate level of difficulty.
+Generate exactly ${totalCount} high-quality, professional, academic exam questions in Khmer language matching the Cambodian ministry curriculum.
+Make sure the questions follow standard educational guidelines for Cambodia, prioritizing rigorous logic, clear scenarios, and appropriate level of difficulty.
 
 Subject: ${expertAiSubject}
 Exam Type: ${expertAiExamType === 'monthly' ? 'វិញ្ញាសាប្រលងប្រចាំខែ (Monthly Exam)' : 'វិញ្ញាសាប្រឡងឆមាស (Semester Exam)'}
@@ -413,7 +424,22 @@ SUBJECT SPECIFIC DIRECTIVES:
 
 Output the response in JSON format.`;
 
-      const generated = await generateQuestions(gPreset, expertAiCount, [], [], [], 'general', 'khmer');
+      const generated = await generateQuestions(
+        gPreset, 
+        totalCount, 
+        [], 
+        [], 
+        [], 
+        'general', 
+        'khmer',
+        {
+          choice: expertAiCountChoice,
+          matching: expertAiCountMatching,
+          fill_blank: expertAiCountFillBlank,
+          theory: expertAiCountTheory,
+          exercise: expertAiCountExercise
+        }
+      );
       
       if (generated && generated.length > 0) {
         const mappedQuestions: ExamQuestion[] = generated.map((g, idx) => ({
@@ -421,8 +447,9 @@ Output the response in JSON format.`;
           text: g.text,
           options: g.options,
           correctIndex: g.correctIndex,
+          category: g.category || 'choice',
           explanation: g.explanation || "",
-          points: 2
+          points: g.category === 'exercise' ? 5 : g.category === 'theory' ? 3 : 2
         }));
 
         const updatedExams = exams.map(e => {
@@ -778,51 +805,195 @@ Output the response in JSON format.`;
   };
 
   const generateDocHtml = (selectedHeaderFontObj: any, selectedBodyFontObj: any, questionCards: any[]) => {
-    let questionsHtml = '';
-    questionCards.forEach((card, qIdx) => {
-      let optionsHtml = '';
-      if (optionsLayout === 'inline') {
-        optionsHtml = `
-          <table class="options-table">
-            <tr>
-              <td class="option-cell ${highlightKey && card.question.correctIndex === 0 ? 'correct-highlight' : ''}">
-                ${getOptionPrefix(0)}. ${renderFormulaToHtml(card.question.options[0] || '')}
-              </td>
-              <td class="option-cell ${highlightKey && card.question.correctIndex === 1 ? 'correct-highlight' : ''}">
-                ${getOptionPrefix(1)}. ${renderFormulaToHtml(card.question.options[1] || '')}
-              </td>
-            </tr>
-            <tr>
-              <td class="option-cell ${highlightKey && card.question.correctIndex === 2 ? 'correct-highlight' : ''}">
-                ${getOptionPrefix(2)}. ${renderFormulaToHtml(card.question.options[2] || '')}
-              </td>
-              <td class="option-cell ${highlightKey && card.question.correctIndex === 3 ? 'correct-highlight' : ''}">
-                ${getOptionPrefix(3)}. ${renderFormulaToHtml(card.question.options[3] || '')}
-              </td>
-            </tr>
-          </table>
-        `;
+    const grouped = {
+      choice: [] as any[],
+      matching: [] as any[],
+      fill_blank: [] as any[],
+      theory: [] as any[],
+      exercise: [] as any[],
+    };
+
+    questionCards.forEach(card => {
+      const q = card.question;
+      const cat = q.category || 'choice';
+      if (grouped[cat]) {
+        grouped[cat].push(card);
       } else {
-        optionsHtml = `
-          <table class="options-table">
-            ${card.question.options.map((opt: string, oIdx: number) => `
-              <tr>
-                <td class="option-cell ${highlightKey && card.question.correctIndex === oIdx ? 'correct-highlight' : ''}" style="width: 100%;">
-                  ${getOptionPrefix(oIdx)}. ${renderFormulaToHtml(opt)}
-                </td>
-              </tr>
-            `).join('')}
-          </table>
+        grouped['choice'].push(card);
+      }
+    });
+
+    const showSections = 
+      grouped.matching.length > 0 || 
+      grouped.fill_blank.length > 0 || 
+      grouped.theory.length > 0 || 
+      grouped.exercise.length > 0;
+
+    let globalIdx = 0;
+    let questionsHtml = '';
+
+    // 1. Choice Section
+    if (grouped.choice.length > 0) {
+      if (showSections) {
+        questionsHtml += `
+          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+            ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
+          </div>
         `;
       }
-      
-      questionsHtml += `
-        <div class="question-block">
-          <div class="question-text font-bold">សំណួរទី ${qIdx + 1}៖ ${renderFormulaToHtml(card.question.text)}</div>
-          ${optionsHtml}
-        </div>
-      `;
-    });
+      grouped.choice.forEach((card) => {
+        globalIdx++;
+        let optionsHtml = '';
+        if (optionsLayout === 'inline') {
+          optionsHtml = `
+            <table class="options-table">
+              <tr>
+                <td class="option-cell ${highlightKey && card.question.correctIndex === 0 ? 'correct-highlight' : ''}">
+                  ${getOptionPrefix(0)}. ${renderFormulaToHtml(card.question.options[0] || '')}
+                </td>
+                <td class="option-cell ${highlightKey && card.question.correctIndex === 1 ? 'correct-highlight' : ''}">
+                  ${getOptionPrefix(1)}. ${renderFormulaToHtml(card.question.options[1] || '')}
+                </td>
+              </tr>
+              <tr>
+                <td class="option-cell ${highlightKey && card.question.correctIndex === 2 ? 'correct-highlight' : ''}">
+                  ${getOptionPrefix(2)}. ${renderFormulaToHtml(card.question.options[2] || '')}
+                </td>
+                <td class="option-cell ${highlightKey && card.question.correctIndex === 3 ? 'correct-highlight' : ''}">
+                  ${getOptionPrefix(3)}. ${renderFormulaToHtml(card.question.options[3] || '')}
+                </td>
+              </tr>
+            </table>
+          `;
+        } else {
+          optionsHtml = `
+            <table class="options-table">
+              ${card.question.options.map((opt: string, oIdx: number) => `
+                <tr>
+                  <td class="option-cell ${highlightKey && card.question.correctIndex === oIdx ? 'correct-highlight' : ''}" style="width: 100%;">
+                    ${getOptionPrefix(oIdx)}. ${renderFormulaToHtml(opt)}
+                  </td>
+                </tr>
+              `).join('')}
+            </table>
+          `;
+        }
+
+        questionsHtml += `
+          <div class="question-block">
+            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            ${optionsHtml}
+          </div>
+        `;
+      });
+    }
+
+    // 2. Matching Section
+    if (grouped.matching.length > 0) {
+      if (showSections) {
+        questionsHtml += `
+          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+            ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+          </div>
+        `;
+      }
+      grouped.matching.forEach((card) => {
+        globalIdx++;
+        questionsHtml += `
+          <div class="question-block">
+            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 8px; max-width: 450px; margin-left: auto; margin-right: auto; border: 1px solid #777;">
+              <tr>
+                <td style="width: 50%; border-right: 1px solid #777; padding: 6px; text-align: left; font-size: 9.5pt;">
+                  <div style="font-weight: bold; border-bottom: 1px solid #aaa; padding-bottom: 3px; margin-bottom: 5px; color: #555;">កូនផ្នែក A</div>
+                  <div style="margin-bottom: 4px;">១. ${card.question.options[0] || '...............'}</div>
+                  <div>២. ${card.question.options[1] || '...............'}</div>
+                </td>
+                <td style="width: 50%; padding: 6px; text-align: left; font-size: 9.5pt;">
+                  <div style="font-weight: bold; border-bottom: 1px solid #aaa; padding-bottom: 3px; margin-bottom: 5px; color: #555;">កូនផ្នែក B</div>
+                  <div style="margin-bottom: 4px;">ក. ${card.question.options[2] || '...............'}</div>
+                  <div>ខ. ${card.question.options[3] || '...............'}</div>
+                </td>
+              </tr>
+            </table>
+          </div>
+        `;
+      });
+    }
+
+    // 3. Fill Blank Section
+    if (grouped.fill_blank.length > 0) {
+      if (showSections) {
+        questionsHtml += `
+          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+            ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+          </div>
+        `;
+      }
+      grouped.fill_blank.forEach((card) => {
+        globalIdx++;
+        questionsHtml += `
+          <div class="question-block">
+            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+          </div>
+        `;
+      });
+    }
+
+    // 4. Theory Section
+    if (grouped.theory.length > 0) {
+      if (showSections) {
+        questionsHtml += `
+          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+            ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
+          </div>
+        `;
+      }
+      grouped.theory.forEach((card) => {
+        globalIdx++;
+        questionsHtml += `
+          <div class="question-block">
+            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div style="margin-top: 8px; font-size: 10pt; color: #999;">
+              <div>............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+            </div>
+          </div>
+        `;
+      });
+    }
+
+    // 5. Exercise Section
+    if (grouped.exercise.length > 0) {
+      if (showSections) {
+        questionsHtml += `
+          <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
+            ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
+          </div>
+        `;
+      }
+      grouped.exercise.forEach((card) => {
+        globalIdx++;
+        questionsHtml += `
+          <div class="question-block">
+            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div style="margin-top: 8px; font-size: 10pt; color: #999;">
+              <div>............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
+            </div>
+          </div>
+        `;
+      });
+    }
 
     const headerGoogleFont = selectedHeaderFontObj.googleFontId || selectedHeaderFontObj.id;
     const bodyGoogleFont = selectedBodyFontObj.googleFontId || selectedBodyFontObj.id;
@@ -1592,7 +1763,7 @@ Output the response in JSON format.`;
             font: selectedBodyFontObj.name,
             size: (bodyFontSize + 2) * 2,
             bold: true,
-            underline: {},
+            underline: { type: UnderlineType.SINGLE },
           })
         ]
       }),
@@ -2199,30 +2370,73 @@ Output the response in JSON format.`;
                         </span>
                       </div>
 
-                      {/* Options Grid */}
-                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
-                        {q.options.map((opt, oIdx) => {
-                          const isCorrect = oIdx === q.correctIndex;
-                          return (
-                            <div 
-                              key={oIdx} 
-                              className={`p-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-2 ${
-                                isCorrect 
-                                  ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-extrabold'
-                                  : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-500'
-                              }`}
-                            >
-                              <span className={`w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center shrink-0 ${
-                                isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
-                              }`}>
-                                {String.fromCharCode(97 + oIdx)}
-                              </span>
-                              <span className="truncate">{opt}</span>
-                              {isCorrect && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-auto" />}
+                      {/* Dynamic Options or visual representation based on Category */}
+                      {(!q.category || q.category === 'choice') ? (
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pl-8">
+                          {q.options.map((opt, oIdx) => {
+                            const isCorrect = oIdx === q.correctIndex;
+                            return (
+                              <div 
+                                key={oIdx} 
+                                className={`p-2.5 rounded-xl border text-[11px] font-bold transition-all flex items-center gap-2 ${
+                                  isCorrect 
+                                    ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-700 dark:text-emerald-400 font-extrabold'
+                                    : 'bg-white dark:bg-slate-900/50 border-slate-200 dark:border-slate-800 text-slate-500'
+                                }`}
+                              >
+                                <span className={`w-4 h-4 rounded-full text-[9px] font-black flex items-center justify-center shrink-0 ${
+                                  isCorrect ? 'bg-emerald-500 text-white' : 'bg-slate-100 dark:bg-slate-800 text-slate-400'
+                                }`}>
+                                  {String.fromCharCode(97 + oIdx).toUpperCase()}
+                                </span>
+                                <span className="truncate">{opt}</span>
+                                {isCorrect && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 shrink-0 ml-auto" />}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      ) : q.category === 'matching' ? (
+                        <div className="pl-8 space-y-2">
+                          <span className="text-[10px] font-black uppercase text-indigo-500 tracking-wider">របៀបផ្គូផ្គង៖</span>
+                          <div className="grid grid-cols-2 gap-3 max-w-md">
+                            <div className="p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-1.5">
+                              <span className="text-[9px] font-bold text-slate-400">ផ្នែកខាងឆ្វេង (Column A)</span>
+                              <div className="text-[11px] font-bold space-y-1 dark:text-slate-200">
+                                <div>១. {q.options[0] || '---'}</div>
+                                <div>២. {q.options[1] || '---'}</div>
+                              </div>
                             </div>
-                          );
-                        })}
-                      </div>
+                            <div className="p-3 rounded-2xl bg-indigo-500/5 border border-indigo-500/10 space-y-1.5">
+                              <span className="text-[9px] font-bold text-slate-400">ផ្នែកខាងស្តាំ (Column B)</span>
+                              <div className="text-[11px] font-bold space-y-1 dark:text-slate-200">
+                                <div>ក. {q.options[2] || '---'}</div>
+                                <div>ខ. {q.options[3] || '---'}</div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+                      ) : q.category === 'fill_blank' ? (
+                        <div className="pl-8">
+                          <div className="p-2.5 rounded-xl border border-dashed border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400 text-xs font-bold inline-flex items-center gap-1.5">
+                            <Edit3 className="w-3.5 h-3.5" />
+                            <span>សិស្សបំពេញចម្លើយត្រង់ចុចៗ "............."</span>
+                          </div>
+                        </div>
+                      ) : q.category === 'theory' ? (
+                        <div className="pl-8 space-y-1 w-full max-w-md opacity-75">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">បន្ទាត់សរសេរចម្លើយសិស្ស (៥ បន្ទាត់សន្លឹកកិច្ចការ)៖</span>
+                          {[1, 2, 3, 4, 5].map((line) => (
+                            <div key={line} className="border-b border-dashed border-slate-350 dark:border-slate-800 h-4.5 w-full"></div>
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="pl-8 space-y-1 w-full max-w-md opacity-75">
+                          <span className="text-[9px] font-bold text-slate-400 uppercase">បន្ទាត់សរសេរគណនា ឬតែងសេចក្ដី (៨ បន្ទាត់សន្លឹកកិច្ចការ)៖</span>
+                          {[1, 2, 3, 4, 5, 6, 7, 8].map((line) => (
+                            <div key={line} className="border-b border-dashed border-slate-350 dark:border-slate-800 h-4.5 w-full"></div>
+                          ))}
+                        </div>
+                      )}
 
                       {q.explanation && (
                         <p className="text-[10px] font-semibold text-slate-400 pl-8 bg-slate-100/40 dark:bg-slate-900/40 p-2 rounded-xl border border-dashed dark:border-slate-800/60">
@@ -2361,32 +2575,212 @@ Output the response in JSON format.`;
 
                     {/* Preview list of questions */}
                     <div className="space-y-4 text-slate-900 mt-2 font-sans text-black" style={bodyInlineStyle}>
-                      {activeSubject?.questions.map((q, idx) => (
-                        <div key={q.id || idx} className="space-y-1.5 avoid-break">
-                          <p className="font-extrabold flex items-start text-left">
-                            <span>សំណួរទី {idx + 1}៖ {q.text}</span>
-                            <span className="text-[9px] text-slate-400 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
-                          </p>
-                          <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                            {q.options.map((opt, oIdx) => {
-                              const isCorrectIdx = oIdx === q.correctIndex;
-                              return (
-                                <div 
-                                  key={oIdx} 
-                                  className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
-                                    highlightKey && isCorrectIdx 
-                                      ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/40' 
-                                      : 'text-slate-700'
-                                  }`}
-                                >
-                                  <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
-                                  <span>{opt}</span>
+                      {(() => {
+                        const questions = activeSubject?.questions || [];
+                        const grouped = {
+                          choice: [] as ExamQuestion[],
+                          matching: [] as ExamQuestion[],
+                          fill_blank: [] as ExamQuestion[],
+                          theory: [] as ExamQuestion[],
+                          exercise: [] as ExamQuestion[],
+                        };
+
+                        questions.forEach(q => {
+                          const cat = q.category || 'choice';
+                          if (grouped[cat]) {
+                            grouped[cat].push(q);
+                          } else {
+                            grouped['choice'].push(q);
+                          }
+                        });
+
+                        const showSections = 
+                          grouped.matching.length > 0 || 
+                          grouped.fill_blank.length > 0 || 
+                          grouped.theory.length > 0 || 
+                          grouped.exercise.length > 0;
+
+                        let globalIdx = 0;
+
+                        return (
+                          <div className="space-y-6 text-slate-900">
+                            {/* 1. Choice Section */}
+                            {grouped.choice.length > 0 && (
+                              <div className="space-y-2">
+                                {showSections && (
+                                  <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                    ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
+                                  </div>
+                                )}
+                                <div className="space-y-4">
+                                  {grouped.choice.map((q) => {
+                                    globalIdx++;
+                                    return (
+                                      <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left">
+                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
+                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                        </div>
+                                        <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                          {q.options.map((opt, oIdx) => {
+                                            const isCorrectIdx = oIdx === q.correctIndex;
+                                            return (
+                                              <div 
+                                                key={oIdx} 
+                                                className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
+                                                  highlightKey && isCorrectIdx 
+                                                    ? 'bg-emerald-50 text-emerald-850 font-bold border border-emerald-250/30' 
+                                                    : 'text-slate-800'
+                                                }`}
+                                              >
+                                                <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
+                                                <span>{opt}</span>
+                                              </div>
+                                            );
+                                          })}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
                                 </div>
-                              );
-                            })}
+                              </div>
+                            )}
+
+                            {/* 2. Matching Section */}
+                            {grouped.matching.length > 0 && (
+                              <div className="space-y-2 text-left">
+                                {showSections && (
+                                  <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                    ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+                                  </div>
+                                )}
+                                <div className="space-y-4">
+                                  {grouped.matching.map((q) => {
+                                    globalIdx++;
+                                    return (
+                                      <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
+                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
+                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                        </div>
+                                        
+                                        {/* Two columns layout for matching */}
+                                        <div className="grid grid-cols-2 gap-8 border border-slate-400 p-4 rounded-xl bg-slate-50/50 my-2 max-w-xl mx-auto">
+                                          <div className="space-y-1.5">
+                                            <p className="font-black border-b border-slate-350 pb-0.5 mb-1 text-[10px] text-slate-500 text-center">កូនផ្នែក A</p>
+                                            <div className="space-y-1 font-bold text-slate-850">
+                                              <div>១. {q.options[0] || '..........'}</div>
+                                              <div>២. {q.options[1] || '..........'}</div>
+                                            </div>
+                                          </div>
+                                          <div className="space-y-1.5">
+                                            <p className="font-black border-b border-slate-350 pb-0.5 mb-1 text-[10px] text-slate-500 text-center">កូនផ្នែក B</p>
+                                            <div className="space-y-1 font-bold text-slate-850">
+                                              <div>ក. {q.options[2] || '..........'}</div>
+                                              <div>ខ. {q.options[3] || '..........'}</div>
+                                            </div>
+                                          </div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 3. Fill Blank Section */}
+                            {grouped.fill_blank.length > 0 && (
+                              <div className="space-y-2 text-left">
+                                {showSections && (
+                                  <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                    ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+                                  </div>
+                                )}
+                                <div className="space-y-4">
+                                  {grouped.fill_blank.map((q) => {
+                                    globalIdx++;
+                                    return (
+                                      <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
+                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 4. Theory Section */}
+                            {grouped.theory.length > 0 && (
+                              <div className="space-y-4 text-left">
+                                {showSections && (
+                                  <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                    ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
+                                  </div>
+                                )}
+                                <div className="space-y-5">
+                                  {grouped.theory.map((q) => {
+                                    globalIdx++;
+                                    return (
+                                      <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
+                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                        </div>
+                                        {/* Subtle answer lines on paper */}
+                                        <div className="space-y-2 pt-2 max-w-2xl">
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+
+                            {/* 5. Exercise Section */}
+                            {grouped.exercise.length > 0 && (
+                              <div className="space-y-4 text-left">
+                                {showSections && (
+                                  <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                    ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
+                                  </div>
+                                )}
+                                <div className="space-y-6">
+                                  {grouped.exercise.map((q) => {
+                                    globalIdx++;
+                                    return (
+                                      <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
+                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                        </div>
+                                        {/* Workspace solving lines on paper */}
+                                        <div className="space-y-2 pt-2 max-w-2xl">
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })()}
                     </div>
 
                     <table className="w-full mt-10 border-none text-[11px] leading-relaxed text-black font-sans">
@@ -2577,6 +2971,17 @@ Output the response in JSON format.`;
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
                     {localQuestions.map((q, idx) => {
                       const isSelected = idx === selectedQIndex;
+                      // Local category labels
+                      const getCatLabel = (cat?: string) => {
+                        switch (cat) {
+                          case 'choice': return 'ជ្រើសរើសចម្លើយ';
+                          case 'matching': return 'ភ្ជាប់ផ្គូផ្គង';
+                          case 'fill_blank': return 'បំពេញចន្លោះ';
+                          case 'theory': return 'សំណួរទ្រឹស្ដី';
+                          case 'exercise': return 'លំហាត់/តែងសេចក្ដី';
+                          default: return 'ជ្រើសរើសចម្លើយ';
+                        }
+                      };
                       return (
                         <div
                           key={q.id || idx}
@@ -2598,7 +3003,7 @@ Output the response in JSON format.`;
                                 {q.text || '(គ្មានអត្ថបទ)'}
                               </p>
                               <span className="text-[9px] font-mono text-slate-400">
-                                ជម្រើស {q.options.length} • {q.points || 2} ពិន្ទុ
+                                {getCatLabel(q.category)} • {q.points || 2} ពិន្ទុ
                               </span>
                             </div>
                           </div>
@@ -2646,6 +3051,27 @@ Output the response in JSON format.`;
                         </div>
                       </div>
 
+                      {/* Question Category Dropdown */}
+                      <div>
+                        <label className="text-[11px] font-black text-slate-400 dark:text-gray-400">ផ្នែកនៃវិញ្ញាសាប្រឡង (Exam Section Category)</label>
+                        <select
+                          value={localQuestions[selectedQIndex].category || 'choice'}
+                          onChange={(e) => {
+                            const val = e.target.value as any;
+                            setLocalQuestions(prev => prev.map((q, idx) => 
+                              idx === selectedQIndex ? { ...q, category: val } : q
+                            ));
+                          }}
+                          className="w-full mt-1 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
+                        >
+                          <option value="choice">ផ្នែកទី១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice)</option>
+                          <option value="matching">ផ្នែកទី២៖ ភ្ជាប់ផ្គូផ្គង (Matching A & B)</option>
+                          <option value="fill_blank">ផ្នែកទី៣៖ បំពេញចន្លោះ (Fill in Blanks)</option>
+                          <option value="theory">ផ្នែកទី៤៖ សំណួរទ្រឹស្ដី ឬសំណួរចម្លើយខ្លី (Theory Question)</option>
+                          <option value="exercise">ផ្នែកទី៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្ដី/សរសេរតាមអាន (Exercise / Essay)</option>
+                        </select>
+                      </div>
+
                       {/* Question Textarea */}
                       <div>
                         <label className="text-[10px] font-black text-slate-400">អត្តបទសំណួរ</label>
@@ -2664,52 +3090,79 @@ Output the response in JSON format.`;
                       </div>
 
                       {/* Choose correct choice options */}
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-slate-400">ជម្រើសចម្លើយ និងធីកចម្លើយត្រឹមត្រូវ</label>
-                        
-                        <div className="space-y-2.5">
-                          {localQuestions[selectedQIndex].options.map((option, oIdx) => {
-                            const isCorrect = oIdx === localQuestions[selectedQIndex].correctIndex;
-                            return (
-                              <div key={oIdx} className="flex items-center gap-3">
-                                <button
-                                  type="button"
-                                  onClick={() => {
-                                    setLocalQuestions(prev => prev.map((q, idx) => 
-                                      idx === selectedQIndex ? { ...q, correctIndex: oIdx } : q
-                                    ));
-                                  }}
-                                  className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all border cursor-pointer ${
-                                    isCorrect
-                                      ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
-                                      : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-400 hover:border-slate-400'
-                                  }`}
-                                >
-                                  {isCorrect ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : String.fromCharCode(97 + oIdx).toUpperCase()}
-                                </button>
+                      {(!localQuestions[selectedQIndex].category || localQuestions[selectedQIndex].category === 'choice' || localQuestions[selectedQIndex].category === 'matching') ? (
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <label className="text-[10px] font-black text-slate-400">
+                              {localQuestions[selectedQIndex].category === 'matching' 
+                                ? 'ធាតុផ្គូផ្គង (២ ដំបូងផ្នែកខាងឆ្វេង ២ ចុងក្រោយផ្នែកខាងស្តាំ)' 
+                                : 'ជម្រើសចម្លើយ និងធីកចម្លើយត្រឹមត្រូវ'}
+                            </label>
+                            {localQuestions[selectedQIndex].category === 'matching' && (
+                              <span className="text-[9px] text-indigo-500 font-bold">ក និង ខ = កូនផ្នែក A, គ និង ឃ = កូនផ្នែក B</span>
+                            )}
+                          </div>
+                          
+                          <div className="space-y-2.5">
+                            {localQuestions[selectedQIndex].options.map((option, oIdx) => {
+                              const isCorrect = oIdx === localQuestions[selectedQIndex].correctIndex;
+                              return (
+                                <div key={oIdx} className="flex items-center gap-3">
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      setLocalQuestions(prev => prev.map((q, idx) => 
+                                        idx === selectedQIndex ? { ...q, correctIndex: oIdx } : q
+                                      ));
+                                    }}
+                                    className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all border cursor-pointer ${
+                                      isCorrect
+                                        ? 'bg-emerald-500 border-emerald-500 text-white shadow-sm'
+                                        : 'bg-white dark:bg-slate-900 border-slate-300 dark:border-slate-800 text-slate-400 hover:border-slate-400'
+                                    }`}
+                                  >
+                                    {isCorrect ? <Check className="w-3.5 h-3.5 stroke-[3]" /> : String.fromCharCode(97 + oIdx).toUpperCase()}
+                                  </button>
 
-                                <input
-                                  type="text"
-                                  value={option}
-                                  onChange={(e) => {
-                                    const val = e.target.value;
-                                    setLocalQuestions(prev => prev.map((q, idx) => {
-                                      if (idx === selectedQIndex) {
-                                        const nextOptions = [...q.options];
-                                        nextOptions[oIdx] = val;
-                                        return { ...q, options: nextOptions };
-                                      }
-                                      return q;
-                                    }));
-                                  }}
-                                  placeholder={`បញ្ចូលចម្លើយទី ${oIdx + 1}`}
-                                  className="flex-1 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-850 dark:text-white"
-                                />
-                              </div>
-                            );
-                          })}
+                                  <input
+                                    type="text"
+                                    value={option}
+                                    onChange={(e) => {
+                                      const val = e.target.value;
+                                      setLocalQuestions(prev => prev.map((q, idx) => {
+                                        if (idx === selectedQIndex) {
+                                          const nextOptions = [...q.options];
+                                          nextOptions[oIdx] = val;
+                                          return { ...q, options: nextOptions };
+                                        }
+                                        return q;
+                                      }));
+                                    }}
+                                    placeholder={
+                                      localQuestions[selectedQIndex].category === 'matching'
+                                        ? (oIdx < 2 ? `ជម្រើសផ្នែកឆ្វេង ទី ${oIdx + 1}` : `ជម្រើសផ្នែកស្តាំ ទី ${oIdx - 1}`)
+                                        : `បញ្ចូលចម្លើយទី ${oIdx + 1}`
+                                    }
+                                    className="flex-1 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-850 dark:text-white"
+                                  />
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
-                      </div>
+                      ) : localQuestions[selectedQIndex].category === 'fill_blank' ? (
+                        <div className="p-3 bg-amber-500/10 border border-amber-500/20 text-amber-900 dark:text-amber-300 rounded-xl text-[11px] leading-relaxed font-bold">
+                          💡 របៀបសរសេរ៖ សូមបញ្ចូលល្បះដែលមានចន្លោះជាចុចត្រង់ៗ "............." នៅខាងក្នុងផ្នែក "អត្តបទសំណួរ"។ សិស្សអាចសរសេរបំពេញចម្លើយនេះនៅលើសំណួរដែលព្រីនបានយ៉ាងស្អាត។
+                        </div>
+                      ) : localQuestions[selectedQIndex].category === 'theory' ? (
+                        <div className="p-3 bg-indigo-500/10 border border-indigo-500/20 text-indigo-900 dark:text-indigo-300 rounded-xl text-[11px] leading-relaxed font-bold">
+                          📝 សំណួរទ្រឹស្ដី៖ ប្រភេទសំណួរចំហនេះនឹងបង្កើតការគូសបន្ទាត់សរសេរចម្លើយ ៥ បន្ទាត់នៅខាងក្រោមសំណួរនីមួយៗនៅលើក្រដាសសន្លឹកកិច្ចការប្រឡង (Worksheet) សម្រាប់ឱ្យសិស្សសរសេរផ្ទាល់ដៃ។
+                        </div>
+                      ) : (
+                        <div className="p-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-900 dark:text-emerald-300 rounded-xl text-[11px] leading-relaxed font-bold">
+                          ⚙️ លំហាត់ ឬតែងសេចក្ដី៖ សំណួរនេះនឹងបង្កើតការគូសបន្ទាត់សរសេរដោះស្រាយ ឬសរសេរតែងសេចក្តីចំនួន ៨ បន្ទាត់នៅចន្លោះខាងក្រោមសំណួរនៅលើក្រដាសសន្លឹកកិច្ចការប្រឡង សម្រាប់សិស្សគណនា ឬរៀបរាប់។
+                        </div>
+                      )}
 
                       {/* Prompt / Tips Input */}
                       <div>
@@ -2749,7 +3202,7 @@ Output the response in JSON format.`;
                                 value={aiApiKeyInput}
                                 onChange={(e) => {
                                   setAiApiKeyInput(e.target.value);
-                                  localStorage.setItem('gemini_api_key', e.target.value);
+                                  saveApiKey(e.target.value);
                                 }}
                                 className="w-full mt-1 px-2.5 py-1.5 border rounded-lg text-xs dark:bg-slate-950 dark:border-slate-800 text-slate-700 dark:text-white"
                               />
@@ -2894,23 +3347,122 @@ Output the response in JSON format.`;
                   </div>
 
                   <div>
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">ចំនួនសំណួរដែលត្រូវការ</label>
-                    <select
-                      value={expertAiCount}
-                      onChange={(e) => setExpertAiCount(Number(e.target.value))}
-                      className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                    >
-                      <option value={5}>៥ សំណួរ (5 Questions)</option>
-                      <option value={10}>១០ សំណួរ (10 Questions)</option>
-                      <option value={15}>១៥ សំណួរ (15 Questions)</option>
-                    </select>
+                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">សរុបសំណួរដែលត្រូវបង្កើត</label>
+                    <div className="w-full mt-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs font-black text-amber-600 dark:text-amber-400">
+                      {expertAiCountChoice + expertAiCountMatching + expertAiCountFillBlank + expertAiCountTheory + expertAiCountExercise} សំណួរ (Questions)
+                    </div>
                   </div>
+                </div>
+
+                <div className="p-3 bg-slate-50 dark:bg-slate-900 border dark:border-slate-800 rounded-2xl space-y-3">
+                  <h4 className="text-[11px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-wider">ប្រភេទទម្រង់សំណួរដែលត្រូវការ</h4>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
+                    {/* Choice questions */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ គូសធីច</label>
+                      <select
+                        value={expertAiCountChoice}
+                        onChange={(e) => setExpertAiCountChoice(Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20].map((num) => (
+                          <option key={num} value={num}>
+                            {num} សំណួរ
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Matching questions */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ ផ្គូផ្គង</label>
+                      <select
+                        value={expertAiCountMatching}
+                        onChange={(e) => setExpertAiCountMatching(Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <option key={num} value={num}>
+                            {num} សំណួរ
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Fill blank questions */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ បំពេញចន្លោះ</label>
+                      <select
+                        value={expertAiCountFillBlank}
+                        onChange={(e) => setExpertAiCountFillBlank(Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <option key={num} value={num}>
+                            {num} សំណួរ
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Theory questions */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ ទូទៅទ្រឹស្ដី & ការរស់នៅ</label>
+                      <select
+                        value={expertAiCountTheory}
+                        onChange={(e) => setExpertAiCountTheory(Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <option key={num} value={num}>
+                            {num} សំណួរ
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {/* Exercises */}
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">លំហាត់</label>
+                      <select
+                        value={expertAiCountExercise}
+                        onChange={(e) => setExpertAiCountExercise(Number(e.target.value))}
+                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
+                      >
+                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
+                          <option key={num} value={num}>
+                            {num} លំហាត់
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase flex items-center gap-1.5">
+                    <Sparkles className="w-3 h-3" />
+                    សោរ Gemini API Key (ប្រើប្រាស់គណនីគន្លឹះតែមួយ)
+                  </label>
+                  <input
+                    type="password"
+                    placeholder="បញ្ចូលសោរ API Key របស់អ្នក..."
+                    value={aiApiKeyInput}
+                    onChange={(e) => {
+                      setAiApiKeyInput(e.target.value);
+                      saveApiKey(e.target.value);
+                    }}
+                    className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
+                  />
+                  <p className="text-[9px] text-slate-450 dark:text-slate-500 mt-1">
+                    * ប្រព័ន្ធទាញយក និងកំណត់សោរ API key តែមួយដូចគ្នាសម្រាប់គ្រប់ប៊ូតុងជំនួយ AI ទាំងអស់។
+                  </p>
                 </div>
 
                 <div>
                   <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">សេចក្ដីណែនាំគន្លឹះបន្ថែមរបស់លោកគ្រូ អ្នកគ្រូ</label>
                   <textarea
-                    rows={3}
+                    rows={2}
                     placeholder="ឧ. សង្កត់ធ្ងន់មេរៀន សន្ទស្សន៍ចំណាំងពន្លឺ ឬ សមីការគីមី... ឬ ជម្រើសចម្លើយដែលមានភាពស៊ីជម្រៅ"
                     value={expertAiInstructions}
                     onChange={(e) => setExpertAiInstructions(e.target.value)}

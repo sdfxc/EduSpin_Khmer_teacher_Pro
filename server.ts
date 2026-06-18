@@ -169,8 +169,28 @@ const ai = new GoogleGenAI({
 
 // API route to proxy Gemini API call
 app.post("/api/generate-questions", async (req, res) => {
-  const { lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage = 'khmer' } = req.body;
+  const { lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage = 'khmer', categoryCounts } = req.body;
   
+  // Extract API key dynamically from request headers or use environment variable
+  const clientApiKey = (req.headers["x-api-key"] as string || "").trim();
+  const activeApiKey = clientApiKey || process.env.GEMINI_API_KEY || "";
+
+  if (!activeApiKey) {
+    return res.status(400).json({ 
+      error: "សូមបញ្ចូលសោរ API Key របស់អ្នកជាមុនសិន! (Please enter your Gemini API Key first before generating questions)" 
+    });
+  }
+
+  // Local instance using the resolved API Key
+  const activeAi = new GoogleGenAI({
+    apiKey: activeApiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
+
   const hasText = lessonText && lessonText.trim().length > 0;
   const hasImages = images && Array.isArray(images) && images.length > 0;
   const hasPdfs = pdfs && Array.isArray(pdfs) && pdfs.length > 0;
@@ -247,30 +267,72 @@ app.post("/api/generate-questions", async (req, res) => {
 Make sure everything including the options represents exact equivalent translations so that students can understand both Khmer and English.`;
   }
 
-  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${count || 25} multiple-choice questions for students. 
-Each question should be high-quality and have exactly 4 options.
+  // Handle specific category counts requested by the user
+  let categoryRatiosPrompt = "";
+  let totalRequestedCount = count || 25;
+
+  if (categoryCounts) {
+    const { 
+      choice = 0, 
+      matching = 0, 
+      fill_blank = 0, 
+      theory = 0, 
+      exercise = 0 
+    } = categoryCounts;
+    
+    totalRequestedCount = choice + matching + fill_blank + theory + exercise;
+    if (totalRequestedCount === 0) {
+      totalRequestedCount = 10;
+    }
+
+    categoryRatiosPrompt = `
+CRITICAL QUANTITY AND CATEGORY REQUIREMENTS:
+You MUST generate exactly the following quantities of questions for each category:
+- Category "choice" (Multiple choice questions / សំណួរ គូសធីច): ${choice} questions.
+- Category "matching" (Matching columns A & B / សំណួរ ផ្គូផ្គង សំណួរ-ចម្លើយ): ${matching} questions.
+- Category "fill_blank" (Fill in blanks / សំណួរ បំពេញចន្លោះ): ${fill_blank} questions.
+- Category "theory" (General theory & daily life lessons / សំណួរ ទូទៅទ្រឹស្ដី និងការរស់នៅអំពីមេរៀន): ${theory} questions.
+- Category "exercise" (Calculations or essays / លំហាត់): ${exercise} questions.
+
+For each generated question, set its "category" field strictly to the corresponding string key: "choice", "matching", "fill_blank", "theory", or "exercise".
+Total number of questions to generate under these constraints is exactly ${totalRequestedCount}.
+
+If a requested category has a count of 0, DO NOT generate any questions of that category.
+
+CATEGORY FORMATTING SPECIFICATIONS:
+1. For questions in the "matching" category:
+   - The question 'text' should ask to match Column A with Column B.
+   - The 'options' array MUST contain exactly 4 items, representing Column A and Column B terms beautifully:
+     * options[0] is Column A Item 1 (represented by number 1, e.g., "១. <term1>")
+     * options[1] is Column A Item 2 (represented by number 2, e.g., "២. <term2>")
+     * options[2] is Column B Item 1 (represented by letter 'ក', e.g., "ក. <definition1>")
+     * options[3] is Column B Item 2 (represented by letter 'ខ', e.g., "ខ. <definition2>")
+   - The explanation should detail which matches which (e.g., 1 with ខ, 2 with ក).
+
+2. For questions in the "fill_blank" category:
+   - The question 'text' MUST contain blank spaces represented by dots (e.g., ".......") where key terms are omitted, asking the student to complete the blank space.
+   - Set 4 plausible words or choices inside the 'options' array, with the truly correct filled term inside options corresponding to 'correctIndex'.
+
+3. For questions in the "theory" category:
+   - The question 'text' should be a general academic theoretical question, or a question exploring real daily-life scenarios (ការរស់នៅអំពីមេរៀន) and student reflections.
+   - Set 4 plausible solutions/answers inside the 'options' array.
+
+4. For questions in the "exercise" category:
+   - The question 'text' should describe an academic calculation problem or essay problem.
+   - Set 4 numeric or formulaic options in the 'options' array.
+`;
+  } else {
+    categoryRatiosPrompt = `
+All questions must belong to the "choice" category. 
+Ensure that approximately 20% of these questions connect directly to real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) related to the lesson formulas or theories.
+`;
+  }
+
+  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${totalRequestedCount} high-quality questions for students. 
 
 ${languagePrompt}
 
-${!isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. However, mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions (e.g. if count is 10, around 2 of them should apply the formulas/theories to daily life scenarios, while the other 8 focus directly on the core lesson contents).` : ''}
-
-${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
-
-=== គំរូ Prompt 01 (PISA Structure & Context) ===
-- តម្រូវឱ្យបង្កើតសំណួរបែប PISA សមស្របទៅតាមមុខវិជ្ជា (គណិតវិទ្យា/វិទ្យាសាស្ត្រ/អំណាន) និងកម្រិតថ្នាក់របស់សិស្ស។
-- សំណួរត្រូវតែផ្អែកលើស្ថានភាពជីវិតពិតជាក់ស្ដែង (Real-life situation) ហើយតម្រូវឱ្យមានការវិភាគវែកញែករកហេតុផល (Reasoning) មិនមែនគ្រាន់តែរំលឹកទ្រឹស្ដី ឬរូបមន្តមេរៀនឡើងវិញនោះទេ។
-- ក្នុងសំណួរនីមួយៗត្រូវរួមបញ្ចូល៖
-  * បរិបទ ឬ សេណារីយ៉ូខ្លីមួយ (Context/Scenario) សម្រាប់ឱ្យសិស្សអាននិងយល់។
-  * សំណួរពហុជ្រើសរើស មានជម្រើសចម្លើយ ៤ ជម្រើស មានចម្លើយត្រឹមត្រូវ ១ និងចម្លើយបន្លំជាលក្ខណៈគិតថ្លឹងថ្លែងចំនួន ៣។
-  * ចម្លើយត្រឹមត្រូវជាមួយនឹងការពន្យល់ល្អិតល្អន់ និងខ្លីៗអំពីមូលហេតុ។
-
-=== គំរូ Prompt 02 (Problem-Solving Level - PISA Level 3) ===
-- បង្កើតសំណួរបែប PISA ក្នុងកម្រិត៣ (Level 3) ដោយប្រើបរិបទពិភពលោកពិតពីជីវិតប្រចាំថ្ងៃទាក់ទងនឹងមេរៀន និងកម្រិតថ្នាក់។
-- ភារកិច្ចរបស់សំណួរគួរតែវាយតម្លៃលើសមត្ថភាពដោះស្រាយបញ្ហា (Problem-solving) និងការគិតត្រិះរិះស៊ីជម្រៅ (Critical Thinking)។
-- ត្រូវតែរួមបញ្ចូល៖
-  * អត្ថបទខ្លី ទិន្នន័យ តារាង ឬស្ថានភាពជាក់ស្ដែងមួយ។
-  * សំណួរផ្ទាល់ដែលតម្រូវឱ្យមានការបកស្រាយ (Interpretation) ការវិភាគ ឬការគណនាដោយប្រើការគិត។
-  * ចម្លើយច្បាស់លាស់ និងការបង្ហាញពីការដោះស្រាយជាជំហានៗ។` : ''}
+${categoryRatiosPrompt}
 
 CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
 If the questions involve math, physics, or chemistry:
@@ -332,9 +394,10 @@ Provide the response in JSON format.`;
 
   try {
     const modelsToTry = [
-      "gemini-flash-latest",
+      "gemini-2.5-flash",
+      "gemini-3.5-flash",
       "gemini-3.1-flash-lite",
-      "gemini-3.5-flash"
+      "gemini-flash-latest"
     ];
 
     const generateWithFallback = async (partsList: any[]): Promise<any> => {
@@ -345,7 +408,7 @@ Provide the response in JSON format.`;
         for (let attempt = 1; attempt <= attempts; attempt++) {
           try {
             console.log(`Attempting question generation with model: ${modelName} (attempt ${attempt}/${attempts})`);
-            const result = await ai.models.generateContent({
+            const result = await activeAi.models.generateContent({
               model: modelName,
               contents: { parts: partsList },
               config: {
@@ -359,12 +422,13 @@ Provide the response in JSON format.`;
                       options: { 
                         type: Type.ARRAY, 
                         items: { type: Type.STRING },
-                        description: "Exactly 4 multiple choice options, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)"
+                        description: "Exactly 4 multiple choice options, matching Column A and B for matching, plausible terms/numerical/text for others"
                       },
                       correctIndex: { type: Type.INTEGER, description: "The 0-based index of the correct option" },
-                      explanation: { type: Type.STRING, description: "Detailed explanation of why the correct option is right of the scenario and step-by-step reasoning in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" }
+                      category: { type: Type.STRING, description: "The precise category of the question: choice, matching, fill_blank, theory, or exercise" },
+                      explanation: { type: Type.STRING, description: "Detailed explanation and steps" }
                     },
-                    required: ["text", "options", "correctIndex"]
+                    required: ["text", "options", "correctIndex", "category"]
                   }
                 }
               }
@@ -395,12 +459,19 @@ Provide the response in JSON format.`;
     const jsonParsed = JSON.parse(generatedText);
     const mappedQuestions = Array.isArray(jsonParsed) ? jsonParsed.map((q: any) => ({
       ...q,
-      questionType: questionType || 'general'
+      questionType: questionType || 'general',
+      category: q.category || 'choice'
     })) : [];
     res.json({ questions: mappedQuestions });
   } catch (error: any) {
     console.error("Error generating questions from Gemini API:", error);
-    res.status(500).json({ error: error.message || "មានកំហុសក្នុងការបង្កើតសំណួរពី Gemini API" });
+    let errorMessage = error.message || String(error);
+    if (errorMessage.includes("The caller does not have permission")) {
+      errorMessage = "កំហុសពី Gemini API៖ The caller does not have permission - សោរ API Key របស់អ្នកអាចមិនត្រឹមត្រូវ ឬគ្មានសិទ្ធិដំណើរការម៉ូដែលនេះទេ។ សូមពិនិត្យ ឬផ្លាស់ប្តូរ API Key របស់អ្នកនៅក្នុងប្រអប់ (Gemini API Key Input) នៅក្នុងផ្ទាំងបញ្ជាខាងលើជាមុនសិន!";
+    } else if (errorMessage.includes("API key not valid")) {
+      errorMessage = "កំហុសពី Gemini API៖ API key not valid - សោរ API Key ដែលអ្នកបានបញ្ចូលមិនត្រឹមត្រូវទេ។ សូមពិនិត្យ ឬផ្លាស់ប្តូរ API Key របស់អ្នកឡើងវិញ!";
+    }
+    res.status(500).json({ error: errorMessage });
   }
 });
 

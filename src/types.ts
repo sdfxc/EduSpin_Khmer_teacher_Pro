@@ -18,6 +18,7 @@ export interface Question {
   options: string[];
   correctIndex: number;
   questionType?: 'general' | 'pisa';
+  category?: 'choice' | 'matching' | 'fill_blank' | 'theory' | 'exercise';
   explanation?: string;
 }
 

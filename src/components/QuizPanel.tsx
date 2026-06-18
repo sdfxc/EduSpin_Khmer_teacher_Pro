@@ -16,7 +16,8 @@ import {
   BorderStyle, 
   WidthType, 
   VerticalAlign,
-  ImageRun
+  ImageRun,
+  UnderlineType
 } from 'docx';
 
 interface QuizPanelProps {
@@ -1104,7 +1105,7 @@ export default function QuizPanel({
             font: selectedBodyFontObj.name,
             size: (bodyFontSize + 2) * 2,
             bold: true,
-            underline: {},
+            underline: { type: UnderlineType.SINGLE },
           })
         ]
       }),
