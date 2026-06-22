@@ -20,6 +20,7 @@ export interface Question {
   questionType?: 'general' | 'pisa';
   category?: 'choice' | 'matching' | 'fill_blank' | 'theory' | 'exercise';
   explanation?: string;
+  points?: number;
 }
 
 export interface QuizCard {

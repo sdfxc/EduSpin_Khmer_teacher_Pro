@@ -69,6 +69,11 @@ export const AVAILABLE_FONTS = [
 
 export const FONT_SIZES = [5, 6, 7, 8, 9, 10, 10.5, 11, 11.5, 12, 13, 14, 15, 16, 18, 20, 24];
 
+export function stripPrefix(text: string): string {
+  if (!text) return '';
+  return text.trim().replace(/^[កខគឃង១២៣៤៥6789051234a-zA-Z]\s*[.\-\)៖:]\s*/, '').trim();
+}
+
 export interface ExamQuestion {
   id: string;
   text: string;
@@ -687,13 +692,18 @@ Output the response in JSON format.`;
 
   // Delete question from temporary local list
   const handleDeleteLocalQuestion = (index: number) => {
-    if (localQuestions.length <= 1) {
-      alert('វិញ្ញាសាត្រូវតែមានសំណួរយ៉ាងតិច ១!');
-      return;
+    if (confirm('តើអ្នកពិតជាចង់លុបសំណួរនេះមែនទេ?')) {
+      const filtered = localQuestions.filter((_, idx) => idx !== index);
+      setLocalQuestions(filtered);
+      setSelectedQIndex(Math.max(0, index - 1));
     }
-    const filtered = localQuestions.filter((_, idx) => idx !== index);
-    setLocalQuestions(filtered);
-    setSelectedQIndex(Math.max(0, index - 1));
+  };
+
+  const handleDeleteAllLocalQuestions = () => {
+    if (confirm('តើអ្នកពិតជាចង់លុបសំណួរទាំងអស់មែនទេ?')) {
+      setLocalQuestions([]);
+      setSelectedQIndex(0);
+    }
   };
 
   // AI Generation triggers
@@ -889,22 +899,44 @@ Output the response in JSON format.`;
       `;
       grouped.matching.forEach((card) => {
         globalIdx++;
+        const lhs = [card.question.options[0], card.question.options[1]].filter(Boolean);
+        const rhs = card.question.options.slice(2).filter(Boolean);
+        const maxRows = Math.max(lhs.length, rhs.length);
+        
+        let rowHtml = "";
+        for (let i = 0; i < maxRows; i++) {
+          const leftText = lhs[i] || "";
+          const rightText = rhs[i] || "";
+          const leftLetter = i === 0 ? "១" : i === 1 ? "២" : i === 2 ? "៣" : String(i + 1);
+          const rightLetter = i === 0 ? "ក" : i === 1 ? "ខ" : i === 2 ? "គ" : i === 3 ? "ឃ" : String.fromCharCode(97 + i);
+
+          const tdLeft = leftText ? `<div style="display: flex; gap: 4px;"><b>${leftLetter}.</b> <span>${stripPrefix(leftText)}</span></div>` : "";
+          const tdRight = rightText ? `<div style="display: flex; gap: 4px;"><b>${rightLetter}.</b> <span>${stripPrefix(rightText)}</span></div>` : "";
+          const tdAns = i < lhs.length ? `<b>${leftLetter} ➔ </b> .........` : "";
+
+          rowHtml += `
+            <tr style="border-bottom: 1px solid #000;">
+              <td style="width: 40%; border-right: 1px solid #000; padding: 6.5px; text-align: left; font-size: 9.5pt; vertical-align: middle;">${tdLeft}</td>
+              <td style="width: 42%; border-right: 1px solid #000; padding: 6.5px; text-align: left; font-size: 9.5pt; vertical-align: middle;">${tdRight}</td>
+              <td style="width: 18%; padding: 6.5px; text-align: center; font-size: 9.5pt; vertical-align: middle;">${tdAns}</td>
+            </tr>
+          `;
+        }
+
         questionsHtml += `
           <div class="question-block">
             <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
-            <table style="width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 8px; max-width: 450px; margin-left: auto; margin-right: auto; border: 1px solid #777;">
-              <tr>
-                <td style="width: 50%; border-right: 1px solid #777; padding: 6px; text-align: left; font-size: 9.5pt;">
-                  <div style="font-weight: bold; border-bottom: 1px solid #aaa; padding-bottom: 3px; margin-bottom: 5px; color: #555;">កូនផ្នែក A</div>
-                  <div style="margin-bottom: 4px;">១. ${card.question.options[0] || '...............'}</div>
-                  <div>២. ${card.question.options[1] || '...............'}</div>
-                </td>
-                <td style="width: 50%; padding: 6px; text-align: left; font-size: 9.5pt;">
-                  <div style="font-weight: bold; border-bottom: 1px solid #aaa; padding-bottom: 3px; margin-bottom: 5px; color: #555;">កូនផ្នែក B</div>
-                  <div style="margin-bottom: 4px;">ក. ${card.question.options[2] || '...............'}</div>
-                  <div>ខ. ${card.question.options[3] || '...............'}</div>
-                </td>
-              </tr>
+            <table style="width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 12px; max-width: 550px; margin-left: auto; margin-right: auto; border: 2px solid #000;">
+              <thead>
+                <tr style="background-color: #f3f4f6; border-bottom: 2px solid #000;">
+                  <th style="width: 40%; border-right: 1px solid #000; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">A</th>
+                  <th style="width: 42%; border-right: 1px solid #000; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">B</th>
+                  <th style="width: 18%; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">ចម្លើយ</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${rowHtml}
+              </tbody>
             </table>
           </div>
         `;
@@ -1862,12 +1894,15 @@ Output the response in JSON format.`;
             const opt1 = card.question.options[i];
             const opt2 = card.question.options[i + 1];
 
+            const isCorrect1 = highlightKey && card.question.correctIndex === i;
+            const isCorrect2 = highlightKey && card.question.correctIndex === (i + 1);
+
             const cells = [
               new TableCell({
                 width: { size: 50, type: WidthType.PERCENTAGE },
                 borders: tableBordersNone,
                 children: [
-                  new Paragraph({
+                   new Paragraph({
                     spacing: { before: 40, after: 40 },
                     children: [
                       new TextRun({
@@ -1875,8 +1910,9 @@ Output the response in JSON format.`;
                         font: selectedBodyFontObj.name,
                         size: bodyFontSize * 2,
                         bold: true,
+                        color: isCorrect1 ? "047857" : undefined,
                       }),
-                      ...convertHtmlToTextRuns(opt1, selectedBodyFontObj.name, bodyFontSize)
+                      ...convertHtmlToTextRuns(opt1, selectedBodyFontObj.name, bodyFontSize, isCorrect1, false, isCorrect1 ? "047857" : undefined)
                     ]
                   })
                 ]
@@ -1897,8 +1933,9 @@ Output the response in JSON format.`;
                           font: selectedBodyFontObj.name,
                           size: bodyFontSize * 2,
                           bold: true,
+                          color: isCorrect2 ? "047857" : undefined,
                         }),
-                        ...convertHtmlToTextRuns(opt2, selectedBodyFontObj.name, bodyFontSize)
+                        ...convertHtmlToTextRuns(opt2, selectedBodyFontObj.name, bodyFontSize, isCorrect2, false, isCorrect2 ? "047857" : undefined)
                       ]
                     })
                   ]
@@ -1919,6 +1956,7 @@ Output the response in JSON format.`;
           );
         } else {
           card.question.options.forEach((opt: string, oIdx: number) => {
+            const isCorrect = highlightKey && card.question.correctIndex === oIdx;
             childrenElements.push(
               new Paragraph({
                 indent: { left: 450 },
@@ -1929,8 +1967,9 @@ Output the response in JSON format.`;
                     font: selectedBodyFontObj.name,
                     size: bodyFontSize * 2,
                     bold: true,
+                    color: isCorrect ? "047857" : undefined,
                   }),
-                  ...convertHtmlToTextRuns(opt, selectedBodyFontObj.name, bodyFontSize)
+                  ...convertHtmlToTextRuns(opt, selectedBodyFontObj.name, bodyFontSize, isCorrect, false, isCorrect ? "047857" : undefined)
                 ]
               })
             );
@@ -1966,100 +2005,166 @@ Output the response in JSON format.`;
           })
         );
 
-        childrenElements.push(
-          new Table({
-            width: { size: 80, type: WidthType.PERCENTAGE },
-            alignment: AlignmentType.CENTER,
-            borders: {
-              top: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
-              bottom: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
-              left: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
-              right: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
-              insideHorizontal: { style: BorderStyle.NONE, size: 0, color: "auto" },
-              insideVertical: { style: BorderStyle.SINGLE, size: 8, color: "777777" },
-            },
-            rows: [
-              new TableRow({
+        const lhsOptions = [card.question.options[0], card.question.options[1]].filter(Boolean);
+        const rhsOptions = card.question.options.slice(2).filter(Boolean);
+        const maxExportRows = Math.max(lhsOptions.length, rhsOptions.length);
+        
+        const tableRows = [
+          // Header Row
+          new TableRow({
+            children: [
+              new TableCell({
+                width: { size: 40, type: WidthType.PERCENTAGE },
                 children: [
-                  new TableCell({
-                    width: { size: 50, type: WidthType.PERCENTAGE },
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
                     children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 100 },
-                        children: [
-                          new TextRun({
-                            text: "កូនផ្នែក A",
-                            font: selectedBodyFontObj.name,
-                            size: (bodyFontSize - 0.5) * 2,
-                            bold: true,
-                            color: "555555",
-                          })
-                        ]
-                      }),
-                      new Paragraph({
-                        spacing: { after: 60 },
-                        children: [
-                          new TextRun({
-                            text: `១. ${card.question.options[0] || ".........."}`,
-                            font: selectedBodyFontObj.name,
-                            size: (bodyFontSize - 0.5) * 2,
-                          })
-                        ]
-                      }),
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: `២. ${card.question.options[1] || ".........."}`,
-                            font: selectedBodyFontObj.name,
-                            size: (bodyFontSize - 0.5) * 2,
-                          })
-                        ]
+                      new TextRun({
+                        text: "A",
+                        font: selectedBodyFontObj.name,
+                        size: bodyFontSize * 2,
+                        bold: true,
                       })
-                    ],
-                    margins: { top: 120, bottom: 120, left: 160, right: 160 }
-                  }),
-                  new TableCell({
-                    width: { size: 50, type: WidthType.PERCENTAGE },
+                    ]
+                  })
+                ],
+                margins: { top: 120, bottom: 120, left: 160, right: 160 }
+              }),
+              new TableCell({
+                width: { size: 42, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
                     children: [
-                      new Paragraph({
-                        alignment: AlignmentType.CENTER,
-                        spacing: { after: 100 },
-                        children: [
-                          new TextRun({
-                            text: "កូនផ្នែក B",
-                            font: selectedBodyFontObj.name,
-                            size: (bodyFontSize - 0.5) * 2,
-                            bold: true,
-                            color: "555555",
-                          })
-                        ]
-                      }),
-                      new Paragraph({
-                        spacing: { after: 60 },
-                        children: [
-                          new TextRun({
-                            text: `ក. ${card.question.options[2] || ".........."}`,
-                            font: selectedBodyFontObj.name,
-                            size: (bodyFontSize - 0.5) * 2,
-                          })
-                        ]
-                      }),
-                      new Paragraph({
-                        children: [
-                          new TextRun({
-                            text: `ខ. ${card.question.options[3] || ".........."}`,
-                            font: selectedBodyFontObj.name,
-                            size: (bodyFontSize - 0.5) * 2,
-                          })
-                        ]
+                      new TextRun({
+                        text: "B",
+                        font: selectedBodyFontObj.name,
+                        size: bodyFontSize * 2,
+                        bold: true,
                       })
-                    ],
-                    margins: { top: 120, bottom: 120, left: 160, right: 160 }
+                    ]
+                  })
+                ],
+                margins: { top: 120, bottom: 120, left: 160, right: 160 }
+              }),
+              new TableCell({
+                width: { size: 18, type: WidthType.PERCENTAGE },
+                children: [
+                  new Paragraph({
+                    alignment: AlignmentType.CENTER,
+                    children: [
+                      new TextRun({
+                        text: "ចម្លើយ",
+                        font: selectedBodyFontObj.name,
+                        size: bodyFontSize * 2,
+                        bold: true,
+                      })
+                    ]
+                  })
+                ],
+                margins: { top: 120, bottom: 120, left: 160, right: 160 }
+              })
+            ]
+          })
+        ];
+
+        for (let i = 0; i < maxExportRows; i++) {
+          const leftText = lhsOptions[i] || "";
+          const rightText = rhsOptions[i] || "";
+          const leftLetter = i === 0 ? "១" : i === 1 ? "២" : i === 2 ? "៣" : String(i + 1);
+          const rightLetter = i === 0 ? "ក" : i === 1 ? "ខ" : i === 2 ? "គ" : i === 3 ? "ឃ" : String.fromCharCode(97 + i);
+
+          const leftCellParagraphs = [];
+          if (leftText) {
+            leftCellParagraphs.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `${leftLetter}. ${stripPrefix(leftText)}`,
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 0.5) * 2,
+                    bold: true,
                   })
                 ]
               })
-            ]
+            );
+          } else {
+            leftCellParagraphs.push(new Paragraph({ children: [] }));
+          }
+
+          const rightCellParagraphs = [];
+          if (rightText) {
+            rightCellParagraphs.push(
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: `${rightLetter}. ${stripPrefix(rightText)}`,
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 0.5) * 2,
+                    bold: true,
+                  })
+                ]
+              })
+            );
+          } else {
+            rightCellParagraphs.push(new Paragraph({ children: [] }));
+          }
+
+          const answerCellParagraphs = [];
+          if (i < lhsOptions.length) {
+            answerCellParagraphs.push(
+              new Paragraph({
+                alignment: AlignmentType.CENTER,
+                children: [
+                  new TextRun({
+                    text: `${leftLetter} ➔ .........`,
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 0.5) * 2,
+                    bold: true,
+                  })
+                ]
+              })
+            );
+          } else {
+            answerCellParagraphs.push(new Paragraph({ children: [] }));
+          }
+
+          tableRows.push(
+            new TableRow({
+              children: [
+                new TableCell({
+                  width: { size: 40, type: WidthType.PERCENTAGE },
+                  children: leftCellParagraphs,
+                  margins: { top: 120, bottom: 120, left: 160, right: 160 }
+                }),
+                new TableCell({
+                  width: { size: 42, type: WidthType.PERCENTAGE },
+                  children: rightCellParagraphs,
+                  margins: { top: 120, bottom: 120, left: 160, right: 160 }
+                }),
+                new TableCell({
+                  width: { size: 18, type: WidthType.PERCENTAGE },
+                  children: answerCellParagraphs,
+                  margins: { top: 120, bottom: 120, left: 160, right: 160 }
+                })
+              ]
+            })
+          );
+        }
+
+        childrenElements.push(
+          new Table({
+            width: { size: 100, type: WidthType.PERCENTAGE },
+            alignment: AlignmentType.CENTER,
+            borders: {
+              top: { style: BorderStyle.SINGLE, size: 12, color: "000000" },
+              bottom: { style: BorderStyle.SINGLE, size: 12, color: "000000" },
+              left: { style: BorderStyle.SINGLE, size: 12, color: "000000" },
+              right: { style: BorderStyle.SINGLE, size: 12, color: "000000" },
+              insideHorizontal: { style: BorderStyle.SINGLE, size: 8, color: "444444" },
+              insideVertical: { style: BorderStyle.SINGLE, size: 12, color: "000000" },
+            },
+            rows: tableRows
           })
         );
       });
@@ -2942,27 +3047,79 @@ Output the response in JSON format.`;
                                     globalIdx++;
                                     return (
                                       <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
-                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
+                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
                                           <span>សំណួរទី {globalIdx}៖ {q.text}</span>
                                           <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                                         </div>
                                         
-                                        {/* Two columns layout for matching */}
-                                        <div className="grid grid-cols-2 gap-8 border border-slate-400 p-4 rounded-xl bg-slate-50/50 my-2 max-w-xl mx-auto">
-                                          <div className="space-y-1.5">
-                                            <p className="font-black border-b border-slate-350 pb-0.5 mb-1 text-[10px] text-slate-500 text-center">កូនផ្នែក A</p>
-                                            <div className="space-y-1 font-bold text-slate-850">
-                                              <div>១. {q.options[0] || '..........'}</div>
-                                              <div>២. {q.options[1] || '..........'}</div>
-                                            </div>
-                                          </div>
-                                          <div className="space-y-1.5">
-                                            <p className="font-black border-b border-slate-350 pb-0.5 mb-1 text-[10px] text-slate-500 text-center">កូនផ្នែក B</p>
-                                            <div className="space-y-1 font-bold text-slate-850">
-                                              <div>ក. {q.options[2] || '..........'}</div>
-                                              <div>ខ. {q.options[3] || '..........'}</div>
-                                            </div>
-                                          </div>
+                                        {/* Classic table matching layout */}
+                                        <div className="my-3 max-w-2xl mx-auto overflow-x-auto avoid-break text-slate-900">
+                                          <table className="w-full border-collapse border-2 border-slate-950 text-xs text-slate-900 font-sans">
+                                            <thead>
+                                              <tr className="bg-slate-100/80 border-b-2 border-slate-950">
+                                                <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[40%] text-slate-950">
+                                                  A
+                                                </th>
+                                                <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[42%] text-slate-950">
+                                                  B
+                                                </th>
+                                                <th className="font-black text-center py-2 px-3 w-[18%] text-slate-950">
+                                                  ចម្លើយ
+                                                </th>
+                                              </tr>
+                                            </thead>
+                                            <tbody>
+                                              {(() => {
+                                                const lhs = [q.options[0], q.options[1]].filter(Boolean);
+                                                const rhs = q.options.slice(2).filter(Boolean);
+                                                const maxRows = Math.max(lhs.length, rhs.length);
+                                                const rows = [];
+                                                for (let i = 0; i < maxRows; i++) {
+                                                  rows.push({
+                                                    left: lhs[i] || '',
+                                                    right: rhs[i] || '',
+                                                    ansNum: i < lhs.length ? i + 1 : null
+                                                  });
+                                                }
+                                                return rows.map((row, rIdx) => {
+                                                  const leftLetter = rIdx === 0 ? '១' : rIdx === 1 ? '២' : rIdx === 2 ? '៣' : String(rIdx + 1);
+                                                  const rightLetter = rIdx === 0 ? 'ក' : rIdx === 1 ? 'ខ' : rIdx === 2 ? 'គ' : rIdx === 3 ? 'ឃ' : String.fromCharCode(97 + rIdx);
+                                                  
+                                                  return (
+                                                    <tr key={rIdx} className="border-b border-slate-950 last:border-b-0 min-h-[38px]">
+                                                      {/* Column A */}
+                                                      <td className="border-r border-slate-950 py-2 px-3 text-left font-bold align-middle">
+                                                        {row.left ? (
+                                                          <div className="flex items-start gap-1">
+                                                            <span className="font-black shrink-0">{leftLetter}.</span>
+                                                            <span>{stripPrefix(row.left)}</span>
+                                                          </div>
+                                                        ) : null}
+                                                      </td>
+                                                      {/* Column B */}
+                                                      <td className="border-r border-slate-950 py-2 px-3 text-left font-bold align-middle">
+                                                        {row.right ? (
+                                                          <div className="flex items-start gap-1">
+                                                            <span className="font-black shrink-0">{rightLetter}.</span>
+                                                            <span>{stripPrefix(row.right)}</span>
+                                                          </div>
+                                                        ) : null}
+                                                      </td>
+                                                      {/* Answer Space */}
+                                                      <td className="py-2 px-3 text-center font-bold align-middle">
+                                                        {row.ansNum !== null ? (
+                                                          <div className="flex items-center justify-center gap-1.5 font-bold">
+                                                            <span>{leftLetter} ➔</span>
+                                                            <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                          </div>
+                                                        ) : null}
+                                                      </td>
+                                                    </tr>
+                                                  );
+                                                });
+                                              })()}
+                                            </tbody>
+                                          </table>
                                         </div>
                                       </div>
                                     );
@@ -3240,15 +3397,26 @@ Output the response in JSON format.`;
                 
                 {/* Left side panel index selection list */}
                 <div className="md:col-span-4 border-r dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 flex flex-col h-full min-h-0">
-                  <div className="p-3 border-b dark:border-slate-800">
-                    <button
-                      type="button"
-                      onClick={handleAddLocalQuestion}
-                      className="w-full py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs cursor-pointer active:scale-95 transition-all outline-none border-none flex items-center justify-center gap-2"
-                    >
-                      <Plus className="w-4 h-4" />
-                      <span>បន្ថែមសំណួរថ្មី</span>
-                    </button>
+                  <div className="p-3 border-b dark:border-slate-800 flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        onClick={handleAddLocalQuestion}
+                        className="py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs cursor-pointer active:scale-95 transition-all outline-none border-none flex items-center justify-center gap-1"
+                      >
+                        <Plus className="w-4 h-4" />
+                        <span>បន្ថែមថ្មី</span>
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleDeleteAllLocalQuestions}
+                        disabled={localQuestions.length === 0}
+                        className="py-2.5 bg-red-650 bg-red-600 hover:bg-red-700 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-xl font-bold text-xs cursor-pointer active:scale-95 transition-all outline-none border-none flex items-center justify-center gap-1"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                        <span>លុបទាំងអស់</span>
+                      </button>
+                    </div>
                   </div>
 
                   <div className="flex-1 overflow-y-auto p-3 space-y-2">
@@ -4097,32 +4265,264 @@ Output the response in JSON format.`;
                       </div>
 
                       <div className="space-y-4 text-slate-900 mt-2 font-sans text-black animate-none" style={bodyInlineStyle}>
-                        {activeSubject?.questions.map((q, idx) => (
-                          <div key={q.id || idx} className="space-y-1.5 avoid-break">
-                            <p className="font-extrabold flex items-start text-left font-sans text-xs">
-                              <span>សំណួរទី {idx + 1}៖ {q.text}</span>
-                              <span className="text-[9px] text-slate-400 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
-                            </p>
-                            <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left font-sans text-xs ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                              {q.options.map((opt, oIdx) => {
-                                const isCorrectIdx = oIdx === q.correctIndex;
-                                return (
-                                  <div 
-                                    key={oIdx} 
-                                    className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
-                                      highlightKey && isCorrectIdx 
-                                        ? 'bg-emerald-50 text-emerald-800 font-bold border border-emerald-200/40' 
-                                        : 'text-slate-700'
-                                    }`}
-                                  >
-                                    <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
-                                    <span>{opt}</span>
+                        {(() => {
+                          const questions = activeSubject?.questions || [];
+                          const grouped = {
+                            choice: [] as ExamQuestion[],
+                            matching: [] as ExamQuestion[],
+                            fill_blank: [] as ExamQuestion[],
+                            theory: [] as ExamQuestion[],
+                            exercise: [] as ExamQuestion[],
+                          };
+
+                          questions.forEach(q => {
+                            const cat = q.category || 'choice';
+                            if (grouped[cat]) {
+                              grouped[cat].push(q);
+                            } else {
+                              grouped['choice'].push(q);
+                            }
+                          });
+
+                          const showSections = 
+                            grouped.matching.length > 0 || 
+                            grouped.fill_blank.length > 0 || 
+                            grouped.theory.length > 0 || 
+                            grouped.exercise.length > 0;
+
+                          let globalIdx = 0;
+
+                          return (
+                            <div className="space-y-6 text-slate-900">
+                              {/* 1. Choice Section */}
+                              {grouped.choice.length > 0 && (
+                                <div className="space-y-2">
+                                  {showSections && (
+                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                      ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
+                                    </div>
+                                  )}
+                                  <div className="space-y-4">
+                                    {grouped.choice.map((q) => {
+                                      globalIdx++;
+                                      return (
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left">
+                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                          </div>
+                                          <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left font-sans text-xs ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                                            {q.options.map((opt, oIdx) => {
+                                              const isCorrectIdx = oIdx === q.correctIndex;
+                                              return (
+                                                <div 
+                                                  key={oIdx} 
+                                                  className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
+                                                    highlightKey && isCorrectIdx 
+                                                      ? 'bg-emerald-50 text-emerald-850 font-bold border border-emerald-250/30' 
+                                                      : 'text-slate-800'
+                                                  }`}
+                                                >
+                                                  <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
+                                                  <span>{opt}</span>
+                                                </div>
+                                              );
+                                            })}
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
-                                );
-                              })}
+                                </div>
+                              )}
+
+                              {/* 2. Matching Section */}
+                              {grouped.matching.length > 0 && (
+                                <div className="space-y-2 text-left">
+                                  {showSections && (
+                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                      ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+                                    </div>
+                                  )}
+                                  <div className="space-y-4">
+                                    {grouped.matching.map((q) => {
+                                      globalIdx++;
+                                      return (
+                                        <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
+                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                          </div>
+                                          
+                                          {/* Classic table matching layout */}
+                                          <div className="my-3 max-w-2xl mx-auto overflow-x-auto avoid-break text-slate-900">
+                                            <table className="w-full border-collapse border-2 border-slate-950 text-xs text-slate-900 font-sans">
+                                              <thead>
+                                                <tr className="bg-slate-100/80 border-b-2 border-slate-950 font-bold">
+                                                  <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[40%] text-slate-950">
+                                                    A
+                                                  </th>
+                                                  <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[42%] text-slate-950">
+                                                    B
+                                                  </th>
+                                                  <th className="font-black text-center py-2 px-3 w-[18%] text-slate-950">
+                                                    ចម្លើយ
+                                                  </th>
+                                                </tr>
+                                              </thead>
+                                              <tbody>
+                                                {(() => {
+                                                  const lhs = [q.options[0], q.options[1]].filter(Boolean);
+                                                  const rhs = q.options.slice(2).filter(Boolean);
+                                                  const maxRows = Math.max(lhs.length, rhs.length);
+                                                  const rows = [];
+                                                  for (let i = 0; i < maxRows; i++) {
+                                                    rows.push({
+                                                      left: lhs[i] || '',
+                                                      right: rhs[i] || '',
+                                                      ansNum: i < lhs.length ? i + 1 : null
+                                                    });
+                                                  }
+                                                  return rows.map((row, rIdx) => {
+                                                    const leftLetter = rIdx === 0 ? '១' : rIdx === 1 ? '២' : rIdx === 2 ? '៣' : String(rIdx + 1);
+                                                    const rightLetter = rIdx === 0 ? 'ក' : rIdx === 1 ? 'ខ' : rIdx === 2 ? 'គ' : rIdx === 3 ? 'ឃ' : String.fromCharCode(97 + rIdx);
+                                                    
+                                                    return (
+                                                      <tr key={rIdx} className="border-b border-slate-950 last:border-b-0 min-h-[38px] min-w-0">
+                                                        {/* Column A */}
+                                                        <td className="border-r border-slate-950 py-2 px-3 text-left font-bold align-middle">
+                                                          {row.left ? (
+                                                            <div className="flex items-start gap-1">
+                                                              <span className="font-black shrink-0">{leftLetter}.</span>
+                                                              <span>{stripPrefix(row.left)}</span>
+                                                            </div>
+                                                          ) : null}
+                                                        </td>
+                                                        {/* Column B */}
+                                                        <td className="border-r border-slate-950 py-2 px-3 text-left font-bold align-middle">
+                                                          {row.right ? (
+                                                            <div className="flex items-start gap-1">
+                                                              <span className="font-black shrink-0">{rightLetter}.</span>
+                                                              <span>{stripPrefix(row.right)}</span>
+                                                            </div>
+                                                          ) : null}
+                                                        </td>
+                                                        {/* Answer Space */}
+                                                        <td className="py-2 px-3 text-center font-bold align-middle">
+                                                          {row.ansNum !== null ? (
+                                                            <div className="flex items-center justify-center gap-1.5 font-bold">
+                                                              <span>{leftLetter} ➔</span>
+                                                              <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                            </div>
+                                                          ) : null}
+                                                        </td>
+                                                      </tr>
+                                                    );
+                                                  });
+                                                })()}
+                                              </tbody>
+                                            </table>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 3. Fill Blank Section */}
+                              {grouped.fill_blank.length > 0 && (
+                                <div className="space-y-2 text-left">
+                                  {showSections && (
+                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                      ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+                                    </div>
+                                  )}
+                                  <div className="space-y-4">
+                                    {grouped.fill_blank.map((q) => {
+                                      globalIdx++;
+                                      return (
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 4. Theory Section */}
+                              {grouped.theory.length > 0 && (
+                                <div className="space-y-4 text-left">
+                                  {showSections && (
+                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                      ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
+                                    </div>
+                                  )}
+                                  <div className="space-y-5">
+                                    {grouped.theory.map((q) => {
+                                      globalIdx++;
+                                      return (
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                          </div>
+                                          {/* Subtle answer lines on paper */}
+                                          <div className="space-y-2 pt-2 max-w-2xl font-sans">
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
+
+                              {/* 5. Exercise Section */}
+                              {grouped.exercise.length > 0 && (
+                                <div className="space-y-4 text-left">
+                                  {showSections && (
+                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                      ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
+                                    </div>
+                                  )}
+                                  <div className="space-y-6">
+                                    {grouped.exercise.map((q) => {
+                                      globalIdx++;
+                                      return (
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                          </div>
+                                          {/* Workspace solving lines on paper */}
+                                          <div className="space-y-2 pt-2 max-w-2xl font-sans">
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
+                                          </div>
+                                        </div>
+                                      );
+                                    })}
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          </div>
-                        ))}
+                          );
+                        })()}
                       </div>
                     </div>
                   </div>
@@ -4130,13 +4530,27 @@ Output the response in JSON format.`;
               </div>
 
               {/* Modal Footer */}
-              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex flex-col sm:flex-row items-center justify-between gap-4 shrink-0">
-                <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-900/30 pr-3 flex items-center gap-1.5">
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>សំណួរសរុប៖ {activeSubject?.questions.length || 0} សំណួរ</span>
-                </span>
+              <div className="px-6 py-4 bg-slate-50 dark:bg-slate-950 border-t border-slate-200 dark:border-slate-800 flex flex-col xl:flex-row items-center justify-between gap-4 shrink-0">
+                <div className="flex flex-wrap items-center gap-3">
+                  <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest bg-indigo-50 dark:bg-indigo-950/40 px-3 py-1.5 rounded-xl border border-indigo-100 dark:border-indigo-900/30 pr-3 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5" />
+                    <span>សំណួរសរុប៖ {activeSubject?.questions.length || 0} សំណួរ</span>
+                  </span>
+
+                  <label className="flex items-center gap-2 px-3 py-1.5 bg-emerald-50 dark:bg-emerald-950/40 border border-emerald-200 dark:border-emerald-800 rounded-xl cursor-pointer select-none transition-all hover:bg-emerald-100/50 dark:hover:bg-emerald-900/30">
+                    <input
+                      type="checkbox"
+                      checked={highlightKey}
+                      onChange={(e) => setHighlightKey(e.target.checked)}
+                      className="w-4 h-4 text-emerald-600 bg-white dark:bg-slate-900 border-slate-300 rounded focus:ring-emerald-500 cursor-pointer"
+                    />
+                    <span className="text-xs font-black text-emerald-800 dark:text-emerald-300">
+                      បង្ហាញចម្លើយ (ទាំងសំណួរនិងចម្លើយ)
+                    </span>
+                  </label>
+                </div>
                 
-                <div className="flex flex-wrap items-center justify-end gap-3">
+                <div className="flex flex-wrap items-center justify-end gap-3 w-full xl:w-auto">
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(false)}
@@ -4201,6 +4615,350 @@ Output the response in JSON format.`;
           </div>
         )}
       </AnimatePresence>
+
+      {/* Hidden layout rendered only at print-time */}
+      <style>{`
+        @media print {
+          @page {
+            size: ${pageSize};
+            margin: ${marginTop}${marginUnit} ${marginRight}${marginUnit} ${marginBottom}${marginUnit} ${marginLeft}${marginUnit} !important;
+          }
+        }
+      `}</style>
+      <div className="hidden print:block printable-sheet bg-white text-black p-0 font-sans w-full max-w-4xl mx-auto min-h-screen text-[11px] sm:text-[12px] leading-relaxed select-text">
+        <div className="grid grid-cols-12 gap-2 w-full text-black">
+          {/* Left Column */}
+          <div className={`${layoutWidths.left.className} flex flex-col justify-start text-left font-black gap-2 mt-2`} style={{ ...headerInlineStyle, ...layoutWidths.left.style }}>
+            <div>មណ្ឌលប្រឡង៖ {renderDotField(examCenter, '.....................................................')}</div>
+            <div>លេខបន្ទប់៖ {renderDotField(roomNumber, '..................')}</div>
+            <div>វិញ្ញាសា៖ {renderDotField(activeSubject?.name || '.....................................', '.....................................')}</div>
+            <div>លេខតុ៖ {renderDotField(deskNumber, '..................')}</div>
+          </div>
+          
+          {/* Middle Column (Logo and school titles) */}
+          <div className={`${layoutWidths.center.className} flex flex-col items-center text-center justify-start`} style={{ ...headerInlineStyle, ...layoutWidths.center.style }}>
+            <div className="mb-2">
+              {customLogo ? (
+                <img 
+                  src={customLogo} 
+                  alt="Custom Logo" 
+                  className="w-16 h-16 object-contain pointer-events-none mx-auto"
+                />
+              ) : imageFailed ? (
+                <SovannaphumiLogoSVG />
+              ) : (
+                <img 
+                  src={imgSrc} 
+                  alt="Sovannphomi Logo" 
+                  className="w-16 h-16 object-contain pointer-events-none mx-auto"
+                  onError={() => {
+                    if (imgSrc === '/Sovannphomi.png') {
+                      setImgSrc('/sovannaphumi.png');
+                    } else {
+                      setImageFailed(true);
+                    }
+                  }}
+                />
+              )}
+            </div>
+            <div className="font-black text-xs text-slate-900 leading-tight tracking-wide font-sans truncate max-w-full">{logoText1}</div>
+            {headerLayout !== '5-1-6' && (
+              <div className="text-[10px] font-medium text-slate-800 leading-tight mt-0.5 truncate max-w-full">{logoText2}</div>
+            )}
+          </div>
+          
+          {/* Right Column */}
+          <div className={`${layoutWidths.right.className} flex items-start justify-between gap-1.5 mt-[6px] pl-4`} style={{ ...headerInlineStyle, ...layoutWidths.right.style }}>
+            <div className="flex-1 flex flex-col justify-start text-left font-black gap-2 min-w-0">
+              <div className="flex justify-between items-center w-full">
+                <span>ប្រឡង៖ {renderDotField(examName, '..................')}</span>
+                <span>ថ្នាក់ទី៖ {renderDotField(gradeNumber, '...............')}</span>
+              </div>
+              <div className="truncate">សម័យប្រឡង៖ {renderDotField(examSession, '......../......../........')}</div>
+              <div className="truncate">រយៈពេល៖ {renderDotField(durationTime, '................ នាទី')} <span className="font-medium">({totalScore || '...... ពិន្ទុ'})</span></div>
+            </div>
+
+            {/* Score Oval Place */}
+            <div className="border-double border-[3px] border-black rounded-[50%/50%] w-[88px] h-[66px] flex flex-col items-center justify-center shrink-0 self-end mt-4 p-1 translate-y-3" title="រង្វង់សម្រាប់ដាក់ពិន្ទុ">
+              <div className="border-t border-dashed border-black w-[58px] my-auto"></div>
+            </div>
+          </div>
+        </div>
+        
+        {/* Horizontal separator */}
+        <div className="border-b-4 border-double border-black my-4 w-full"></div>
+        
+        {/* Document Body */}
+        <div className="text-center mb-6" style={bodyInlineStyle}>
+          <div className="font-black text-[13px] tracking-wider uppercase text-slate-900 font-sans">
+            សន្លឹកកិច្ចការវិញ្ញាសា
+          </div>
+          <div className="text-[11.5px] font-black text-slate-800 mt-1.5 font-sans">
+            សេចក្តីណែនាំ៖ ចូរគូសរង្វង់លើចម្លើយត្រឹមត្រូវតែមួយគត់
+          </div>
+        </div>
+        
+        <div className="space-y-6 text-black mt-4 font-sans" style={bodyInlineStyle}>
+          {(() => {
+            const questions = activeSubject?.questions || [];
+            const grouped = {
+              choice: [] as ExamQuestion[],
+              matching: [] as ExamQuestion[],
+              fill_blank: [] as ExamQuestion[],
+              theory: [] as ExamQuestion[],
+              exercise: [] as ExamQuestion[],
+            };
+
+            questions.forEach(q => {
+              const cat = q.category || 'choice';
+              if (grouped[cat]) {
+                grouped[cat].push(q);
+              } else {
+                grouped['choice'].push(q);
+              }
+            });
+
+            const showSections = 
+              grouped.matching.length > 0 || 
+              grouped.fill_blank.length > 0 || 
+              grouped.theory.length > 0 || 
+              grouped.exercise.length > 0;
+
+            let globalIdx = 0;
+
+            return (
+              <div className="space-y-6 text-black">
+                {/* 1. Choice Section */}
+                {grouped.choice.length > 0 && (
+                  <div className="space-y-2">
+                    {showSections && (
+                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
+                        ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {grouped.choice.map((q) => {
+                        globalIdx++;
+                        return (
+                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left">
+                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
+                              <span><span>សំណួរទី {globalIdx}៖ {q.text}</span></span>
+                              <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                            </div>
+                            <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left font-sans text-xs ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
+                              {q.options.map((opt, oIdx) => {
+                                const isCorrectIdx = oIdx === q.correctIndex;
+                                return (
+                                  <div 
+                                    key={oIdx} 
+                                    className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
+                                      highlightKey && isCorrectIdx 
+                                        ? 'bg-slate-100 text-black font-bold border border-slate-300' 
+                                        : 'text-black'
+                                    }`}
+                                  >
+                                    <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
+                                    <span>{opt}</span>
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 2. Matching Section */}
+                {grouped.matching.length > 0 && (
+                  <div className="space-y-2 text-left">
+                    {showSections && (
+                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
+                        ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {grouped.matching.map((q) => {
+                        globalIdx++;
+                        return (
+                          <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
+                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
+                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                            </div>
+                            
+                            {/* Classic table matching layout */}
+                            <div className="my-3 max-w-2xl mx-auto overflow-x-auto avoid-break text-black">
+                              <table className="w-full border-collapse border-2 border-black text-xs text-black font-sans">
+                                <thead>
+                                  <tr className="bg-slate-100 border-b-2 border-black font-bold">
+                                    <th className="border-r border-black font-black text-center py-2 px-3 w-[40%]">
+                                      A
+                                    </th>
+                                    <th className="border-r border-black font-black text-center py-2 px-3 w-[42%]">
+                                      B
+                                    </th>
+                                    <th className="font-black text-center py-2 px-3 w-[18%]">
+                                      ចម្លើយ
+                                    </th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(() => {
+                                    const lhs = [q.options[0], q.options[1]].filter(Boolean);
+                                    const rhs = q.options.slice(2).filter(Boolean);
+                                    const maxRows = Math.max(lhs.length, rhs.length);
+                                    const rows = [];
+                                    for (let i = 0; i < maxRows; i++) {
+                                      rows.push({
+                                        left: lhs[i] || '',
+                                        right: rhs[i] || '',
+                                        ansNum: i < lhs.length ? i + 1 : null
+                                      });
+                                    }
+                                    return rows.map((row, rIdx) => {
+                                      const leftLetter = rIdx === 0 ? '១' : rIdx === 1 ? '២' : rIdx === 2 ? '៣' : String(rIdx + 1);
+                                      const rightLetter = rIdx === 0 ? 'ក' : rIdx === 1 ? 'ខ' : rIdx === 2 ? 'គ' : rIdx === 3 ? 'ឃ' : String.fromCharCode(97 + rIdx);
+                                      
+                                      return (
+                                        <tr key={rIdx} className="border-b border-black last:border-b-0 min-h-[38px] min-w-0">
+                                          {/* Column A */}
+                                          <td className="border-r border-black py-2 px-3 text-left font-bold align-middle">
+                                            {row.left ? (
+                                              <div className="flex items-start gap-1">
+                                                <span className="font-black shrink-0">{leftLetter}.</span>
+                                                <span>{stripPrefix(row.left)}</span>
+                                              </div>
+                                            ) : null}
+                                          </td>
+                                          {/* Column B */}
+                                          <td className="border-r border-black py-2 px-3 text-left font-bold align-middle">
+                                            {row.right ? (
+                                              <div className="flex items-start gap-1">
+                                                <span className="font-black shrink-0">{rightLetter}.</span>
+                                                <span>{stripPrefix(row.right)}</span>
+                                              </div>
+                                            ) : null}
+                                          </td>
+                                          {/* Answer Space */}
+                                          <td className="py-2 px-3 text-center font-bold align-middle">
+                                            {row.ansNum !== null ? (
+                                              <div className="flex items-center justify-center gap-1.5 font-bold">
+                                                <span>{leftLetter} ➔</span>
+                                                <span className="text-slate-500 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                              </div>
+                                            ) : null}
+                                          </td>
+                                        </tr>
+                                      );
+                                    });
+                                  })()}
+                                </tbody>
+                              </table>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 3. Fill Blank Section */}
+                {grouped.fill_blank.length > 0 && (
+                  <div className="space-y-2 text-left font-sans">
+                    {showSections && (
+                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
+                        ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+                      </div>
+                    )}
+                    <div className="space-y-4">
+                      {grouped.fill_blank.map((q) => {
+                        globalIdx++;
+                        return (
+                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
+                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
+                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 4. Theory Section */}
+                {grouped.theory.length > 0 && (
+                  <div className="space-y-4 text-left font-sans">
+                    {showSections && (
+                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
+                        ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
+                      </div>
+                    )}
+                    <div className="space-y-5 animate-none">
+                      {grouped.theory.map((q) => {
+                        globalIdx++;
+                        return (
+                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
+                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                            </div>
+                            {/* Answer lines on paper */}
+                            <div className="space-y-2 pt-2 max-w-2xl font-sans">
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* 5. Exercise Section */}
+                {grouped.exercise.length > 0 && (
+                  <div className="space-y-4 text-left font-sans">
+                    {showSections && (
+                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
+                        ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
+                      </div>
+                    )}
+                    <div className="space-y-6">
+                      {grouped.exercise.map((q) => {
+                        globalIdx++;
+                        return (
+                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
+                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                            </div>
+                            {/* Workspace solving lines on paper */}
+                            <div className="space-y-2 pt-2 max-w-2xl font-sans">
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      </div>
 
     </div>
   );
