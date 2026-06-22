@@ -798,6 +798,76 @@ Output the response in JSON format.`;
     return String.fromCharCode(65 + index);
   };
 
+  const getMatchingAnswerForIndex = (q: any, index: number) => {
+    if (!q.explanation) {
+      if (q.correctIndex === 3) {
+        return index === 1 ? 'ខ' : 'ក';
+      } else {
+        return index === 1 ? 'ក' : 'ខ';
+      }
+    }
+    
+    const explanation = q.explanation.toLowerCase();
+    const numKh = index === 1 ? '១' : index === 2 ? '២' : index === 3 ? '៣' : String(index);
+    const numEn = String(index);
+    
+    const khmerLetters = ['ក', 'ខ', 'គ', 'ឃ'];
+    const englishLetters = ['a', 'b', 'c', 'd'];
+    
+    const cleanExp = explanation.replace(/\s+/g, '');
+    
+    for (let lIdx = 0; lIdx < khmerLetters.length; lIdx++) {
+      const khL = khmerLetters[lIdx];
+      const enL = englishLetters[lIdx];
+      
+      const khRegex = new RegExp(`${numKh}[➔\\-=>:]+${khL}`);
+      const khRegexReverse = new RegExp(`${khL}[➔\\-=>:]+${numKh}`);
+      const enRegex = new RegExp(`${numEn}[➔\\-=>:]+${enL}`);
+      
+      if (khRegex.test(cleanExp) || khRegexReverse.test(cleanExp) || enRegex.test(cleanExp)) {
+        return khL;
+      }
+    }
+    
+    const leftText = (q.options[index - 1] || '').trim();
+    if (leftText) {
+      let bestRhsIdx = -1;
+      let minDistance = Infinity;
+      
+      const leftWords = leftText.replace(/^[0-9១២៣៤៥៦៧៨៩០.\s]+/, '').substring(0, 10).toLowerCase();
+      
+      if (leftWords.length >= 3) {
+        const leftPos = explanation.indexOf(leftWords);
+        if (leftPos !== -1) {
+          for (let rIdx = 0; rIdx < 2; rIdx++) {
+            const rightText = (q.options[2 + rIdx] || '').trim();
+            const rightWords = rightText.replace(/^[ក-ឃa-d.\s]+/, '').substring(0, 10).toLowerCase();
+            if (rightWords.length >= 3) {
+              const rightPos = explanation.indexOf(rightWords);
+              if (rightPos !== -1) {
+                const distance = Math.abs(leftPos - rightPos);
+                if (distance < minDistance) {
+                  minDistance = distance;
+                  bestRhsIdx = rIdx;
+                }
+              }
+            }
+          }
+        }
+      }
+      
+      if (bestRhsIdx !== -1) {
+        return khmerLetters[bestRhsIdx];
+      }
+    }
+    
+    if (q.correctIndex === 3) {
+      return index === 1 ? 'ខ' : 'ក';
+    } else {
+      return index === 1 ? 'ក' : 'ខ';
+    }
+  };
+
   const triggerPrint = () => {
     window.print();
   };
@@ -912,7 +982,9 @@ Output the response in JSON format.`;
 
           const tdLeft = leftText ? `<div style="display: flex; gap: 4px;"><b>${leftLetter}.</b> <span>${stripPrefix(leftText)}</span></div>` : "";
           const tdRight = rightText ? `<div style="display: flex; gap: 4px;"><b>${rightLetter}.</b> <span>${stripPrefix(rightText)}</span></div>` : "";
-          const tdAns = i < lhs.length ? `<b>${leftLetter} ➔ </b> .........` : "";
+          
+          const matchingAns = highlightKey ? `<span style="color: #059669; font-weight: bold; background-color: #ecfdf5; padding: 1px 6px; border: 1px solid #a7f3d0; border-radius: 4px; font-family: sans-serif;">${getMatchingAnswerForIndex(card.question, i + 1)}</span>` : ".........";
+          const tdAns = i < lhs.length ? `<b>${leftLetter} ➔ </b> ${matchingAns}` : "";
 
           rowHtml += `
             <tr style="border-bottom: 1px solid #000;">
@@ -952,9 +1024,21 @@ Output the response in JSON format.`;
       `;
       grouped.fill_blank.forEach((card) => {
         globalIdx++;
+        
+        let fillBlankText = card.question.text;
+        const ans = (card.question.options && card.question.options[card.question.correctIndex]) ? card.question.options[card.question.correctIndex] : '';
+        if (ans && highlightKey) {
+          const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
+          if (blankRegex.test(fillBlankText)) {
+            fillBlankText = fillBlankText.replace(blankRegex, `<span style="color: #059669; font-weight: 900; background-color: #ecfdf5; padding: 2px 6px; border: 1px solid #a7f3d0; border-radius: 4px; font-family: sans-serif; display: inline-block; margin: 0 4px;">${ans}</span>`);
+          } else {
+            fillBlankText = `${fillBlankText} ➔ <span style="color: #059669; font-weight: 900; background-color: #ecfdf5; padding: 2px 6px; border: 1px solid #a7f3d0; border-radius: 4px; font-family: sans-serif; display: inline-block; margin-left: 6px;">${ans}</span>`;
+          }
+        }
+
         questionsHtml += `
           <div class="question-block">
-            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(fillBlankText)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
           </div>
         `;
       });
@@ -969,16 +1053,37 @@ Output the response in JSON format.`;
       `;
       grouped.theory.forEach((card) => {
         globalIdx++;
+        
+        let theoryAnsHtml = '';
+        if (highlightKey) {
+          const modelAns = card.question.options && card.question.options[card.question.correctIndex] ? card.question.options[card.question.correctIndex] : card.question.explanation || "មិនទាន់មានចម្លើយគំរូ";
+          theoryAnsHtml = `
+            <div style="margin-top: 10px; padding: 12px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; text-align: left; font-family: inherit;">
+              <div style="font-size: 8.5pt; font-weight: bold; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">● ចម្លើយគំរូ (Model Answer)</div>
+              <div style="font-size: 10pt; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">${modelAns}</div>
+              ${card.question.explanation && card.question.options && card.question.options[card.question.correctIndex] ? `
+                <div style="font-size: 8.5pt; color: #64748b; margin-top: 8px; border-top: 1px dashed #d1fae5; padding-top: 6px; font-style: italic;">
+                  💡 ការពន្យល់បន្ថែម៖ ${card.question.explanation}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        } else {
+          theoryAnsHtml = `
+            <div style="margin-top: 8px; font-size: 10pt; color: #999; line-height: 2;">
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+            </div>
+          `;
+        }
+
         questionsHtml += `
           <div class="question-block">
             <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
-            <div style="margin-top: 8px; font-size: 10pt; color: #999;">
-              <div>............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-            </div>
+            ${theoryAnsHtml}
           </div>
         `;
       });
@@ -993,19 +1098,40 @@ Output the response in JSON format.`;
       `;
       grouped.exercise.forEach((card) => {
         globalIdx++;
+        
+        let exerciseAnsHtml = '';
+        if (highlightKey) {
+          const modelSol = card.question.options && card.question.options[card.question.correctIndex] ? card.question.options[card.question.correctIndex] : card.question.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ";
+          exerciseAnsHtml = `
+            <div style="margin-top: 10px; padding: 12px; background-color: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; text-align: left; font-family: inherit;">
+              <div style="font-size: 8.5pt; font-weight: bold; color: #065f46; margin-bottom: 6px; text-transform: uppercase;">● ដំណោះស្រាយគំរូ (Model Solution)</div>
+              <div style="font-size: 10pt; color: #1e293b; line-height: 1.6; white-space: pre-wrap;">${modelSol}</div>
+              ${card.question.explanation && card.question.options && card.question.options[card.question.correctIndex] ? `
+                <div style="font-size: 8.5pt; color: #64748b; margin-top: 8px; border-top: 1px dashed #d1fae5; padding-top: 6px; font-style: italic;">
+                  💡 គន្លឹះដោះស្រាយ៖ ${card.question.explanation}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        } else {
+          exerciseAnsHtml = `
+            <div style="margin-top: 8px; font-size: 10pt; color: #999; line-height: 2;">
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+              <div>............................................................................................................................................................................</div>
+            </div>
+          `;
+        }
+
         questionsHtml += `
           <div class="question-block">
             <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
-            <div style="margin-top: 8px; font-size: 10pt; color: #999;">
-              <div>............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-              <div style="margin-top: 8px;">............................................................................................................................................................................</div>
-            </div>
+            ${exerciseAnsHtml}
           </div>
         `;
       });
@@ -2117,10 +2243,23 @@ Output the response in JSON format.`;
                 alignment: AlignmentType.CENTER,
                 children: [
                   new TextRun({
-                    text: `${leftLetter} ➔ .........`,
+                    text: `${leftLetter} ➔ `,
                     font: selectedBodyFontObj.name,
                     size: (bodyFontSize - 0.5) * 2,
                     bold: true,
+                  }),
+                  highlightKey ? new TextRun({
+                    text: `${getMatchingAnswerForIndex(card.question, i + 1)}`,
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 0.5) * 2,
+                    bold: true,
+                    color: "059669"
+                  }) : new TextRun({
+                    text: ".........",
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 0.5) * 2,
+                    bold: true,
+                    color: "888888"
                   })
                 ]
               })
@@ -2186,7 +2325,19 @@ Output the response in JSON format.`;
                 size: bodyFontSize * 2,
                 bold: true,
               }),
-              ...convertHtmlToTextRuns(card.question.text, selectedBodyFontObj.name, bodyFontSize),
+              ...(() => {
+                let fillBlankText = card.question.text;
+                const ans = (card.question.options && card.question.options[card.question.correctIndex]) ? card.question.options[card.question.correctIndex] : '';
+                if (ans && highlightKey) {
+                  const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
+                  if (blankRegex.test(fillBlankText)) {
+                    fillBlankText = fillBlankText.replace(blankRegex, ` [${ans}] `);
+                  } else {
+                    fillBlankText = `${fillBlankText} ➔ [${ans}]`;
+                  }
+                }
+                return convertHtmlToTextRuns(fillBlankText, selectedBodyFontObj.name, bodyFontSize);
+              })(),
               new TextRun({
                 text: ` (${card.question.points || 2} ពិន្ទុ)`,
                 font: selectedBodyFontObj.name,
@@ -2226,20 +2377,60 @@ Output the response in JSON format.`;
           })
         );
 
-        for (let l = 0; l < 5; l++) {
+        if (highlightKey) {
+          const modelAns = card.question.options && card.question.options[card.question.correctIndex] ? card.question.options[card.question.correctIndex] : card.question.explanation || "មិនទាន់មានចម្លើយគំរូ";
           childrenElements.push(
             new Paragraph({
               spacing: { before: 120, after: 120 },
               children: [
                 new TextRun({
-                  text: "............................................................................................................................................................................",
+                  text: "ចម្លើយគំរូ (Model Answer)៖ ",
                   font: selectedBodyFontObj.name,
-                  size: (bodyFontSize - 1) * 2,
-                  color: "888888",
+                  size: bodyFontSize * 2,
+                  bold: true,
+                  color: "059669",
+                }),
+                new TextRun({
+                  text: modelAns,
+                  font: selectedBodyFontObj.name,
+                  size: bodyFontSize * 2,
+                  bold: true,
                 })
               ]
             })
           );
+          if (card.question.explanation && card.question.options && card.question.options[card.question.correctIndex]) {
+            childrenElements.push(
+              new Paragraph({
+                spacing: { before: 60, after: 120 },
+                children: [
+                  new TextRun({
+                    text: `💡 ការពន្យល់បន្ថែម៖ ${card.question.explanation}`,
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 1) * 2,
+                    italic: true,
+                    color: "555555"
+                  })
+                ]
+              })
+            );
+          }
+        } else {
+          for (let l = 0; l < 5; l++) {
+            childrenElements.push(
+              new Paragraph({
+                spacing: { before: 120, after: 120 },
+                children: [
+                  new TextRun({
+                    text: "............................................................................................................................................................................",
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 1) * 2,
+                    color: "888888",
+                  })
+                ]
+              })
+            );
+          }
         }
       });
     }
@@ -2271,20 +2462,60 @@ Output the response in JSON format.`;
           })
         );
 
-        for (let l = 0; l < 8; l++) {
+        if (highlightKey) {
+          const modelSol = card.question.options && card.question.options[card.question.correctIndex] ? card.question.options[card.question.correctIndex] : card.question.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ";
           childrenElements.push(
             new Paragraph({
               spacing: { before: 120, after: 120 },
               children: [
                 new TextRun({
-                  text: "............................................................................................................................................................................",
+                  text: "ដំណោះស្រាយគំរូ (Model Solution)៖ ",
                   font: selectedBodyFontObj.name,
-                  size: (bodyFontSize - 1) * 2,
-                  color: "888888",
+                  size: bodyFontSize * 2,
+                  bold: true,
+                  color: "059669",
+                }),
+                new TextRun({
+                  text: modelSol,
+                  font: selectedBodyFontObj.name,
+                  size: bodyFontSize * 2,
+                  bold: true,
                 })
               ]
             })
           );
+          if (card.question.explanation && card.question.options && card.question.options[card.question.correctIndex]) {
+            childrenElements.push(
+              new Paragraph({
+                spacing: { before: 60, after: 120 },
+                children: [
+                  new TextRun({
+                    text: `💡 គន្លឹះដោះស្រាយ៖ ${card.question.explanation}`,
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 1) * 2,
+                    italic: true,
+                    color: "555555"
+                  })
+                ]
+              })
+            );
+          }
+        } else {
+          for (let l = 0; l < 8; l++) {
+            childrenElements.push(
+              new Paragraph({
+                spacing: { before: 120, after: 120 },
+                children: [
+                  new TextRun({
+                    text: "............................................................................................................................................................................",
+                    font: selectedBodyFontObj.name,
+                    size: (bodyFontSize - 1) * 2,
+                    color: "888888",
+                  })
+                ]
+              })
+            );
+          }
         }
       });
     }
@@ -4846,7 +5077,13 @@ Output the response in JSON format.`;
                                             {row.ansNum !== null ? (
                                               <div className="flex items-center justify-center gap-1.5 font-bold">
                                                 <span>{leftLetter} ➔</span>
-                                                <span className="text-slate-500 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                {highlightKey ? (
+                                                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 font-sans text-xs">
+                                                    {getMatchingAnswerForIndex(q, row.ansNum)}
+                                                  </span>
+                                                ) : (
+                                                  <span className="text-slate-500 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                )}
                                               </div>
                                             ) : null}
                                           </td>
@@ -4863,7 +5100,7 @@ Output the response in JSON format.`;
                     </div>
                   </div>
                 )}
-
+ 
                 {/* 3. Fill Blank Section */}
                 {grouped.fill_blank.length > 0 && (
                   <div className="space-y-2 text-left font-sans">
@@ -4878,7 +5115,42 @@ Output the response in JSON format.`;
                         return (
                           <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
                             <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                              <span>
+                                សំណួរទី {globalIdx}៖{' '}
+                                {(() => {
+                                  const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                                  if (!ans || !highlightKey) {
+                                    return q.text;
+                                  }
+                                  const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
+                                  if (blankRegex.test(q.text)) {
+                                    const parts = q.text.split(blankRegex);
+                                    return (
+                                      <span>
+                                        {parts.map((part: string, idx: number) => (
+                                          <span key={idx}>
+                                            {part}
+                                            {idx < parts.length - 1 && (
+                                              <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
+                                                {ans}
+                                              </span>
+                                            )}
+                                          </span>
+                                        ))}
+                                      </span>
+                                    );
+                                  } else {
+                                    return (
+                                      <span>
+                                        {q.text} ➔{' '}
+                                        <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
+                                          {ans}
+                                        </span>
+                                      </span>
+                                    );
+                                  }
+                                })()}
+                              </span>
                               <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                             </div>
                           </div>
@@ -4887,7 +5159,7 @@ Output the response in JSON format.`;
                     </div>
                   </div>
                 )}
-
+ 
                 {/* 4. Theory Section */}
                 {grouped.theory.length > 0 && (
                   <div className="space-y-4 text-left font-sans">
@@ -4906,20 +5178,37 @@ Output the response in JSON format.`;
                               <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                             </div>
                             {/* Answer lines on paper */}
-                            <div className="space-y-2 pt-2 max-w-2xl font-sans">
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                            </div>
+                            {highlightKey ? (
+                              <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
+                                <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                  ចម្លើយគំរូ (Model Answer)
+                                </div>
+                                <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap">
+                                  {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានចម្លើយគំរូ"}
+                                </div>
+                                {q.explanation && q.options && q.options[q.correctIndex] && (
+                                  <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5">
+                                    💡 ការពន្យល់បន្ថែម៖ {q.explanation}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2 pt-2 max-w-2xl font-sans">
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
                     </div>
                   </div>
                 )}
-
+ 
                 {/* 5. Exercise Section */}
                 {grouped.exercise.length > 0 && (
                   <div className="space-y-4 text-left font-sans">
@@ -4938,16 +5227,33 @@ Output the response in JSON format.`;
                               <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                             </div>
                             {/* Workspace solving lines on paper */}
-                            <div className="space-y-2 pt-2 max-w-2xl font-sans">
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                            </div>
+                            {highlightKey ? (
+                              <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
+                                <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                  ដំណោះស្រាយគំរូ (Model Solution)
+                                </div>
+                                <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap">
+                                  {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ"}
+                                </div>
+                                {q.explanation && q.options && q.options[q.correctIndex] && (
+                                  <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5">
+                                    💡 គន្លឹះដោះស្រាយ៖ {q.explanation}
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <div className="space-y-2 pt-2 max-w-2xl font-sans">
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
+                              </div>
+                            )}
                           </div>
                         );
                       })}
