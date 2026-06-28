@@ -1773,7 +1773,14 @@ Output the response in JSON format.`;
     const borderNone = {
       style: BorderStyle.NONE,
       size: 0,
-      color: "auto"
+      color: "FFFFFF"
+    };
+
+    const cellBordersNone = {
+      top: borderNone,
+      bottom: borderNone,
+      left: borderNone,
+      right: borderNone,
     };
 
     const tableBordersNone = {
@@ -1896,17 +1903,17 @@ Output the response in JSON format.`;
           children: [
             new TableCell({
               width: { size: pctLeft, type: WidthType.PERCENTAGE },
-              borders: tableBordersNone,
+              borders: cellBordersNone,
               children: leftCellChildren,
             }),
             new TableCell({
               width: { size: pctCenter, type: WidthType.PERCENTAGE },
-              borders: tableBordersNone,
+              borders: cellBordersNone,
               children: centerCellChildren,
             }),
             new TableCell({
               width: { size: pctRight + pctScore, type: WidthType.PERCENTAGE },
-              borders: tableBordersNone,
+              borders: cellBordersNone,
               margins: { left: 200 },
               children: rightCellChildren,
             })
@@ -2057,7 +2064,7 @@ Output the response in JSON format.`;
             const cells = [
               new TableCell({
                 width: { size: 50, type: WidthType.PERCENTAGE },
-                borders: tableBordersNone,
+                borders: cellBordersNone,
                 children: [
                    new Paragraph({
                     spacing: { before: 40, after: 40 },
@@ -2080,7 +2087,7 @@ Output the response in JSON format.`;
               cells.push(
                 new TableCell({
                   width: { size: 50, type: WidthType.PERCENTAGE },
-                  borders: tableBordersNone,
+                  borders: cellBordersNone,
                   children: [
                     new Paragraph({
                       spacing: { before: 40, after: 40 },
