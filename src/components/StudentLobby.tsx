@@ -22,6 +22,7 @@ interface StudentLobbyProps {
   setActiveCardId: (id: string | null) => void;
   activeCardState: 'answering' | 'revealed';
   setActiveCardState: (state: 'answering' | 'revealed') => void;
+  activeSubjectName?: string;
 }
 
 export default function StudentLobby({
@@ -35,7 +36,8 @@ export default function StudentLobby({
   isDarkMode,
   setActiveCardId,
   activeCardState,
-  setActiveCardState
+  setActiveCardState,
+  activeSubjectName
 }: StudentLobbyProps) {
   const [copied, setCopied] = useState(false);
   const [showPodium, setShowPodium] = useState(false);
@@ -354,6 +356,24 @@ export default function StudentLobby({
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const getSubjectLeaderboardTitle = () => {
+    if (!activeSubjectName) return 'ស្វែងរកកំពូលម្ចាស់ជ័យលាភី';
+    const name = activeSubjectName.toLowerCase();
+    if (name.includes('រូប') || name.includes('physics')) {
+      return 'ស្វែងរកកំពូលម្ចាស់ជ័យលាភីរូបវិទ្យា';
+    }
+    if (name.includes('គណិត') || name.includes('math')) {
+      return 'ស្វែងរកកំពូលម្ចាស់ជ័យលាភីគណិត';
+    }
+    if (name.includes('គីមី') || name.includes('chem')) {
+      return 'ស្វែងរកកំពូលម្ចាស់ជ័យលាភីគីមីវិទ្យា';
+    }
+    if (name.includes('ខ្មែរ') || name.includes('khmer')) {
+      return 'ស្វែងរកកំពូលម្ចាស់ជ័យលាភីភាសាខ្មែរ';
+    }
+    return `ស្វែងរកកំពូលម្ចាស់ជ័យលាភី${activeSubjectName}`;
+  };
+
   // Sound Synthesizer function
   const playPodiumSound = (isChampion = false) => {
     try {
@@ -378,6 +398,91 @@ export default function StudentLobby({
           
           osc.start(now + idx * 0.15);
           osc.stop(now + idx * 0.15 + 1.5);
+        });
+
+        // Play Merry Christmas Jingle Bells Music!
+        const beat = 0.28; // Duration of 1 beat in seconds
+        const pitches: Record<string, number> = {
+          'C4': 261.63, 'D4': 293.66, 'E4': 329.63, 'F4': 349.23, 'G4': 392.00, 'A4': 440.00, 'B4': 493.88,
+          'C5': 523.25, 'D5': 587.33, 'E5': 659.25, 'F5': 698.46, 'G5': 783.99, 'A5': 880.00, 'B5': 987.77,
+          'C6': 1046.50, 'D6': 1174.66, 'E6': 1318.51, 'F6': 1396.91, 'G6': 1567.98, 'A6': 1760.00, 'B6': 1975.53,
+          'R': 0
+        };
+
+        const melody = [
+          ['E5', 1], ['E5', 1], ['E5', 2],
+          ['E5', 1], ['E5', 1], ['E5', 2],
+          ['E5', 1], ['G5', 1], ['C5', 1.5], ['D5', 0.5], ['E5', 4],
+          
+          ['F5', 1], ['F5', 1], ['F5', 1.5], ['F5', 0.5],
+          ['F5', 1], ['E5', 1], ['E5', 1], ['E5', 0.5], ['E5', 0.5],
+          ['E5', 1], ['D5', 1], ['D5', 1], ['E5', 1], ['D5', 2], ['G5', 2],
+          
+          ['E5', 1], ['E5', 1], ['E5', 2],
+          ['E5', 1], ['E5', 1], ['E5', 2],
+          ['E5', 1], ['G5', 1], ['C5', 1.5], ['D5', 0.5], ['E5', 4],
+          
+          ['F5', 1], ['F5', 1], ['F5', 1.5], ['F5', 0.5],
+          ['F5', 1], ['E5', 1], ['E5', 2],
+          ['G5', 1], ['G5', 1], ['F5', 1], ['D5', 1], ['C5', 4]
+        ];
+
+        let currentSec = now + 1.2;
+
+        melody.forEach(([note, duration]) => {
+          const freq = pitches[note as string];
+          const noteDuration = (duration as number) * beat;
+          
+          if (freq > 0) {
+            // 1. Melody Oscillator (Triangle for pleasant warmth)
+            const osc1 = ctx.createOscillator();
+            const gain1 = ctx.createGain();
+            osc1.connect(gain1);
+            gain1.connect(ctx.destination);
+            osc1.type = 'triangle';
+            osc1.frequency.setValueAtTime(freq, currentSec);
+            
+            // 2. Bell Sparkle Oscillator (Sine, 1 octave higher for crisp bell tone)
+            const osc2 = ctx.createOscillator();
+            const gain2 = ctx.createGain();
+            osc2.connect(gain2);
+            gain2.connect(ctx.destination);
+            osc2.type = 'sine';
+            osc2.frequency.setValueAtTime(freq * 2, currentSec);
+
+            // 3. High Chime Strike (Sine, 3 times frequency for sharp metal resonance)
+            const osc3 = ctx.createOscillator();
+            const gain3 = ctx.createGain();
+            osc3.connect(gain3);
+            gain3.connect(ctx.destination);
+            osc3.type = 'sine';
+            osc3.frequency.setValueAtTime(freq * 3, currentSec);
+
+            // Volume envelopes (increased gain values for louder sound)
+            gain1.gain.setValueAtTime(0, currentSec);
+            gain1.gain.linearRampToValueAtTime(0.24, currentSec + 0.02);
+            gain1.gain.exponentialRampToValueAtTime(0.0001, currentSec + noteDuration - 0.02);
+
+            gain2.gain.setValueAtTime(0, currentSec);
+            gain2.gain.linearRampToValueAtTime(0.14, currentSec + 0.015);
+            gain2.gain.exponentialRampToValueAtTime(0.0001, currentSec + noteDuration - 0.02);
+
+            // High chime strike decays very quickly to simulate a real metallic bell hit
+            gain3.gain.setValueAtTime(0, currentSec);
+            gain3.gain.linearRampToValueAtTime(0.12, currentSec + 0.01);
+            gain3.gain.exponentialRampToValueAtTime(0.0001, currentSec + 0.12);
+
+            osc1.start(currentSec);
+            osc1.stop(currentSec + noteDuration);
+
+            osc2.start(currentSec);
+            osc2.stop(currentSec + noteDuration);
+
+            osc3.start(currentSec);
+            osc3.stop(currentSec + noteDuration);
+          }
+          
+          currentSec += noteDuration;
         });
       } else {
         // Individual rising sound
@@ -779,7 +884,7 @@ export default function StudentLobby({
               : 'bg-white border-slate-200 text-slate-650 text-slate-600 shadow-xs'
           }`}>
             <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-            <span>ម៉ាស៊ីេនមេ Live (Online Server)</span>
+            <span>Online Play</span>
           </div>
         </div>
       </div>
@@ -1159,7 +1264,7 @@ export default function StudentLobby({
             <div className="text-center space-y-2 shrink-0">
               <span className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded-full text-xs font-black uppercase tracking-widest animate-pulse">
                 <Crown className="w-3.5 h-3.5" />
-                ស្វែងរកកំពូលម្ចាស់ជ័យលាភីរូបវិទ្យា/គណិត
+                {getSubjectLeaderboardTitle()}
               </span>
               <h2 className="text-2xl sm:text-4xl font-black text-white tracking-tight leading-none drop-shadow-md">
                 ជណ្តើរពានរង្វាន់ - ម្ចាស់ជ័យលាភីទាំង៥នាក់

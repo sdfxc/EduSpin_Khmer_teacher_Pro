@@ -798,6 +798,14 @@ Output the response in JSON format.`;
     return String.fromCharCode(65 + index);
   };
 
+  const toKhmerNum = (num: number | string) => {
+    const khmerDigits = ['០', '១', '២', '៣', '៤', '៥', '៦', '៧', '៨', '៩'];
+    return String(num).split('').map(char => {
+      const digit = parseInt(char, 10);
+      return isNaN(digit) ? char : khmerDigits[digit];
+    }).join('');
+  };
+
   const getMatchingAnswerForIndex = (q: any, index: number) => {
     if (!q.explanation) {
       if (q.correctIndex === 3) {
@@ -1017,12 +1025,32 @@ Output the response in JSON format.`;
 
     // 3. Fill Blank Section
     if (grouped.fill_blank.length > 0) {
+      const totalPoints = grouped.fill_blank.reduce((acc, card) => acc + (card.question.points || 2), 0);
+      const allOptions = Array.from(new Set(
+        grouped.fill_blank.flatMap(card => card.question.options || [])
+      )).filter(Boolean);
+      if (allOptions.length === 0) {
+        grouped.fill_blank.forEach(card => {
+          const ans = (card.question.options && card.question.options[card.question.correctIndex]) ? card.question.options[card.question.correctIndex] : '';
+          if (ans) allOptions.push(ans);
+        });
+      }
+
       questionsHtml += `
         <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-          ផ្នែកទី ៣៖ សំណួរ បំពេញចន្លោះ ចំនួន ${grouped.fill_blank.length}
+          ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ (${toKhmerNum(totalPoints)} ពិន្ទុ)
         </div>
+        <div style="font-size: ${bodyFontSize}pt; font-weight: bold; margin-bottom: 8px; text-align: left; color: #1e293b;">
+          ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖
+        </div>
+        ${allOptions.length > 0 ? `
+          <div style="margin: 10px 0; padding: 8px 16px; border: 1px dashed #cbd5e1; background-color: #f8fafc; border-radius: 6px; text-align: center; font-weight: bold; font-size: ${bodyFontSize}pt; color: #1e293b;">
+            ( ${allOptions.join(', ')} )
+          </div>
+        ` : ''}
       `;
-      grouped.fill_blank.forEach((card) => {
+
+      grouped.fill_blank.forEach((card, qIdx) => {
         globalIdx++;
         
         let fillBlankText = card.question.text;
@@ -1037,8 +1065,11 @@ Output the response in JSON format.`;
         }
 
         questionsHtml += `
-          <div class="question-block">
-            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(fillBlankText)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+          <div class="question-block" style="margin-bottom: 12px;">
+            <div class="question-text" style="font-size: ${bodyFontSize}pt; line-height: 1.6; text-align: left;">
+              <span style="font-weight: bold;">${toKhmerNum(qIdx + 1)}. </span>${renderFormulaToHtml(fillBlankText)} 
+              <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span>
+            </div>
           </div>
         `;
       });
@@ -2311,8 +2342,53 @@ Output the response in JSON format.`;
 
     // 3. Fill Blank Section
     if (grouped.fill_blank.length > 0) {
-      childrenElements.push(createSectionHeader(`ផ្នែកទី ៣៖ សំណួរ បំពេញចន្លោះ ចំនួន ${grouped.fill_blank.length}`));
-      grouped.fill_blank.forEach((card) => {
+      const totalPoints = grouped.fill_blank.reduce((acc, card) => acc + (card.question.points || 2), 0);
+      const allOptions = Array.from(new Set(
+        grouped.fill_blank.flatMap(card => card.question.options || [])
+      )).filter(Boolean);
+      if (allOptions.length === 0) {
+        grouped.fill_blank.forEach(card => {
+          const ans = (card.question.options && card.question.options[card.question.correctIndex]) ? card.question.options[card.question.correctIndex] : '';
+          if (ans) allOptions.push(ans);
+        });
+      }
+
+      childrenElements.push(createSectionHeader(`ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ (${toKhmerNum(totalPoints)} ពិន្ទុ)`));
+      
+      // Instruction
+      childrenElements.push(
+        new Paragraph({
+          spacing: { before: 120, after: 60 },
+          children: [
+            new TextRun({
+              text: "ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖",
+              font: selectedBodyFontObj.name,
+              size: bodyFontSize * 2,
+              bold: true,
+            })
+          ]
+        })
+      );
+
+      // Options
+      if (allOptions.length > 0) {
+        childrenElements.push(
+          new Paragraph({
+            spacing: { before: 60, after: 120 },
+            alignment: AlignmentType.CENTER,
+            children: [
+              new TextRun({
+                text: `( ${allOptions.join(', ')} )`,
+                font: selectedBodyFontObj.name,
+                size: bodyFontSize * 2,
+                bold: true,
+              })
+            ]
+          })
+        );
+      }
+
+      grouped.fill_blank.forEach((card, qIdx) => {
         globalIdx++;
         childrenElements.push(
           new Paragraph({
@@ -2320,7 +2396,7 @@ Output the response in JSON format.`;
             keepNext: true,
             children: [
               new TextRun({
-                text: `សំណួរទី ${globalIdx}៖ `,
+                text: `${toKhmerNum(qIdx + 1)}. `,
                 font: selectedBodyFontObj.name,
                 size: bodyFontSize * 2,
                 bold: true,
@@ -2408,7 +2484,7 @@ Output the response in JSON format.`;
                     text: `💡 ការពន្យល់បន្ថែម៖ ${card.question.explanation}`,
                     font: selectedBodyFontObj.name,
                     size: (bodyFontSize - 1) * 2,
-                    italic: true,
+                    italics: true,
                     color: "555555"
                   })
                 ]
@@ -2493,7 +2569,7 @@ Output the response in JSON format.`;
                     text: `💡 គន្លឹះដោះស្រាយ៖ ${card.question.explanation}`,
                     font: selectedBodyFontObj.name,
                     size: (bodyFontSize - 1) * 2,
-                    italic: true,
+                    italics: true,
                     color: "555555"
                   })
                 ]
@@ -3270,7 +3346,7 @@ Output the response in JSON format.`;
                               <div className="space-y-2 text-left">
                                 {showSections && (
                                   <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                    ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+                                    ផ្នែកទី២៖ សំណួរផ្គូផ្គង ({toKhmerNum(grouped.matching.reduce((acc, cur) => acc + (cur.points || 4), 0))} ពិន្ទុ)
                                   </div>
                                 )}
                                 <div className="space-y-4">
@@ -3278,9 +3354,8 @@ Output the response in JSON format.`;
                                     globalIdx++;
                                     return (
                                       <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
-                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                        <div className="font-bold text-left text-slate-900 leading-relaxed font-sans text-xs">
+                                          <span>{q.text || 'ចូរផ្គូផ្គងល្បារ ឬនិមិត្តសញ្ញានៅជួរ (A) ទៅនឹងនិយមន័យ ឬការពិពណ៌នាដែលត្រូវគ្នានៅជួរ (B) ឱ្យបានត្រឹមត្រូវ៖'}</span>
                                         </div>
                                         
                                         {/* Classic table matching layout */}
@@ -3289,13 +3364,13 @@ Output the response in JSON format.`;
                                             <thead>
                                               <tr className="bg-slate-100/80 border-b-2 border-slate-950">
                                                 <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[40%] text-slate-950">
-                                                  A
+                                                  ជួរ (A)
                                                 </th>
                                                 <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[42%] text-slate-950">
-                                                  B
+                                                  ជួរ (B)
                                                 </th>
                                                 <th className="font-black text-center py-2 px-3 w-[18%] text-slate-950">
-                                                  ចម្លើយ
+                                                  ចម្លើយផ្គូផ្គង
                                                 </th>
                                               </tr>
                                             </thead>
@@ -3341,7 +3416,13 @@ Output the response in JSON format.`;
                                                         {row.ansNum !== null ? (
                                                           <div className="flex items-center justify-center gap-1.5 font-bold">
                                                             <span>{leftLetter} ➔</span>
-                                                            <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                            {highlightKey ? (
+                                                              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800/60 font-sans text-xs">
+                                                                {getMatchingAnswerForIndex(q, row.ansNum)}
+                                                              </span>
+                                                            ) : (
+                                                              <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                            )}
                                                           </div>
                                                         ) : null}
                                                       </td>
@@ -3360,54 +3441,118 @@ Output the response in JSON format.`;
                             )}
 
                             {/* 3. Fill Blank Section */}
-                            {grouped.fill_blank.length > 0 && (
-                              <div className="space-y-2 text-left">
-                                {showSections && (
-                                  <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                    ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+                            {grouped.fill_blank.length > 0 && (() => {
+                              const totalPoints = grouped.fill_blank.reduce((acc, cur) => acc + (cur.points || 2), 0);
+                              const allOptions = Array.from(new Set(
+                                grouped.fill_blank.flatMap(q => q.options || [])
+                              )).filter(Boolean);
+                              if (allOptions.length === 0) {
+                                grouped.fill_blank.forEach(q => {
+                                  const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                                  if (ans) allOptions.push(ans);
+                                });
+                              }
+
+                              return (
+                                <div className="space-y-2 text-left font-sans">
+                                  {showSections && (
+                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                      ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ ({toKhmerNum(totalPoints)} ពិន្ទុ)
+                                    </div>
+                                  )}
+                                  <div className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed mt-2 font-sans">
+                                    ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖
                                   </div>
-                                )}
-                                <div className="space-y-4">
-                                  {grouped.fill_blank.map((q) => {
-                                    globalIdx++;
-                                    return (
-                                      <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
-                                        <div className="font-extrabold text-left text-slate-950 leading-relaxed">
-                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                          <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                  {allOptions.length > 0 && (
+                                    <div className="my-3 p-3 px-5 border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl text-center font-bold text-slate-800 dark:text-slate-200 tracking-wide text-xs font-sans max-w-2xl mx-auto">
+                                      ( {allOptions.join(', ')} )
+                                    </div>
+                                  )}
+                                  <div className="space-y-4">
+                                    {grouped.fill_blank.map((q, qIdx) => {
+                                      globalIdx++;
+                                      return (
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                            <span>
+                                              {toKhmerNum(qIdx + 1)}.{' '}
+                                              {(() => {
+                                                const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                                                if (!ans || !highlightKey) {
+                                                  return q.text;
+                                                }
+                                                const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
+                                                if (blankRegex.test(q.text)) {
+                                                  const parts = q.text.split(blankRegex);
+                                                  return (
+                                                    <span>
+                                                      {parts.map((part: string, idx: number) => (
+                                                        <span key={idx}>
+                                                          {part}
+                                                          {idx < parts.length - 1 && (
+                                                            <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-250 dark:border-emerald-800/60 inline-block font-sans">
+                                                              {ans}
+                                                            </span>
+                                                          )}
+                                                        </span>
+                                                      ))}
+                                                    </span>
+                                                  );
+                                                } else {
+                                                  return (
+                                                    <span>
+                                                      {q.text} ➔{' '}
+                                                      <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-250 dark:border-emerald-800/60 inline-block font-sans">
+                                                        {ans}
+                                                      </span>
+                                                    </span>
+                                                  );
+                                                }
+                                              })()}
+                                            </span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                          </div>
                                         </div>
-                                      </div>
-                                    );
-                                  })}
+                                      );
+                                    })}
+                                  </div>
                                 </div>
-                              </div>
-                            )}
+                              );
+                            })()}
 
                             {/* 4. Theory Section */}
                             {grouped.theory.length > 0 && (
                               <div className="space-y-4 text-left">
                                 {showSections && (
                                   <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                    ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
+                                    ផ្នែកទី៤៖ សំណួរទូទៅ ទ្រឹស្ដី និងការរស់នៅ ({toKhmerNum(grouped.theory.reduce((acc, cur) => acc + (cur.points || 3), 0))} ពិន្ទុ)
                                   </div>
                                 )}
                                 <div className="space-y-5">
-                                  {grouped.theory.map((q) => {
+                                  {grouped.theory.map((q, qIdx) => {
                                     globalIdx++;
                                     return (
                                       <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
                                         <div className="font-extrabold text-left text-slate-950 leading-relaxed">
-                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span>{toKhmerNum(qIdx + 1)}. {q.text}</span>
                                           <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                                         </div>
-                                        {/* Subtle answer lines on paper */}
-                                        <div className="space-y-2 pt-2 max-w-2xl">
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                        </div>
+                                        {highlightKey ? (
+                                          <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
+                                            <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                              ចម្លើយគំរូ (Model Answer)
+                                            </div>
+                                            <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap font-sans">
+                                              {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានចម្លើយគំរូ"}
+                                            </div>
+                                            {q.explanation && q.options && q.options[q.correctIndex] && (
+                                              <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5">
+                                                💡 ការពន្យល់បន្ថែម៖ {q.explanation}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : null}
                                       </div>
                                     );
                                   })}
@@ -3420,29 +3565,34 @@ Output the response in JSON format.`;
                               <div className="space-y-4 text-left">
                                 {showSections && (
                                   <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                    ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
+                                    ផ្នែកទី៥៖ លំហាត់ ({toKhmerNum(grouped.exercise.reduce((acc, cur) => acc + (cur.points || 5), 0))} ពិន្ទុ)
                                   </div>
                                 )}
                                 <div className="space-y-6">
-                                  {grouped.exercise.map((q) => {
+                                  {grouped.exercise.map((q, qIdx) => {
                                     globalIdx++;
                                     return (
                                       <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
                                         <div className="font-extrabold text-left text-slate-950 leading-relaxed">
-                                          <span>សំណួរទី {globalIdx}៖ {q.text}</span>
+                                          <span>លំហាត់ទី{toKhmerNum(qIdx + 1)}៖ {q.text}</span>
                                           <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                                         </div>
-                                        {/* Workspace solving lines on paper */}
-                                        <div className="space-y-2 pt-2 max-w-2xl">
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                        </div>
+                                        {highlightKey ? (
+                                          <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
+                                            <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                                              <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                              ដំណោះស្រាយគំរូ (Model Solution)
+                                            </div>
+                                            <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap font-sans">
+                                              {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ"}
+                                            </div>
+                                            {q.explanation && q.options && q.options[q.correctIndex] && (
+                                              <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5">
+                                                💡 គន្លឹះដោះស្រាយ៖ {q.explanation}
+                                              </div>
+                                            )}
+                                          </div>
+                                        ) : null}
                                       </div>
                                     );
                                   })}
@@ -4572,7 +4722,7 @@ Output the response in JSON format.`;
                                 <div className="space-y-2 text-left">
                                   {showSections && (
                                     <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+                                      ផ្នែកទី២៖ សំណួរផ្គូផ្គង ({toKhmerNum(grouped.matching.reduce((acc, cur) => acc + (cur.points || 4), 0))} ពិន្ទុ)
                                     </div>
                                   )}
                                   <div className="space-y-4">
@@ -4580,9 +4730,8 @@ Output the response in JSON format.`;
                                       globalIdx++;
                                       return (
                                         <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
-                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                          <div className="font-bold text-left text-slate-900 leading-relaxed font-sans text-xs">
+                                            <span>{q.text || 'ចូរផ្គូផ្គងល្បារ ឬនិមិត្តសញ្ញានៅជួរ (A) ទៅនឹងនិយមន័យ ឬការពិពណ៌នាដែលត្រូវគ្នានៅជួរ (B) ឱ្យបានត្រឹមត្រូវ៖'}</span>
                                           </div>
                                           
                                           {/* Classic table matching layout */}
@@ -4591,13 +4740,13 @@ Output the response in JSON format.`;
                                               <thead>
                                                 <tr className="bg-slate-100/80 border-b-2 border-slate-950 font-bold">
                                                   <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[40%] text-slate-950">
-                                                    A
+                                                    ជួរ (A)
                                                   </th>
                                                   <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[42%] text-slate-950">
-                                                    B
+                                                    ជួរ (B)
                                                   </th>
                                                   <th className="font-black text-center py-2 px-3 w-[18%] text-slate-950">
-                                                    ចម្លើយ
+                                                    ចម្លើយផ្គូផ្គង
                                                   </th>
                                                 </tr>
                                               </thead>
@@ -4643,7 +4792,13 @@ Output the response in JSON format.`;
                                                           {row.ansNum !== null ? (
                                                             <div className="flex items-center justify-center gap-1.5 font-bold">
                                                               <span>{leftLetter} ➔</span>
-                                                              <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                              {highlightKey ? (
+                                                                <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800/60 font-sans text-xs">
+                                                                  {getMatchingAnswerForIndex(q, row.ansNum)}
+                                                                </span>
+                                                              ) : (
+                                                                <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
+                                                              )}
                                                             </div>
                                                           ) : null}
                                                         </td>
@@ -4662,54 +4817,118 @@ Output the response in JSON format.`;
                               )}
 
                               {/* 3. Fill Blank Section */}
-                              {grouped.fill_blank.length > 0 && (
-                                <div className="space-y-2 text-left">
-                                  {showSections && (
-                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+                              {grouped.fill_blank.length > 0 && (() => {
+                                const totalPoints = grouped.fill_blank.reduce((acc, cur) => acc + (cur.points || 2), 0);
+                                const allOptions = Array.from(new Set(
+                                  grouped.fill_blank.flatMap(q => q.options || [])
+                                )).filter(Boolean);
+                                if (allOptions.length === 0) {
+                                  grouped.fill_blank.forEach(q => {
+                                    const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                                    if (ans) allOptions.push(ans);
+                                  });
+                                }
+
+                                return (
+                                  <div className="space-y-2 text-left font-sans">
+                                    {showSections && (
+                                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
+                                        ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ ({toKhmerNum(totalPoints)} ពិន្ទុ)
+                                      </div>
+                                    )}
+                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed mt-2 font-sans">
+                                      ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖
                                     </div>
-                                  )}
-                                  <div className="space-y-4">
-                                    {grouped.fill_blank.map((q) => {
-                                      globalIdx++;
-                                      return (
-                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
-                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                    {allOptions.length > 0 && (
+                                      <div className="my-3 p-3 px-5 border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl text-center font-bold text-slate-800 dark:text-slate-200 tracking-wide text-xs font-sans max-w-2xl mx-auto">
+                                        ( {allOptions.join(', ')} )
+                                      </div>
+                                    )}
+                                    <div className="space-y-4">
+                                      {grouped.fill_blank.map((q, qIdx) => {
+                                        globalIdx++;
+                                        return (
+                                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                            <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
+                                              <span>
+                                                {toKhmerNum(qIdx + 1)}.{' '}
+                                                {(() => {
+                                                  const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                                                  if (!ans || !highlightKey) {
+                                                    return q.text;
+                                                  }
+                                                  const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
+                                                  if (blankRegex.test(q.text)) {
+                                                    const parts = q.text.split(blankRegex);
+                                                    return (
+                                                      <span>
+                                                        {parts.map((part: string, idx: number) => (
+                                                          <span key={idx}>
+                                                            {part}
+                                                            {idx < parts.length - 1 && (
+                                                              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-250 dark:border-emerald-800/60 inline-block font-sans">
+                                                                {ans}
+                                                              </span>
+                                                            )}
+                                                          </span>
+                                                        ))}
+                                                      </span>
+                                                    );
+                                                  } else {
+                                                    return (
+                                                      <span>
+                                                        {q.text} ➔{' '}
+                                                        <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-250 dark:border-emerald-800/60 inline-block font-sans">
+                                                          {ans}
+                                                        </span>
+                                                      </span>
+                                                    );
+                                                  }
+                                                })()}
+                                              </span>
+                                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                            </div>
                                           </div>
-                                        </div>
-                                      );
-                                    })}
+                                        );
+                                      })}
+                                    </div>
                                   </div>
-                                </div>
-                              )}
+                                );
+                              })()}
 
                               {/* 4. Theory Section */}
                               {grouped.theory.length > 0 && (
                                 <div className="space-y-4 text-left">
                                   {showSections && (
                                     <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
+                                      ផ្នែកទី៤៖ សំណួរទូទៅ ទ្រឹស្ដី និងការរស់នៅ ({toKhmerNum(grouped.theory.reduce((acc, cur) => acc + (cur.points || 3), 0))} ពិន្ទុ)
                                     </div>
                                   )}
                                   <div className="space-y-5">
-                                    {grouped.theory.map((q) => {
+                                    {grouped.theory.map((q, qIdx) => {
                                       globalIdx++;
                                       return (
-                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
                                           <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                            <span>{toKhmerNum(qIdx + 1)}. {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                                           </div>
-                                          {/* Subtle answer lines on paper */}
-                                          <div className="space-y-2 pt-2 max-w-2xl font-sans">
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          </div>
+                                          {highlightKey ? (
+                                            <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
+                                              <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                ចម្លើយគំរូ (Model Answer)
+                                              </div>
+                                              <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap font-sans">
+                                                {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានចម្លើយគំរូ"}
+                                              </div>
+                                              {q.explanation && q.options && q.options[q.correctIndex] && (
+                                                <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5 font-sans">
+                                                  💡 ការពន្យល់បន្ថែម៖ {q.explanation}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : null}
                                         </div>
                                       );
                                     })}
@@ -4722,29 +4941,34 @@ Output the response in JSON format.`;
                                 <div className="space-y-4 text-left">
                                   {showSections && (
                                     <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
+                                      ផ្នែកទី៥៖ លំហាត់ ({toKhmerNum(grouped.exercise.reduce((acc, cur) => acc + (cur.points || 5), 0))} ពិន្ទុ)
                                     </div>
                                   )}
                                   <div className="space-y-6">
-                                    {grouped.exercise.map((q) => {
+                                    {grouped.exercise.map((q, qIdx) => {
                                       globalIdx++;
                                       return (
-                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
+                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
                                           <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
+                                            <span>លំហាត់ទី{toKhmerNum(qIdx + 1)}៖ {q.text}</span>
+                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
                                           </div>
-                                          {/* Workspace solving lines on paper */}
-                                          <div className="space-y-2 pt-2 max-w-2xl font-sans">
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                            <div className="border-b border-dotted border-slate-400 h-5.5 w-full"></div>
-                                          </div>
+                                          {highlightKey ? (
+                                            <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
+                                              <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-sans">
+                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
+                                                ដំណោះស្រាយគំរូ (Model Solution)
+                                              </div>
+                                              <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap font-sans">
+                                                {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ"}
+                                              </div>
+                                              {q.explanation && q.options && q.options[q.correctIndex] && (
+                                                <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5 font-sans">
+                                                  💡 គន្លឹះដោះស្រាយ៖ {q.explanation}
+                                                </div>
+                                              )}
+                                            </div>
+                                          ) : null}
                                         </div>
                                       );
                                     })}
@@ -4971,9 +5195,9 @@ Output the response in JSON format.`;
                       {grouped.choice.map((q) => {
                         globalIdx++;
                         return (
-                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left">
+                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left font-sans">
                             <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span><span>សំណួរទី {globalIdx}៖ {q.text}</span></span>
+                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
                               <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
                             </div>
                             <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left font-sans text-xs ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
@@ -5006,7 +5230,7 @@ Output the response in JSON format.`;
                   <div className="space-y-2 text-left">
                     {showSections && (
                       <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                        ផ្នែកទី ២៖ ភ្ជាប់ផ្គូផ្គង (Matching Column A & B)
+                        ផ្នែកទី២៖ សំណួរផ្គូផ្គង ({toKhmerNum(grouped.matching.reduce((acc, cur) => acc + (cur.points || 4), 0))} ពិន្ទុ)
                       </div>
                     )}
                     <div className="space-y-4">
@@ -5014,9 +5238,8 @@ Output the response in JSON format.`;
                         globalIdx++;
                         return (
                           <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
-                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                            <div className="font-bold text-left text-black leading-relaxed font-sans text-xs">
+                              <span>{q.text || 'ចូរផ្គូផ្គងល្បារ ឬនិមិត្តសញ្ញានៅជួរ (A) ទៅនឹងនិយមន័យ ឬការពិពណ៌នាដែលត្រូវគ្នានៅជួរ (B) ឱ្យបានត្រឹមត្រូវ៖'}</span>
                             </div>
                             
                             {/* Classic table matching layout */}
@@ -5025,13 +5248,13 @@ Output the response in JSON format.`;
                                 <thead>
                                   <tr className="bg-slate-100 border-b-2 border-black font-bold">
                                     <th className="border-r border-black font-black text-center py-2 px-3 w-[40%]">
-                                      A
+                                      ជួរ (A)
                                     </th>
                                     <th className="border-r border-black font-black text-center py-2 px-3 w-[42%]">
-                                      B
+                                      ជួរ (B)
                                     </th>
                                     <th className="font-black text-center py-2 px-3 w-[18%]">
-                                      ចម្លើយ
+                                      ចម្លើយផ្គូផ្គង
                                     </th>
                                   </tr>
                                 </thead>
@@ -5102,63 +5325,84 @@ Output the response in JSON format.`;
                 )}
  
                 {/* 3. Fill Blank Section */}
-                {grouped.fill_blank.length > 0 && (
-                  <div className="space-y-2 text-left font-sans">
-                    {showSections && (
-                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                        ផ្នែកទី ៣៖ ចូរបំពេញចន្លោះ (Fill in Blanks)
+                {grouped.fill_blank.length > 0 && (() => {
+                  const totalPoints = grouped.fill_blank.reduce((acc, cur) => acc + (cur.points || 2), 0);
+                  const allOptions = Array.from(new Set(
+                    grouped.fill_blank.flatMap(q => q.options || [])
+                  )).filter(Boolean);
+                  if (allOptions.length === 0) {
+                    grouped.fill_blank.forEach(q => {
+                      const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                      if (ans) allOptions.push(ans);
+                    });
+                  }
+
+                  return (
+                    <div className="space-y-2 text-left font-sans">
+                      {showSections && (
+                        <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
+                          ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ ({toKhmerNum(totalPoints)} ពិន្ទុ)
+                        </div>
+                      )}
+                      <div className="text-xs font-bold text-black leading-relaxed mt-2 font-sans">
+                        ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖
                       </div>
-                    )}
-                    <div className="space-y-4">
-                      {grouped.fill_blank.map((q) => {
-                        globalIdx++;
-                        return (
-                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
-                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>
-                                សំណួរទី {globalIdx}៖{' '}
-                                {(() => {
-                                  const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
-                                  if (!ans || !highlightKey) {
-                                    return q.text;
-                                  }
-                                  const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
-                                  if (blankRegex.test(q.text)) {
-                                    const parts = q.text.split(blankRegex);
-                                    return (
-                                      <span>
-                                        {parts.map((part: string, idx: number) => (
-                                          <span key={idx}>
-                                            {part}
-                                            {idx < parts.length - 1 && (
-                                              <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
-                                                {ans}
-                                              </span>
-                                            )}
-                                          </span>
-                                        ))}
-                                      </span>
-                                    );
-                                  } else {
-                                    return (
-                                      <span>
-                                        {q.text} ➔{' '}
-                                        <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
-                                          {ans}
+                      {allOptions.length > 0 && (
+                        <div className="my-3 p-3 px-5 border border-dashed border-black bg-slate-50 text-center font-bold text-black tracking-wide text-xs font-sans max-w-2xl mx-auto">
+                          ( {allOptions.join(', ')} )
+                        </div>
+                      )}
+                      <div className="space-y-4">
+                        {grouped.fill_blank.map((q, qIdx) => {
+                          globalIdx++;
+                          return (
+                            <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
+                              <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
+                                <span>
+                                  {toKhmerNum(qIdx + 1)}.{' '}
+                                  {(() => {
+                                    const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
+                                    if (!ans || !highlightKey) {
+                                      return q.text;
+                                    }
+                                    const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
+                                    if (blankRegex.test(q.text)) {
+                                      const parts = q.text.split(blankRegex);
+                                      return (
+                                        <span>
+                                          {parts.map((part: string, idx: number) => (
+                                            <span key={idx}>
+                                              {part}
+                                              {idx < parts.length - 1 && (
+                                                <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
+                                                  {ans}
+                                                </span>
+                                              )}
+                                            </span>
+                                          ))}
                                         </span>
-                                      </span>
-                                    );
-                                  }
-                                })()}
-                              </span>
-                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                                      );
+                                    } else {
+                                      return (
+                                        <span>
+                                          {q.text} ➔{' '}
+                                          <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
+                                            {ans}
+                                          </span>
+                                        </span>
+                                      );
+                                    }
+                                  })()}
+                                </span>
+                                <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
-                  </div>
-                )}
+                  );
+                })()}
  
                 {/* 4. Theory Section */}
                 {grouped.theory.length > 0 && (

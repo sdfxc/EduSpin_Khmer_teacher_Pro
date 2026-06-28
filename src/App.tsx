@@ -2453,6 +2453,7 @@ export default function App() {
             setActiveCardId={setActiveCardId}
             activeCardState={activeCardState}
             setActiveCardState={setActiveCardState}
+            activeSubjectName={subjects.find(s => s.id === activeSubjectId)?.name}
           />
         )}
 
