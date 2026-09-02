@@ -1,6 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye, Pencil } from 'lucide-react';
+import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye, Pencil, Link as LinkIcon } from 'lucide-react';
+import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
+import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import confetti from 'canvas-confetti';
 import { Question, QuizCard, Student, QuizRoom, QuizChapter, QuizSubject } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
@@ -270,7 +272,7 @@ export default function QuizPanel({
   const [customLeftSpan, setCustomLeftSpan] = useState<number>(5);
   const [customCenterSpan, setCustomCenterSpan] = useState<number>(2);
   const [customRightSpan, setCustomRightSpan] = useState<number>(5);
-  const [examCenter, setExamCenter] = useState('.....................................................');
+  const [examCenter, setExamCenter] = useState('សាលារៀនសុវណ្ណភូមិ');
   const [roomNumber, setRoomNumber] = useState('..................');
   const [subjectName, setSubjectName] = useState('');
   const [deskNumber, setDeskNumber] = useState('..................');
@@ -287,15 +289,21 @@ export default function QuizPanel({
   
   const [customLogo, setCustomLogo] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('teacher_custom_logo') || null;
+      const saved = localStorage.getItem('teacher_custom_logo');
+      if (saved && (saved.includes('1AHlIse7sV5KwQ9EOzhLl6ZPuJhvUz1km') || saved.includes('1dEG3MOdFHToMpHs6gm-B3VjUOaIvIlWf'))) {
+        localStorage.setItem('teacher_custom_logo', '/sovannaphumi.png');
+        return '/sovannaphumi.png';
+      }
+      return saved || null;
     }
     return null;
   });
+  const [logoUrlInput, setLogoUrlInput] = useState('');
   
   const [optionsLayout, setOptionsLayout] = useState<'inline' | 'stacked'>('inline');
   const [optionStyle, setOptionStyle] = useState<'khmer' | 'latin'>('khmer');
   const [highlightKey, setHighlightKey] = useState(false);
-  const [imgSrc, setImgSrc] = useState('/Sovannphomi.png');
+  const [imgSrc, setImgSrc] = useState('/sovannaphumi.png');
   const [imageFailed, setImageFailed] = useState(false);
 
   useEffect(() => {
@@ -305,6 +313,21 @@ export default function QuizPanel({
       setSubjectName('...................................');
     }
   }, [activeRoomId, activeRoom]);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      const saved = localStorage.getItem('logged_in_teacher');
+      if (saved) {
+        try {
+          const parsed = JSON.parse(saved);
+          if (parsed?.schoolName) {
+            setExamCenter(parsed.schoolName);
+            setLogoText1(parsed.schoolName);
+          }
+        } catch (e) {}
+      }
+    }
+  }, []);
 
   const SovannaphumiLogoSVG = () => (
     <svg viewBox="0 0 120 120" className="w-16 h-16 pointer-events-none mx-auto" xmlns="http://www.w3.org/2000/svg">
@@ -3342,11 +3365,26 @@ export default function QuizPanel({
                       </div>
 
                       {/* Logo File Selector and management block */}
-                      <div className="bg-slate-50 dark:bg-slate-950/40 p-3 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-2">
-                        <label className="block text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">រូបសញ្ញាសាលារៀន (School Logo PNG/JPG)</label>
+                      <div className="bg-slate-50 dark:bg-slate-950/40 p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">រូបសញ្ញាសាលារៀន (School Logo)</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomLogo('/sovannaphumi.png');
+                              localStorage.setItem('teacher_custom_logo', '/sovannaphumi.png');
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            title="កំណត់យក Logo សាលារៀនសុវណ្ណភូមិពី Google Drive ស្វ័យប្រវត្តិ"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-500" />
+                            <span>ប្រើ Logo សុវណ្ណភូមិ (Google Drive)</span>
+                          </button>
+                        </div>
+
                         <div className="flex items-center gap-3">
                           {customLogo ? (
-                            <div className="relative w-12 h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center p-1 overflow-hidden group shrink-0">
+                            <div className="relative w-12 h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center p-1 overflow-hidden group shrink-0 shadow-xs">
                               <img src={customLogo} alt="Custom School Logo Preview" className="w-full h-full object-contain" />
                               <button
                                 type="button"
@@ -3362,35 +3400,79 @@ export default function QuizPanel({
                             </div>
                           ) : (
                             <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 text-[9px] font-black uppercase shrink-0">
-                              គ្មាន
+                              គំរូដើម
                             </div>
                           )}
-                          <div className="flex-1 min-w-0">
-                            <input
-                              type="file"
-                              accept="image/png, image/jpeg, image/gif"
-                              id="custom-logo-uploader"
-                              className="hidden"
-                              onChange={(e) => {
-                                const file = e.target.files?.[0];
-                                if (file) {
-                                  const reader = new FileReader();
-                                  reader.onload = (event) => {
-                                    const base64 = event.target?.result as string;
-                                    setCustomLogo(base64);
-                                    localStorage.setItem('teacher_custom_logo', base64);
-                                  };
-                                  reader.readAsDataURL(file);
-                                }
-                              }}
-                            />
-                             <label
-                              htmlFor="custom-logo-uploader"
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950 dark:hover:bg-indigo-900 border border-indigo-150 dark:border-indigo-900/40 text-indigo-600 dark:text-indigo-400 text-[10px] font-black rounded-lg cursor-pointer transition-all active:scale-95 uppercase tracking-wide"
-                            >
-                              📂 បញ្ចូល Logo (PNG)
-                            </label>
-                            <p className="text-[9px] text-slate-400 mt-1">ទោះបញ្ចូលក៏បាន អត់បញ្ចូលក៏បាន (ឡូហ្គោខុសៗគ្នាតាមគ្រូ)</p>
+                          <div className="flex-1 min-w-0 space-y-2">
+                            {/* Google Drive / Web link input */}
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative flex-1">
+                                <LinkIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="url"
+                                  placeholder="បិទភ្ជាប់ Google Drive Link ឬ Image URL..."
+                                  value={logoUrlInput}
+                                  onChange={(e) => setLogoUrlInput(e.target.value)}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === 'Enter' && logoUrlInput.trim()) {
+                                      e.preventDefault();
+                                      const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
+                                      const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
+                                      setCustomLogo(transparentPng);
+                                      localStorage.setItem('teacher_custom_logo', transparentPng);
+                                      setLogoUrlInput('');
+                                    }
+                                  }}
+                                  className="w-full pl-8 pr-2 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white placeholder:text-slate-400"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (logoUrlInput.trim()) {
+                                    const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
+                                    const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
+                                    setCustomLogo(transparentPng);
+                                    localStorage.setItem('teacher_custom_logo', transparentPng);
+                                    setLogoUrlInput('');
+                                  }
+                                }}
+                                disabled={!logoUrlInput.trim()}
+                                className="px-2.5 py-1 bg-indigo-600 disabled:opacity-40 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all hover:bg-indigo-700 shrink-0"
+                              >
+                                ដាក់ចូល
+                              </button>
+                            </div>
+
+                            {/* File Upload Button */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="file"
+                                accept="image/png, image/jpeg, image/gif"
+                                id="custom-logo-uploader"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = async (event) => {
+                                      const base64 = event.target?.result as string;
+                                      const transparentPng = await removeWhiteBackgroundFromDataUrl(base64);
+                                      setCustomLogo(transparentPng);
+                                      localStorage.setItem('teacher_custom_logo', transparentPng);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor="custom-logo-uploader"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                              >
+                                📂 ជ្រើសរើស File ពីកុំព្យូទ័រ
+                              </label>
+                              <span className="text-[9px] text-slate-400">គាំទ្រ Google Drive, Web Link, PNG, JPG</span>
+                            </div>
                           </div>
                         </div>
                       </div>

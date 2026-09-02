@@ -66,4 +66,5 @@ export interface TeacherAccount {
   subjects?: string;
   username: string;
   password?: string;
+  avatarUrl?: string;
 }

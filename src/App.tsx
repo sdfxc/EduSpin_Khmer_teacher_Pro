@@ -4,11 +4,13 @@
  */
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
-import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical } from 'lucide-react';
+import { motion, AnimatePresence } from 'motion/react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
 import TeacherAuthModal from './components/TeacherAuthModal';
+import { TeacherProfileModal } from './components/TeacherProfileModal';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
 import StudentManager from './components/StudentManager';
@@ -18,82 +20,7 @@ import { db, handleFirestoreError, OperationType } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
-
-const SovannaphumiLogo = ({ className = "w-12 h-12" }: { className?: string }) => {
-  const angles = [0, 45, 90, 135, 180, 225, 270, 315];
-  return (
-    <svg viewBox="0 0 120 120" className={`${className} pointer-events-none select-none`} xmlns="http://www.w3.org/2000/svg">
-      <defs>
-        <path id="curve-top-header" d="M 24,60 A 36,36 0 0,1 96,60" fill="none" />
-        <path id="curve-bottom-header" d="M 96,60 A 36,36 0 0,1 24,60" fill="none" />
-      </defs>
-      
-      {/* 8-petal blue scalloped border */}
-      {/* Draw gold background to act as outline */}
-      {angles.map((angle, idx) => {
-        const rad = (angle * Math.PI) / 180;
-        const cx = 60 + 22 * Math.cos(rad);
-        const cy = 60 + 22 * Math.sin(rad);
-        return <circle key={`gold-${idx}`} cx={cx} cy={cy} r={24.5} fill="#f59e0b" />;
-      })}
-      
-      {/* Draw blue petals inside */}
-      {angles.map((angle, idx) => {
-        const rad = (angle * Math.PI) / 180;
-        const cx = 60 + 22 * Math.cos(rad);
-        const cy = 60 + 22 * Math.sin(rad);
-        return <circle key={`blue-${idx}`} cx={cx} cy={cy} r={23} fill="#0ea5e9" />;
-      })}
-
-      {/* Outer separator line of blue band */}
-      <circle cx="60" cy="60" r="41" fill="none" stroke="#f59e0b" strokeWidth="1.2" />
-      
-      {/* Decorative golden diamonds on left/right */}
-      <polygon points="17,60 20,57 23,60 20,63" fill="#f59e0b" />
-      <polygon points="103,60 100,57 97,60 100,63" fill="#f59e0b" />
-
-      {/* Inner circle border */}
-      <circle cx="60" cy="60" r="31.5" fill="none" stroke="#f59e0b" strokeWidth="1.2" />
-      
-      {/* Inner Red circular background */}
-      <circle cx="60" cy="60" r="30" fill="#dc2626" stroke="#ffffff" strokeWidth="1" />
-      
-      {/* Altar / sacred pedestal */}
-      {/* Pedestal Base */}
-      <path d="M 45,74 L 75,74 L 71,78 L 49,78 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
-      <path d="M 49,74 L 71,74 L 67,66 L 53,66 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
-      {/* Pedestal Bowl */}
-      <path d="M 44,65 C 44,65 50,71 60,71 C 70,71 76,65 76,65 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
-      
-      {/* Sacred Book on pedestal */}
-      <path d="M 44,65 C 51,63 58,63 60,66 C 62,63 69,63 76,65 L 73,61 C 68,59 62,59 60,62 C 58,59 52,59 47,61 Z" fill="#ffffff" stroke="#1e293b" strokeWidth="0.5" />
-      {/* Bookmark Ribbon */}
-      <path d="M 60,65 L 60,70" stroke="#dc2626" strokeWidth="1" />
-      
-      {/* Golden crown / Angkor symbol inside the cup */}
-      <path d="M 52,59 L 54,49 L 57,52 L 60,43 L 63,52 L 66,49 L 68,59 Z" fill="#eab308" stroke="#d97706" strokeWidth="0.5" />
-      
-      {/* Laurel Wreath surrounding bottom of red circle */}
-      <path d="M 40,68 C 42,76 50,79 60,79 C 70,79 78,76 80,68 C 76,73 70,75 60,75 C 50,75 44,73 40,68 Z" fill="#eab308" />
-
-      {/* Abbreviation Text inside crown/vase */}
-      <text x="60" y="57" fontSize="3.2" fontWeight="bold" fill="#dc2626" textAnchor="middle" fontFamily="sans-serif">S.P.S</text>
-
-      {/* SVG Curved Text inside the blue band using textPath */}
-      <text fill="#ffffff" fontSize="4.5" fontWeight="black" fontFamily="'Khmer OS Siemreap', 'Siemreap', sans-serif">
-        <textPath href="#curve-top-header" startOffset="50%" textAnchor="middle">
-          សាលារៀនសុវណ្ណភូមិ
-        </textPath>
-      </text>
-      
-      <text fill="#ffffff" fontSize="4.2" fontWeight="black" fontFamily="sans-serif">
-        <textPath href="#curve-bottom-header" startOffset="50%" textAnchor="middle">
-          SOVANNAPHUMI SCHOOL
-        </textPath>
-      </text>
-    </svg>
-  );
-};
+import SovannaphumiLogo from './components/SovannaphumiLogo';
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
@@ -121,67 +48,18 @@ function getMigratedSubjects(loadedChapters: QuizChapter[]): { subjects: QuizSub
       name: 'រូបវិទ្យា',
       chapters: chaptersToUse,
       createdAt: Date.now()
-    },
-    {
-      id: 'subj-chemistry',
-      name: 'គីមីវិទ្យា',
-      chapters: [
-        {
-          id: `chapter-chem-${Date.now()}`,
-          name: 'ជំពូកទី១',
-          rooms: [
-            {
-              id: `room-chem-${Date.now()}`,
-              name: 'មេរៀនទី១',
-              cards: [],
-              pickedIds: [],
-              createdAt: Date.now()
-            }
-          ],
-          createdAt: Date.now()
-        }
-      ],
-      createdAt: Date.now()
     }
   ];
   return { subjects: defaultSubjects, activeSubjectId: 'subj-physics' };
 }
 
-const SAMPLE_STUDENTS: Record<string, Student[]> = {
-  'class-7a': [
-    { id: 's-1', name: 'សុខ ម៉េង', score: 120, emoji: '😎', gender: 'ប្រុស', status: 'ឆ្នើម', classId: 'class-7a' },
-    { id: 's-2', name: 'ចាន់ ធារ៉ា', score: 95, emoji: '🥰', gender: 'ស្រី', status: 'សកម្ម', classId: 'class-7a' },
-    { id: 's-3', name: 'កុសល សីហា', score: 110, emoji: '🤩', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-7a' },
-    { id: 's-4', name: 'លីដា ណាវិក', score: 80, emoji: '🥳', gender: 'ស្រី', status: 'សកម្ម', classId: 'class-7a' },
-    { id: 's-5', name: 'រដ្ឋា ចាន់ឌី', score: 70, emoji: '🤪', gender: 'ប្រុស', status: 'កំពុងរីកចម្រើន', classId: 'class-7a' },
-    { id: 's-6', name: 'កញ្ញា ពិសី', score: 130, emoji: '😇', gender: 'ស្រី', status: 'ឆ្នើម', classId: 'class-7a' },
-  ],
-  'class-8a': [
-    { id: 's-11', name: 'មករា ចន្ទ', score: 105, emoji: '😎', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-8a' },
-    { id: 's-12', name: 'ធីតា រតនា', score: 115, emoji: '🥰', gender: 'ស្រី', status: 'ឆ្នើម', classId: 'class-8a' },
-    { id: 's-13', name: 'សម្បត្ដិ វណ្ណា', score: 90, emoji: '🤩', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-8a' },
-    { id: 's-14', name: 'សុភា លីន', score: 65, emoji: '🥺', gender: 'ស្រី', status: 'គួរឲ្យបារម្ភ', classId: 'class-8a' },
-    { id: 's-15', name: 'វិបុល ទេវី', score: 85, emoji: '🤪', gender: 'ប្រុស', status: 'សកម្ម', classId: 'class-8a' },
-  ],
-  'class-9a': [
-    { id: 's-21', name: 'ណារ៉ុង ចាន់', score: 140, emoji: '😎', gender: 'ប្រុស', status: 'ឆ្នើម', classId: 'class-9a' },
-    { id: 's-22', name: 'មន្នី ផល្លា', score: 100, emoji: '🥰', gender: 'ស្រី', status: 'សកម្ម', classId: 'class-9a' },
-    { id: 's-23', name: 'វិចិត្រ សាវី', score: 125, emoji: '🤩', gender: 'ប្រុស', status: 'ឆ្នើម', classId: 'class-9a' },
-    { id: 's-24', name: 'បុប្ផា រី', score: 75, emoji: '🥺', gender: 'ស្រី', status: 'កំពុងរីកចម្រើន', classId: 'class-9a' },
-  ]
-};
+const SAMPLE_STUDENTS: Record<string, Student[]> = {};
 
 const DEFAULT_CLASSES: ClassInfo[] = [
-  { id: 'class-7a', name: 'ថ្នាក់ទី៧ក' },
-  { id: 'class-8a', name: 'ថ្នាក់ទី៨ក' },
-  { id: 'class-9a', name: 'ថ្នាក់ទី៩ក' }
+  { id: 'class-7a', name: 'ថ្នាក់ទី៧ក', order: 0 },
+  { id: 'class-8a', name: 'ថ្នាក់ទី៨ក', order: 1 },
+  { id: 'class-9a', name: 'ថ្នាក់ទី៩ក', order: 2 }
 ];
-
-const PINNED_CLASS_NAMES = ['ថ្នាក់ទី៧ក', 'ថ្នាក់ទី៨ក', 'ថ្នាក់ទី៩ក'];
-const isPinnedClass = (classId: string, className: string): boolean => {
-  const name = className ? className.trim() : '';
-  return ['class-7a', 'class-8a', 'class-9a'].includes(classId) || PINNED_CLASS_NAMES.includes(name);
-};
 
 const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
   const clean = classList.filter(c => c && c.name && c.name.trim() !== '');
@@ -195,19 +73,19 @@ const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
     return true;
   });
 
-  // If there is an 'order' property on the classes, sort by that!
   const hasOrder = filtered.some(c => typeof c.order === 'number');
+  let sorted: ClassInfo[];
   if (hasOrder) {
-    return [...filtered].sort((a, b) => {
+    sorted = [...filtered].sort((a, b) => {
       const orderA = typeof a.order === 'number' ? a.order : 999;
       const orderB = typeof b.order === 'number' ? b.order : 999;
       return orderA - orderB;
     });
+  } else {
+    sorted = [...filtered];
   }
 
-  const pinned = filtered.filter(c => isPinnedClass(c.id, c.name));
-  const others = filtered.filter(c => !isPinnedClass(c.id, c.name));
-  return [...pinned, ...others].map((c, idx) => ({ ...c, order: idx }));
+  return sorted.map((c, idx) => ({ ...c, order: idx }));
 };
 
 export default function App() {
@@ -311,14 +189,22 @@ export default function App() {
     if (savedTeacherObj === null) {
       const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
       const saved = localStorage.getItem(`students_class_${activeId}`);
-      return saved ? JSON.parse(saved) : (SAMPLE_STUDENTS[activeId] || []);
+      if (!saved) return [];
+      try {
+        const parsed = JSON.parse(saved) as Student[];
+        return parsed.filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
+      } catch (e) {
+        return [];
+      }
     } else {
       try {
         const teacherObj = JSON.parse(savedTeacherObj);
         const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
         if (!activeId) return [];
         const saved = localStorage.getItem(`students_class_${activeId}`);
-        return saved ? JSON.parse(saved) : [];
+        if (!saved) return [];
+        const parsed = JSON.parse(saved) as Student[];
+        return parsed.filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
       } catch (e) {
         return [];
       }
@@ -363,6 +249,52 @@ export default function App() {
     }
   });
 
+  // One-time cleanup effect to purge legacy mock student data and extra default subjects from localStorage
+  useEffect(() => {
+    try {
+      const keysToClean: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (key.startsWith('students_class_') || key.startsWith('khmer_teacher_divided_groups_') || key.startsWith('subjects_class_'))) {
+          keysToClean.push(key);
+        }
+      }
+      keysToClean.forEach(key => {
+        const val = localStorage.getItem(key);
+        if (val) {
+          try {
+            const list = JSON.parse(val);
+            if (Array.isArray(list)) {
+              if (key.startsWith('students_class_')) {
+                const cleaned = list.filter((s: any) => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
+                localStorage.setItem(key, JSON.stringify(cleaned));
+              } else if (key.startsWith('khmer_teacher_divided_groups_')) {
+                const cleanedGroups = list.map((g: any) => ({
+                  ...g,
+                  members: (g.members || []).filter((s: any) => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'))
+                })).filter((g: any) => g.members.length > 0);
+                if (cleanedGroups.length === 0) {
+                  localStorage.removeItem(key);
+                } else {
+                  localStorage.setItem(key, JSON.stringify(cleanedGroups));
+                }
+              } else if (key.startsWith('subjects_class_')) {
+                const cleanedSubs = list.filter((s: any) => s && s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
+                if (cleanedSubs.length > 0) {
+                  localStorage.setItem(key, JSON.stringify(cleanedSubs));
+                } else {
+                  localStorage.removeItem(key);
+                }
+              }
+            }
+          } catch (e) {}
+        }
+      });
+    } catch (e) {
+      console.error("Cleanup error:", e);
+    }
+  }, []);
+
   const [subjects, setSubjects] = useState<QuizSubject[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
     let activeId = 'class-7a';
@@ -375,7 +307,16 @@ export default function App() {
       } catch (e) {}
     }
     const saved = localStorage.getItem(`subjects_class_${activeId}`);
-    return saved ? JSON.parse(saved) : [];
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const filtered = parsed.filter((s: any) => s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
+          if (filtered.length > 0) return filtered;
+        }
+      } catch (e) {}
+    }
+    return getMigratedSubjects([]).subjects;
   });
 
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(() => {
@@ -431,10 +372,20 @@ export default function App() {
 
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
+  const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
+  const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
 
   const [teacher, setTeacher] = useState<TeacherAccount | null>(() => {
     const saved = localStorage.getItem('logged_in_teacher');
-    return saved ? JSON.parse(saved) : null;
+    if (saved) {
+      try {
+        const parsed = JSON.parse(saved);
+        return parsed;
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    return null;
   });
 
   // Dark mode Sync effect
@@ -465,32 +416,37 @@ export default function App() {
     updated.splice(draggedClassIndex, 1);
     updated.splice(index, 0, draggedItem);
     
+    const reordered = updated.map((c, idx) => ({ ...c, order: idx }));
     setDraggedClassIndex(index);
-    setClasses(updated);
+    setClasses(reordered);
   };
 
   const handleClassDragEnd = async () => {
     setDraggedClassIndex(null);
     setCanDrag(false);
-    const finalizedClasses = classes.map((c, idx) => ({ ...c, order: idx }));
-    setClasses(finalizedClasses);
-    
-    const currentTeacherId = teacher?.id || null;
-    if (currentTeacherId) {
-      localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
-      try {
-        for (let i = 0; i < finalizedClasses.length; i++) {
-          const cls = finalizedClasses[i];
-          await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-            order: i
-          }, { merge: true });
-        }
-      } catch (err) {
-        console.error("Failed to save reordered classes to Firestore:", err);
+
+    setClasses(prevClasses => {
+      const finalizedClasses = prevClasses.map((c, idx) => ({ ...c, order: idx }));
+      const currentTeacherId = teacher?.id || null;
+      if (currentTeacherId) {
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
+        (async () => {
+          try {
+            for (let i = 0; i < finalizedClasses.length; i++) {
+              const cls = finalizedClasses[i];
+              await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                order: i
+              }, { merge: true });
+            }
+          } catch (err) {
+            console.error("Failed to save reordered classes to Firestore:", err);
+          }
+        })();
+      } else {
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
-    } else {
-      localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
-    }
+      return finalizedClasses;
+    });
   };
 
   const handleMoveClass = async (e: React.MouseEvent, index: number, direction: 'left' | 'right') => {
@@ -498,30 +454,33 @@ export default function App() {
     const targetIndex = direction === 'left' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= classes.length) return;
 
-    const updated = [...classes];
-    const temp = updated[index];
-    updated[index] = updated[targetIndex];
-    updated[targetIndex] = temp;
+    setClasses(prevClasses => {
+      const updated = [...prevClasses];
+      const temp = updated[index];
+      updated[index] = updated[targetIndex];
+      updated[targetIndex] = temp;
 
-    const finalizedClasses = updated.map((c, idx) => ({ ...c, order: idx }));
-    setClasses(finalizedClasses);
-
-    const currentTeacherId = teacher?.id || null;
-    if (currentTeacherId) {
-      localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
-      try {
-        for (let i = 0; i < finalizedClasses.length; i++) {
-          const cls = finalizedClasses[i];
-          await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-            order: i
-          }, { merge: true });
-        }
-      } catch (err) {
-        console.error("Failed to save reordered classes to Firestore:", err);
+      const finalizedClasses = updated.map((c, idx) => ({ ...c, order: idx }));
+      const currentTeacherId = teacher?.id || null;
+      if (currentTeacherId) {
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
+        (async () => {
+          try {
+            for (let i = 0; i < finalizedClasses.length; i++) {
+              const cls = finalizedClasses[i];
+              await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                order: i
+              }, { merge: true });
+            }
+          } catch (err) {
+            console.error("Failed to save reordered classes to Firestore:", err);
+          }
+        })();
+      } else {
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
-    } else {
-      localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
-    }
+      return finalizedClasses;
+    });
   };
 
   // Load teacher classes from Cloud when logged in
@@ -538,6 +497,25 @@ export default function App() {
     const loadTeacherClasses = async () => {
       try {
         setLoadingCloudData(true);
+
+        // Fetch latest teacher profile from Cloud Firestore to keep schoolName fresh
+        try {
+          const teacherDocRef = doc(db, 'teachers', teacher.id);
+          const teacherSnap = await getDoc(teacherDocRef);
+          if (teacherSnap.exists()) {
+            const cloudTeacher = teacherSnap.data() as TeacherAccount;
+            if (cloudTeacher) {
+              setTeacher(prev => {
+                const updated = prev ? { ...prev, ...cloudTeacher } : cloudTeacher;
+                localStorage.setItem('logged_in_teacher', JSON.stringify(updated));
+                return updated;
+              });
+            }
+          }
+        } catch (tErr) {
+          console.error("Failed to sync teacher profile from cloud:", tErr);
+        }
+
         const classesCollRef = collection(db, 'teachers', teacher.id, 'classes');
         const classesSnap = await getDocs(classesCollRef);
         
@@ -658,7 +636,27 @@ export default function App() {
            }
          }
 
-        // Do not seed or pin DEFAULT_CLASSES when registering/logging in! Let newly registered accounts be clean.
+        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
+        let localClassesMap = new Map<string, number>();
+        if (localClassesStr) {
+          try {
+            const parsedLocals = JSON.parse(localClassesStr) as ClassInfo[];
+            parsedLocals.forEach((lc, index) => {
+              if (lc && lc.id) {
+                localClassesMap.set(lc.id, typeof lc.order === 'number' ? lc.order : index);
+              }
+            });
+          } catch (e) {}
+        }
+
+        fetchedClasses = fetchedClasses.map((cls, idx) => {
+          if (typeof cls.order === 'number') return cls;
+          if (localClassesMap.has(cls.id)) {
+            return { ...cls, order: localClassesMap.get(cls.id) };
+          }
+          return { ...cls, order: idx };
+        });
+
         const merged = [...fetchedClasses];
         DEFAULT_CLASSES.forEach(pc => {
           if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
@@ -668,6 +666,11 @@ export default function App() {
         const sortedCloudClasses = sortClasses(merged);
         setClasses(sortedCloudClasses);
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
+
+        for (let i = 0; i < sortedCloudClasses.length; i++) {
+          const c = sortedCloudClasses[i];
+          setDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { order: i }, { merge: true }).catch(() => {});
+        }
         
         const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || (fetchedClasses[0]?.id || '');
         const exists = fetchedClasses.some(c => c.id === lastActiveId);
@@ -695,7 +698,16 @@ export default function App() {
     if (!teacher) {
       // Local fallback
       const loadedStudents = localStorage.getItem(`students_class_${activeClassId}`);
-      setStudents(loadedStudents ? JSON.parse(loadedStudents) : (SAMPLE_STUDENTS[activeClassId] || []));
+      if (loadedStudents) {
+        try {
+          const parsed = JSON.parse(loadedStudents) as Student[];
+          setStudents(parsed.filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-')));
+        } catch (e) {
+          setStudents([]);
+        }
+      } else {
+        setStudents([]);
+      }
 
       const loadedSubjectsStr = localStorage.getItem(`subjects_class_${activeClassId}`);
       let loadedSubjects: QuizSubject[] = [];
@@ -704,7 +716,12 @@ export default function App() {
       let loadedActiveRoomId: string | null = null;
 
       if (loadedSubjectsStr) {
-        loadedSubjects = JSON.parse(loadedSubjectsStr);
+        try {
+          const parsed = JSON.parse(loadedSubjectsStr);
+          if (Array.isArray(parsed)) {
+            loadedSubjects = parsed.filter((s: any) => s && s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
+          }
+        } catch (e) {}
         loadedActiveSubjectId = localStorage.getItem(`active_subject_id_${activeClassId}`) || (loadedSubjects[0]?.id || null);
       }
 
@@ -903,7 +920,10 @@ export default function App() {
         
         let loadedStudents: Student[] = [];
         studentsSnap.forEach(docSnap => {
-          loadedStudents.push(docSnap.data() as Student);
+          const data = docSnap.data() as Student;
+          if (data && data.id && !data.id.startsWith('s-') && !data.id.startsWith('sim-')) {
+            loadedStudents.push(data);
+          }
         });
         
         // Fallback to local guest data if cloud has 0 students to prevent overwriting newly added local students
@@ -911,7 +931,7 @@ export default function App() {
           const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
           if (localStudentsStr) {
             try {
-              const localStudents = JSON.parse(localStudentsStr) as Student[];
+              const localStudents = (JSON.parse(localStudentsStr) as Student[]).filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
               if (localStudents.length > 0) {
                 loadedStudents = localStudents;
                 // Upload local students to cloud Firestore so they persist on cloud too
@@ -949,7 +969,7 @@ export default function App() {
         const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
         if (localStudentsStr) {
           try {
-            const localStudents = JSON.parse(localStudentsStr) as Student[];
+            const localStudents = (JSON.parse(localStudentsStr) as Student[]).filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
             if (localStudents.length > 0) {
               setStudents(localStudents);
               return;
@@ -964,7 +984,10 @@ export default function App() {
 
       let loadedStudents: Student[] = [];
       snapshot.forEach(docSnap => {
-        loadedStudents.push(docSnap.data() as Student);
+        const data = docSnap.data() as Student;
+        if (data && data.id && !data.id.startsWith('s-') && !data.id.startsWith('sim-')) {
+          loadedStudents.push(data);
+        }
       });
       setStudents(loadedStudents);
     }, (err) => {
@@ -1576,22 +1599,48 @@ export default function App() {
   }, [subjects, teacher, activeClassId]);
 
   const handleDeleteSubject = useCallback((subjectId: string) => {
-    if (subjects.length <= 1) {
-      alert('មិនអាចលុបមុខវិជ្ជាទាំងអស់បានទេ! ត្រូវតែមានយ៉ាងហោចណាស់មុខវិជ្ជាសកម្មមួយ។');
-      return;
-    }
-    if (!window.confirm('តើអ្នកពិតជាចង់លុបមុខវិជ្ជានេះមែនទេ?​ ជំពូក មេរៀន និងគំនូសសកម្មភាពទាំងអស់នឹងត្រូវបាត់បង់ទាំងអស់។')) {
+    const targetSub = subjects.find(s => s.id === subjectId);
+    const subName = targetSub ? targetSub.name : 'មុខវិជ្ជានេះ';
+    
+    if (!window.confirm(`តើអ្នកពិតជាចង់លុបមុខវិជ្ជា "${subName}" នេះមែនទេ? ជំពូក មេរៀន និងកាតសំណួរទាំងអស់ក្នុងមុខវិជ្ជានេះនឹងត្រូវបាត់បង់។`)) {
       return;
     }
 
-    const updatedSubjects = subjects.filter(s => s.id !== subjectId);
+    let updatedSubjects = subjects.filter(s => s.id !== subjectId);
+
+    // If all subjects deleted, reset with a fresh default subject
+    if (updatedSubjects.length === 0) {
+      const freshSubject: QuizSubject = {
+        id: `subj-physics-${Date.now()}`,
+        name: 'រូបវិទ្យា',
+        chapters: [
+          {
+            id: `chapter-${Date.now()}`,
+            name: 'ជំពូកទី១',
+            rooms: [
+              {
+                id: `room-${Date.now()}`,
+                name: 'មេរៀនទី១',
+                cards: [],
+                pickedIds: [],
+                createdAt: Date.now()
+              }
+            ],
+            createdAt: Date.now()
+          }
+        ],
+        createdAt: Date.now()
+      };
+      updatedSubjects = [freshSubject];
+    }
+
     setSubjects(updatedSubjects);
 
     let nextSubjectId = activeSubjectId;
     let nextChapters = chapters;
     let nextActiveRoomId = activeRoomId;
 
-    if (activeSubjectId === subjectId) {
+    if (activeSubjectId === subjectId || !updatedSubjects.some(s => s.id === activeSubjectId)) {
       const fallbackSubject = updatedSubjects[0];
       nextSubjectId = fallbackSubject.id;
       nextChapters = fallbackSubject.chapters;
@@ -1637,7 +1686,8 @@ export default function App() {
     const className = window.prompt('សូមបញ្ចូលឈ្មោះថ្នាក់រៀនថ្មី៖', 'ថ្នាក់ទី១០ក');
     if (className && className.trim()) {
       const newClassId = `class-${Date.now()}`;
-      const newClass = { id: newClassId, name: className.trim() };
+      const newOrder = classes.length;
+      const newClass: ClassInfo = { id: newClassId, name: className.trim(), order: newOrder };
       
       const { subjects: defaultSubjects, activeSubjectId: defaultActiveSubjectId } = getMigratedSubjects([]);
       const defaultActiveRoomId = defaultSubjects[0]?.chapters[0]?.rooms[0]?.id || null;
@@ -1647,6 +1697,7 @@ export default function App() {
           await setDoc(doc(db, 'teachers', teacher.id, 'classes', newClassId), {
             id: newClassId,
             name: className.trim(),
+            order: newOrder,
             subjects: defaultSubjects,
             activeSubjectId: defaultActiveSubjectId,
             activeRoomId: defaultActiveRoomId,
@@ -1999,37 +2050,42 @@ export default function App() {
   }, []);
 
   const handleLogout = () => {
-    if (window.confirm('តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ចាកចេញពីគណនីមែនទេ? (រាល់ទិន្នន័យដែលបានរក្សាទុកក្នុង Cloud នឹងមិនបាត់បង់ទេ ហើយទំព័រនេះនឹងត្រូវលាងសម្អាតឡើងវិញជាទម្រង់ថ្មី)')) {
-      // Clear logged in teacher token
-      localStorage.removeItem('logged_in_teacher');
-      
-      // Also clear active teacher's selected class ID in memory & offline caches
-      if (teacher) {
-        localStorage.removeItem(`khmer_teacher_active_class_id_${teacher.id}`);
-      }
-      localStorage.removeItem('khmer_teacher_active_class_id');
-      localStorage.removeItem('khmer_teacher_classes');
+    setIsLogoutModalOpen(true);
+  };
 
-      // Clear all cached students/cards/pickedIds in localstorage for a clean slate
-      const keysToClear = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (key.startsWith('students_class_') || key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_'))) {
-          keysToClear.push(key);
-        }
-      }
-      keysToClear.forEach(k => localStorage.removeItem(k));
-
-      // Reset application states back to fresh template
-      setTeacher(null);
-      setClasses(DEFAULT_CLASSES);
-      setActiveClassId('class-7a');
-      setStudents([]);
-      setCards([]);
-      setPickedIds([]);
-      setSelectedStudentId(null);
-      setActiveCardId(null);
+  const confirmLogout = () => {
+    setIsLogoutModalOpen(false);
+    setIsProfileModalOpen(false);
+    
+    // Clear logged in teacher token
+    localStorage.removeItem('logged_in_teacher');
+    
+    // Also clear active teacher's selected class ID in memory & offline caches
+    if (teacher) {
+      localStorage.removeItem(`khmer_teacher_active_class_id_${teacher.id}`);
     }
+    localStorage.removeItem('khmer_teacher_active_class_id');
+    localStorage.removeItem('khmer_teacher_classes');
+
+    // Clear all cached students/cards/pickedIds in localstorage for a clean slate
+    const keysToClear = [];
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (key && (key.startsWith('students_class_') || key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_'))) {
+        keysToClear.push(key);
+      }
+    }
+    keysToClear.forEach(k => localStorage.removeItem(k));
+
+    // Reset application states back to fresh template
+    setTeacher(null);
+    setClasses(DEFAULT_CLASSES);
+    setActiveClassId('class-7a');
+    setStudents([]);
+    setCards([]);
+    setPickedIds([]);
+    setSelectedStudentId(null);
+    setActiveCardId(null);
   };
 
   const selectedStudent = students.find(s => s.id === selectedStudentId) || null;
@@ -2039,137 +2095,161 @@ export default function App() {
   return (
     <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
       {/* Header */}
-      <header className={`h-20 flex items-center justify-between px-8 shrink-0 z-20 border-b ${
-        isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+      <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
+        isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
       }`}>
         <div 
           onClick={() => setActiveTab('wheel')}
-          className="flex items-center gap-4 cursor-pointer hover:opacity-90 active:scale-98 transition-all select-none"
+          className="flex items-center gap-3.5 cursor-pointer hover:opacity-90 active:scale-98 transition-all select-none shrink-0"
           title="ត្រឡប់ទៅទំព័រដើម (Home)"
         >
-          <div className="w-12 h-12 flex items-center justify-center relative">
-            <SovannaphumiLogo className="w-12 h-12" />
+          <div className="w-11 h-11 flex items-center justify-center relative drop-shadow-xs">
+            <SovannaphumiLogo className="w-11 h-11" />
           </div>
           <div>
-            <h1 className="text-xl font-black tracking-tight flex items-center gap-2">
-              <span className="text-indigo-600 dark:text-indigo-400">Teacher EduSpin</span>
-              <span className="text-xs px-2 py-0.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-300 rounded-full">Edu_Pro</span>
-            </h1>
-            <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest leading-none flex items-center gap-2 flex-wrap">
-              <span>សាលារៀន៖ {teacher ? teacher.schoolName : 'សាលាសុវណ្ណភូមិ សាខាផ្សារដីហុយ'}</span>
+            <div className="flex items-center gap-2">
+              <h1 className="text-lg font-black tracking-tight flex items-center gap-1.5">
+                <span className="text-indigo-600 dark:text-indigo-400">EduSpin</span>
+                <span className="text-slate-800 dark:text-slate-200">Pro</span>
+              </h1>
+            </div>
+            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-none flex items-center gap-1.5 mt-1">
+              <span className="truncate max-w-[180px] sm:max-w-[260px] md:max-w-[340px]" title={teacher?.schoolName || 'សាលារៀន'}>
+                {teacher ? (teacher.schoolName || 'មិនទាន់បញ្ចូលឈ្មោះសាលា') : 'សាលារៀនសុវណ្ណភូមិ'}
+              </span>
               {loadingCloudData && (
-                <span className="inline-flex items-center gap-1.5 text-indigo-500 dark:text-indigo-400 animate-pulse font-black text-[9px] uppercase ml-1.5">
+                <span className="inline-flex items-center gap-1 text-indigo-500 dark:text-indigo-400 animate-pulse font-bold text-[10px]">
                   <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>កំពុង Sync Cloud...</span>
+                  <span>Sync...</span>
                 </span>
               )}
               {teacher && !loadingCloudData && (
-                <span className="inline-flex items-center gap-1 text-emerald-500 dark:text-emerald-400 font-black text-[9px] uppercase ml-1.5">
-                  <Cloud className="w-3 h-3" />
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded-md">
+                  <Cloud className="w-2.5 h-2.5" />
                   <span>Cloud Active</span>
                 </span>
               )}
-            </p>
+            </div>
           </div>
         </div>
 
-        {/* Dynamic Center Navigation Tabs */}
-        <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-slate-200/50 dark:border-slate-800">
-          <button
-            onClick={() => setActiveTab('wheel')}
-            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeTab === 'wheel'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
-            }`}
-          >
-            <Compass className="w-4 h-4 animate-spin-slow" />
-            <span>បង្វិលឈ្មោះ</span>
-          </button>
+        {/* Dynamic Telegram iOS Liquid Glass Water Droplet Navigation Tabs */}
+        <nav className="flex items-center gap-1 bg-slate-200/50 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-white/80 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.05)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
+          {[
+            { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass },
+            { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon },
+            { id: 'students', label: 'គ្រប់គ្រងសិស្ស', icon: UserCog },
+            { id: 'quiz', label: 'ក្ដារសំណួរ', icon: LayoutGrid },
+            { id: 'exams-room', label: 'បន្ទប់វិញ្ញាសា', icon: GraduationCap },
+            { id: 'student-lobby', label: 'Live Game QR', icon: Sparkles, badge: true },
+          ].map((tab) => {
+            const Icon = tab.icon;
+            const isActive = activeTab === tab.id;
 
-          <button
-            onClick={() => setActiveTab('groups')}
-            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeTab === 'groups'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
-            }`}
-          >
-            <UsersIcon className="w-4 h-4" />
-            <span>បែងចែកក្រុម</span>
-          </button>
+            return (
+              <motion.button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.93 }}
+                transition={{ type: "spring", stiffness: 600, damping: 22 }}
+                className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
+                  isActive
+                    ? 'text-blue-600 dark:text-blue-400 font-extrabold'
+                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/30 dark:hover:bg-white/10'
+                }`}
+              >
+                {isActive && (
+                  <motion.div
+                    layoutId="telegramWaterDroplet"
+                    transition={{
+                      type: "spring",
+                      stiffness: 380,
+                      damping: 26,
+                      mass: 0.55
+                    }}
+                    className="absolute inset-0 rounded-xl bg-white/40 dark:bg-white/10 border border-white/90 dark:border-white/30 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04),inset_0_2px_3px_rgba(255,255,255,0.95),inset_0_-1.5px_3px_rgba(0,0,0,0.06)] backdrop-blur-xl overflow-hidden pointer-events-none"
+                  >
+                    {/* Pure Clear Glass Top Specular Glare Reflection */}
+                    <div className="absolute top-0 inset-x-1.5 h-[48%] bg-gradient-to-b from-white/90 via-white/30 to-transparent rounded-t-xl pointer-events-none" />
+                    {/* Water Droplet Lens Curved Ambient Highlight */}
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/50 via-transparent to-transparent pointer-events-none" />
+                    {/* Pure Glass Bottom Edge Light Rim */}
+                    <div className="absolute bottom-0 inset-x-2 h-[1px] bg-white/80 pointer-events-none" />
+                  </motion.div>
+                )}
 
-          <button
-            onClick={() => setActiveTab('students')}
-            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeTab === 'students'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
-            }`}
-          >
-            <UserCog className="w-4 h-4" />
-            <span>គ្រប់គ្រងសិស្ស</span>
-          </button>
+                <motion.span
+                  animate={{ scale: isActive ? 1.05 : 1 }}
+                  transition={{ type: "spring", stiffness: 400, damping: 22 }}
+                  className="relative z-10 flex items-center gap-2"
+                >
+                  <Icon className={`w-4 h-4 transition-all duration-300 ${
+                    isActive
+                      ? 'text-blue-600 dark:text-blue-400 scale-110'
+                      : 'text-slate-500 dark:text-slate-400'
+                  } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
+                  <span className={isActive ? 'text-blue-600 dark:text-blue-400 font-extrabold tracking-wide' : 'font-bold'}>{tab.label}</span>
+                  {tab.badge && (
+                    <span className="flex h-2 w-2 relative ml-0.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                    </span>
+                  )}
+                </motion.span>
+              </motion.button>
+            );
+          })}
+        </nav>
 
-          <button
-            onClick={() => setActiveTab('quiz')}
-            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeTab === 'quiz'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
-            }`}
-          >
-            <LayoutGrid className="w-4 h-4" />
-            <span>ក្ដារសំណួរ</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('exams-room')}
-            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeTab === 'exams-room'
-                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/15'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
-            }`}
-          >
-            <GraduationCap className="w-4 h-4" />
-            <span>បន្ទប់វិញ្ញាសាប្រឡង</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab('student-lobby')}
-            className={`px-4 py-2 rounded-xl text-xs font-black flex items-center gap-2 transition-all cursor-pointer select-none relative overflow-hidden ${
-              activeTab === 'student-lobby'
-                ? 'bg-amber-500 text-white shadow-md shadow-amber-500/15'
-                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-white'
-            }`}
-          >
-            <Sparkles className="w-4 h-4 text-amber-500 dark:text-amber-300 animate-pulse" />
-            <span>បន្ទប់ហ្គេមសិស្ស (Game & QR)</span>
-            <span className="absolute top-0 right-0 w-1.5 h-1.5 bg-red-500 rounded-full animate-ping" />
-          </button>
-        </div>
-
-        <div className="flex items-center gap-2.5">
+        {/* Action and Profile Controls */}
+        <div className="flex items-center gap-2">
           {/* Active Teacher Profile Area */}
           {teacher ? (
-            <div className={`flex items-center gap-2 px-3 py-1.5 rounded-2xl border ${
-              isDarkMode ? 'bg-slate-800 border-slate-700' : 'bg-slate-50 border-slate-200'
+            <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
+              isDarkMode ? 'bg-slate-800/80 border-slate-700 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
             }`}>
-              <div className="w-7 h-7 bg-emerald-500 rounded-full flex items-center justify-center text-white">
-                <User className="w-4 h-4" />
-              </div>
-              <div className="text-left pr-1">
-                <p className="text-xs font-black truncate max-w-[120px]">
+              {/* Avatar with Camera badge for instant change from phone/PC */}
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="relative cursor-pointer select-none rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                title="ចុចដើម្បីប្ដូររូបភាព Profile ពីទូរស័ព្ទ ឬកុំព្យូទ័រ"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-500/40 bg-emerald-500 flex items-center justify-center text-white text-xs font-black shadow-xs group-hover/prof:border-emerald-500 transition-all">
+                  {teacher.avatarUrl ? (
+                    <img 
+                      src={teacher.avatarUrl} 
+                      alt={teacher.name} 
+                      className="w-full h-full object-cover select-none" 
+                    />
+                  ) : (
+                    <User className="w-4.5 h-4.5" />
+                  )}
+                </div>
+                {/* Camera Badge Icon */}
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-600 group-hover/prof:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-xs border border-white dark:border-slate-800 transition-transform group-hover/prof:scale-110">
+                  <Camera className="w-2.5 h-2.5" />
+                </span>
+              </button>
+
+              <div 
+                onClick={() => setIsProfileModalOpen(true)}
+                className="text-left pr-1 hidden sm:block cursor-pointer select-none hover:opacity-85 transition-opacity"
+                title="ចុចដើម្បីមើល ឬកែប្រែព័ត៌មាន Profile"
+              >
+                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[110px]">
                   {teacher.name}
                 </p>
                 {teacher.subjects && (
-                  <p className="text-[9px] text-slate-400 leading-none mt-0.5">{teacher.subjects}</p>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-none truncate max-w-[110px]">{teacher.subjects}</p>
                 )}
               </div>
+
               <button
                 onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors"
-                title="ចាកចេញ"
+                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                title="ចាកចេញពីគណនី"
               >
                 <LogOut className="w-3.5 h-3.5" />
               </button>
@@ -2177,153 +2257,191 @@ export default function App() {
           ) : (
             <button
               onClick={() => setIsAuthModalOpen(true)}
-              className="px-4 py-2 bg-indigo-50 dark:bg-indigo-950/30 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-black flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/30 transition-all border border-indigo-100 dark:border-indigo-900/40"
+              className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
             >
               <LogIn className="w-4 h-4" />
-              <span>ចូលប្រើប្រាស់គណនីគ្រូ</span>
+              <span className="hidden sm:inline">ចូលគណនីគ្រូ</span>
             </button>
           )}
 
-          <div className={`h-6 w-[1px] ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-1`} />
+          <div className={`h-6 w-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-0.5`} />
 
           {/* Theme Switcher */}
           <button
             onClick={() => setIsDarkMode(!isDarkMode)}
-            className={`p-2.5 rounded-xl transition-all ${
-              isDarkMode ? 'text-yellow-400 hover:bg-slate-800' : 'text-slate-500 hover:bg-slate-150'
+            className={`p-2 rounded-xl transition-all cursor-pointer ${
+              isDarkMode ? 'text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
             }`}
-            title={isDarkMode ? 'ប្ដូរទៅមុខងារពន្លឺ' : 'ប្ដូរទៅមុខងារងងឹត'}
+            title={isDarkMode ? 'ប្ដូរទៅមុខងារពន្លឺ (Light)' : 'ប្ដូរទៅមុខងារងងឹត (Dark)'}
           >
-            {isDarkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+            {isDarkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
           </button>
 
           {/* Reset All */}
           <button
             onClick={resetAll}
-            className={`p-2.5 rounded-xl transition-all ${
+            className={`p-2 rounded-xl transition-all cursor-pointer ${
               isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
             }`}
-            title="កំណត់ឡើងវិញទាំងស្រុង"
+            title="កំណត់កម្មវិធីឡើងវិញ (Reset All)"
           >
-            <RotateCcw className="w-5 h-5" />
+            <RotateCcw className="w-4.5 h-4.5" />
           </button>
 
           {/* Create Questions Button */}
           <button
             onClick={() => setIsLessonModalOpen(true)}
-            className="px-5 py-2.5 btn-orange-gemini text-white rounded-xl text-xs font-black flex items-center gap-1.5 shadow-md hover:shadow-lg shadow-orange-500/10 hover:shadow-orange-500/20 group cursor-pointer select-none"
+            className="px-4 py-2 btn-orange-gemini text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow-md shadow-orange-500/20 group cursor-pointer select-none shrink-0"
           >
             <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform" />
-            <span>បង្កើតសំណួរ</span>
+            <span className="hidden sm:inline">បង្កើតសំណួរ AI</span>
           </button>
         </div>
       </header>
 
-      {/* Class/Grade switcher sub-bar */}
-      <div className={`py-3 px-8 flex items-center gap-3 shrink-0 overflow-x-auto border-b ${
-        isDarkMode ? 'bg-slate-900 border-slate-800' : 'bg-slate-50 border-slate-200 shadow-sm'
+      {/* Class Switcher & Workspace Sub-Bar */}
+      <div className={`py-2.5 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b transition-colors gap-4 overflow-x-auto ${
+        isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50/90 border-slate-200'
       }`}>
-        <GraduationCap className="w-5 h-5 text-indigo-500 shrink-0" />
-        <span className="text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider mr-2 shrink-0">ថ្នាក់រៀនសកម្ម៖</span>
-        <div className="flex items-center gap-2">
-          {classes.map((cls, idx) => (
-            <div 
-              key={cls.id ? `class-${cls.id}-${idx}` : `class-idx-${idx}`}
-              onClick={() => handleSwitchClass(cls.id)}
-              draggable={canDrag}
-              onDragStart={(e) => handleClassDragStart(e, idx)}
-              onDragOver={(e) => handleClassDragOver(e, idx)}
-              onDragEnd={handleClassDragEnd}
-              onMouseLeave={() => setCanDrag(false)}
-              className={`px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all select-none border group/item ${
-                draggedClassIndex === idx
-                  ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50 dark:bg-slate-800 scale-95'
-                  : activeClassId === cls.id 
-                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-500/10 scale-102 cursor-default' 
-                    : isDarkMode 
-                      ? 'bg-slate-800 text-slate-200 border-slate-700 hover:bg-slate-700 hover:text-white hover:border-slate-600 shadow-sm' 
-                      : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-50 hover:text-slate-950 hover:border-slate-300 shadow-sm'
-              }`}
-            >
-              <div
-                onMouseDown={() => setCanDrag(true)}
-                onTouchStart={() => setCanDrag(true)}
-                onMouseUp={() => setCanDrag(false)}
-                onTouchEnd={() => setCanDrag(false)}
-                className="cursor-grab active:cursor-grabbing p-1 -m-1 rounded hover:bg-black/5 dark:hover:bg-white/10 transition-colors shrink-0 flex items-center justify-center"
-                title="អូសដើម្បីប្ដូរទីតាំង"
-              >
-                <GripVertical className={`w-3.5 h-3.5 opacity-30 group-hover/item:opacity-80 transition-opacity shrink-0 ${
-                  activeClassId === cls.id ? 'text-white' : 'text-slate-400 dark:text-slate-500'
-                }`} />
-              </div>
-              <span className="cursor-pointer">{cls.name}</span>
-              <div className="flex items-center gap-1 shrink-0">
-                {idx > 0 && (
-                  <button
-                    onClick={(e) => handleMoveClass(e, idx, 'left')}
-                    className={`p-0.5 rounded-md transition-colors ${
-                      activeClassId === cls.id 
-                        ? 'hover:bg-white/20 text-white hover:text-indigo-200' 
-                        : 'hover:text-indigo-500 hover:bg-slate-500/10 text-slate-400 dark:text-slate-400'
-                    }`}
-                    title="រំកិលទៅឆ្វេង"
-                  >
-                    <ChevronLeft className="w-3 h-3" />
-                  </button>
-                )}
-                {idx < classes.length - 1 && (
-                  <button
-                    onClick={(e) => handleMoveClass(e, idx, 'right')}
-                    className={`p-0.5 rounded-md transition-colors ${
-                      activeClassId === cls.id 
-                        ? 'hover:bg-white/20 text-white hover:text-indigo-200' 
-                        : 'hover:text-indigo-500 hover:bg-slate-500/10 text-slate-400 dark:text-slate-400'
-                    }`}
-                    title="រំកិលទៅស្ដាំ"
-                  >
-                    <ChevronRight className="w-3 h-3" />
-                  </button>
-                )}
-                <button
-                  onClick={(e) => handleRenameClass(e, cls.id, cls.name)}
-                  className={`p-0.5 rounded-md transition-colors ${
-                    activeClassId === cls.id 
-                      ? 'hover:bg-white/20 text-white hover:text-indigo-200' 
-                      : 'hover:text-indigo-500 hover:bg-slate-500/10 text-slate-400 dark:text-slate-400'
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 mr-1 text-slate-500 dark:text-slate-400 font-bold text-xs">
+            <GraduationCap className="w-4 h-4 text-indigo-500 shrink-0" />
+            <span>ថ្នាក់រៀន៖</span>
+          </div>
+
+          {/* Class Pills */}
+          <div className="flex items-center gap-1.5 flex-wrap">
+            {classes.map((cls, idx) => {
+              const isActive = activeClassId === cls.id;
+              return (
+                <div 
+                  key={cls.id ? `class-${cls.id}-${idx}` : `class-idx-${idx}`}
+                  onClick={() => handleSwitchClass(cls.id)}
+                  draggable={canDrag}
+                  onDragStart={(e) => handleClassDragStart(e, idx)}
+                  onDragOver={(e) => handleClassDragOver(e, idx)}
+                  onDragEnd={handleClassDragEnd}
+                  onMouseLeave={() => setCanDrag(false)}
+                  className={`group/item relative px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all select-none border ${
+                    draggedClassIndex === idx
+                      ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50 dark:bg-slate-800 scale-95'
+                      : isActive 
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-extrabold' 
+                        : isDarkMode 
+                          ? 'bg-slate-800/90 text-slate-300 border-slate-700/80 hover:bg-slate-700/80 hover:text-white hover:border-slate-600' 
+                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-950 hover:border-slate-300 shadow-xs'
                   }`}
-                  title="កែឈ្មោះថ្នាក់"
                 >
-                  <Pencil className="w-2.5 h-2.5" />
-                </button>
-                {classes.length > 1 && (
-                  <button
-                    onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
-                    className={`p-0.5 rounded-md transition-colors ${
-                      activeClassId === cls.id
-                        ? 'hover:bg-red-500/40 text-red-200 hover:text-red-100'
-                        : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400 dark:text-slate-400'
-                    }`}
-                    title="លុបថ្នាក់"
+                  <div
+                    onMouseDown={() => setCanDrag(true)}
+                    onTouchStart={() => setCanDrag(true)}
+                    onMouseUp={() => setCanDrag(false)}
+                    onTouchEnd={() => setCanDrag(false)}
+                    className="cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90"
+                    title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
                   >
-                    <Trash2 className="w-2.5 h-2.5" />
-                  </button>
-                )}
-              </div>
-            </div>
-          ))}
-          <button
-            onClick={handleAddClass}
-            className={`px-3 py-1 bg-transparent border-2 border-dashed rounded-xl text-xs font-bold flex items-center gap-1 btn-add-class-gemini ${
-              isDarkMode 
-                ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-500' 
-                : 'border-slate-300 hover:border-indigo-500 hover:text-indigo-600 text-slate-400'
-            }`}
-            title="បន្ថែមថ្នាក់ថ្មី"
-          >
-            <Plus className="w-3.5 h-3.5" />
-            <span>បន្ថែមថ្នាក់</span>
-          </button>
+                    <GripVertical className="w-3 h-3" />
+                  </div>
+                  
+                  <span>{cls.name}</span>
+
+                  {/* Discrete action buttons (reveal on hover) */}
+                  <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
+                    {idx > 0 && (
+                      <button
+                        onClick={(e) => handleMoveClass(e, idx, 'left')}
+                        className={`p-0.5 rounded transition-colors ${
+                          isActive 
+                            ? 'hover:bg-white/20 text-white' 
+                            : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                        }`}
+                        title="រំកិលទៅឆ្វេង"
+                      >
+                        <ChevronLeft className="w-3 h-3" />
+                      </button>
+                    )}
+                    {idx < classes.length - 1 && (
+                      <button
+                        onClick={(e) => handleMoveClass(e, idx, 'right')}
+                        className={`p-0.5 rounded transition-colors ${
+                          isActive 
+                            ? 'hover:bg-white/20 text-white' 
+                            : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                        }`}
+                        title="រំកិលទៅស្ដាំ"
+                      >
+                        <ChevronRight className="w-3 h-3" />
+                      </button>
+                    )}
+                    <button
+                      onClick={(e) => handleRenameClass(e, cls.id, cls.name)}
+                      className={`p-0.5 rounded transition-colors ${
+                        isActive 
+                          ? 'hover:bg-white/20 text-white' 
+                          : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                      }`}
+                      title="កែឈ្មោះថ្នាក់"
+                    >
+                      <Pencil className="w-2.5 h-2.5" />
+                    </button>
+                    {classes.length > 1 && (
+                      <button
+                        onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                        className={`p-0.5 rounded transition-colors ${
+                          isActive
+                            ? 'hover:bg-red-500 text-red-200 hover:text-white'
+                            : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
+                        }`}
+                        title="លុបថ្នាក់"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+
+            <button
+              onClick={handleAddClass}
+              className={`px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                isDarkMode 
+                  ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-400 hover:bg-slate-800/50' 
+                  : 'border-slate-300 hover:border-indigo-500 hover:text-indigo-600 text-slate-500 hover:bg-indigo-50/50'
+              }`}
+              title="បន្ថែមថ្នាក់ថ្មី"
+            >
+              <Plus className="w-3.5 h-3.5" />
+              <span>បន្ថែមថ្នាក់</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right workspace quick metrics */}
+        <div className="hidden lg:flex items-center gap-3 shrink-0 text-xs font-bold">
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
+            isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
+          }`}>
+            <UsersIcon className="w-3.5 h-3.5 text-indigo-500" />
+            <span>សិស្សសរុប៖ <strong className="text-indigo-600 dark:text-indigo-400">{students.length}</strong> នាក់</span>
+          </div>
+
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
+            isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
+          }`}>
+            <Compass className="w-3.5 h-3.5 text-amber-500" />
+            <span>បានហៅ៖ <strong className="text-amber-600 dark:text-amber-400">{pickedIds.length}</strong>/{students.length}</span>
+          </div>
+
+          {pickedIds.length > 0 && (
+            <button
+              onClick={() => handleSetPickedIds([])}
+              className="px-2.5 py-1 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+              title="លាងសម្អាតការហៅឈ្មោះឡើងវិញ"
+            >
+              សម្អាតការហៅ
+            </button>
+          )}
         </div>
       </div>
 
@@ -2480,6 +2598,63 @@ export default function App() {
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={(acc) => setTeacher(acc)}
       />
+
+      {teacher && (
+        <TeacherProfileModal
+          isOpen={isProfileModalOpen}
+          onClose={() => setIsProfileModalOpen(false)}
+          teacher={teacher}
+          onUpdateTeacher={(updated) => setTeacher(updated)}
+          onLogout={() => {
+            setIsProfileModalOpen(false);
+            setIsLogoutModalOpen(true);
+          }}
+        />
+      )}
+
+      {/* Logout Confirmation Modal */}
+      <AnimatePresence>
+        {isLogoutModalOpen && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-xs">
+            <motion.div 
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl max-w-sm w-full p-6 shadow-2xl space-y-4"
+            >
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-red-100 dark:bg-red-950/50 flex items-center justify-center shrink-0 text-red-600 dark:text-red-400">
+                  <LogOut className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">ចាកចេញពីគណនី</h3>
+                  <p className="text-xs text-slate-500 dark:text-slate-400">Logout Account</p>
+                </div>
+              </div>
+              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ចាកចេញពីគណនីមែនទេ? (រាល់ទិន្នន័យដែលបានរក្សាទុកក្នុង Cloud នឹងមិនបាត់បង់ឡើយ)
+              </p>
+              <div className="flex items-center justify-end gap-2.5 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setIsLogoutModalOpen(false)}
+                  className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
+                >
+                  បោះបង់
+                </button>
+                <button
+                  type="button"
+                  onClick={confirmLogout}
+                  className="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl transition-all shadow-md shadow-red-600/20 cursor-pointer flex items-center gap-1.5"
+                >
+                  <LogOut className="w-3.5 h-3.5" />
+                  <span>ចាកចេញ</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

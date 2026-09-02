@@ -22,8 +22,11 @@ import {
   Languages,
   Settings,
   Eye,
-  Layers
+  Layers,
+  Link as LinkIcon
 } from 'lucide-react';
+import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
+import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import { generateQuestions, getSavedApiKey, saveApiKey } from '../lib/gemini';
 import { PREBUILT_LESSONS } from '../lib/templates';
 import { Question } from '../types';
@@ -190,54 +193,68 @@ const DEFAULT_EXAMS: ExamPaper[] = [
     id: 'exam-oct',
     title: 'វិញ្ញាសាខែតុលា',
     type: 'monthly',
-    schoolName: 'សាលារៀនជំនាន់ថ្មី វិទ្យាល័យព្រះស៊ីសុវត្ថិ',
+    schoolName: 'សាលារៀនសុវណ្ណភូមិ',
     timeLimit: '60 នាទី',
     examDate: '2026-10-25',
     createdAt: Date.now() - 2000000,
     subjects: [
-      { id: 'sub-p', name: 'រូបវិទ្យា', questions: DEFAULT_PHYSICS_QUESTIONS },
-      { id: 'sub-c', name: 'គីមីវិទ្យា', questions: DEFAULT_CHEMISTRY_QUESTIONS }
+      { id: 'sub-p', name: 'រូបវិទ្យា', questions: DEFAULT_PHYSICS_QUESTIONS }
     ]
   },
   {
     id: 'exam-nov',
     title: 'វិញ្ញាសាខែវិច្ឆិកា',
     type: 'monthly',
-    schoolName: 'សាលារៀនជំនាន់ថ្មី វិទ្យាល័យព្រះស៊ីសុវត្ថិ',
+    schoolName: 'សាលារៀនសុវណ្ណភូមិ',
     timeLimit: '60 នាទី',
     examDate: '2026-11-28',
     createdAt: Date.now() - 1000000,
     subjects: [
-      { id: 'sub-p', name: 'រូបវិទ្យា', questions: DEFAULT_PHYSICS_QUESTIONS },
-      { id: 'sub-c', name: 'គីមីវិទ្យា', questions: DEFAULT_CHEMISTRY_QUESTIONS }
+      { id: 'sub-p', name: 'រូបវិទ្យា', questions: DEFAULT_PHYSICS_QUESTIONS }
     ]
   },
   {
     id: 'exam-sem1',
     title: 'វិញ្ញាសាប្រឡងឆមាសទី១',
     type: 'semester',
-    schoolName: 'សាលារៀនជំនាន់ថ្មី វិទ្យាល័យព្រះស៊ីសុវត្ថិ',
+    schoolName: 'សាលារៀនសុវណ្ណភូមិ',
     timeLimit: '90 នាទី',
     examDate: '2026-03-12',
     createdAt: Date.now(),
     subjects: [
-      { id: 'sub-p', name: 'រូបវិទ្យា', questions: DEFAULT_PHYSICS_QUESTIONS },
-      { id: 'sub-c', name: 'គីមីវិទ្យា', questions: DEFAULT_CHEMISTRY_QUESTIONS }
+      { id: 'sub-p', name: 'រូបវិទ្យា', questions: DEFAULT_PHYSICS_QUESTIONS }
     ]
   }
 ];
 
 export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode, teacher }: ExamsPanelProps) {
+  const defaultSchool = teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ';
+
+  const formatSchoolName = (name?: string) => {
+    if (!name || name.includes('ព្រះស៊ីសុវត្តិ') || name.includes('ជំនាន់ថ្មី')) {
+      return defaultSchool;
+    }
+    return name;
+  };
+
   const [exams, setExams] = useState<ExamPaper[]>(() => {
     const saved = localStorage.getItem(`khmer_exams_${activeClassId || 'general'}`);
     if (saved) {
       try {
-        return JSON.parse(saved);
+        const parsed: ExamPaper[] = JSON.parse(saved);
+        return parsed.map(e => ({
+          ...e,
+          schoolName: formatSchoolName(e.schoolName),
+          subjects: (e.subjects || []).filter(s => s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា' && s.id !== 'sub-c' && s.id !== 'sub-m')
+        }));
       } catch (e) {
         console.error("Failed to parse exams, using defaults", e);
       }
     }
-    return DEFAULT_EXAMS;
+    return DEFAULT_EXAMS.map(e => ({
+      ...e,
+      schoolName: defaultSchool
+    }));
   });
 
   const [activeType, setActiveType] = useState<'monthly' | 'semester'>('monthly');
@@ -253,7 +270,7 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [newTitle, setNewTitle] = useState('');
   const [newType, setNewType] = useState<'monthly' | 'semester'>('monthly');
-  const [newSchool, setNewSchool] = useState('សាលារៀនជំនាន់ថ្មី វិទ្យាល័យព្រះស៊ីសុវត្ថិ');
+  const [newSchool, setNewSchool] = useState(defaultSchool);
   const [newTime, setNewTime] = useState('60 នាទី');
   const [newDate, setNewDate] = useState('2026-06-25');
 
@@ -295,7 +312,7 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
   const [customCenterSpan, setCustomCenterSpan] = useState<number>(2);
   const [customRightSpan, setCustomRightSpan] = useState<number>(5);
   
-  const [examCenter, setExamCenter] = useState('.....................................................');
+  const [examCenter, setExamCenter] = useState(defaultSchool);
   const [roomNumber, setRoomNumber] = useState('..................');
   const [subjectName, setSubjectName] = useState('');
   const [deskNumber, setDeskNumber] = useState('..................');
@@ -307,20 +324,26 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
   const [durationTime, setDurationTime] = useState('................ នាទី');
   const [totalScore, setTotalScore] = useState('...... ពិន្ទុ');
   
-  const [logoText1, setLogoText1] = useState('សាលារៀនសុវណ្ណភូមិ');
+  const [logoText1, setLogoText1] = useState(defaultSchool);
   const [logoText2, setLogoText2] = useState('ទីតាំងផ្សារដីហុយ');
   
   const [customLogo, setCustomLogo] = useState<string | null>(() => {
     if (typeof window !== 'undefined') {
-      return localStorage.getItem('teacher_custom_logo') || null;
+      const saved = localStorage.getItem('teacher_custom_logo');
+      if (saved && (saved.includes('1AHlIse7sV5KwQ9EOzhLl6ZPuJhvUz1km') || saved.includes('1dEG3MOdFHToMpHs6gm-B3VjUOaIvIlWf'))) {
+        localStorage.setItem('teacher_custom_logo', '/sovannaphumi.png');
+        return '/sovannaphumi.png';
+      }
+      return saved || null;
     }
     return null;
   });
+  const [logoUrlInput, setLogoUrlInput] = useState('');
   
   const [optionsLayout, setOptionsLayout] = useState<'inline' | 'stacked'>('inline');
   const [optionStyle, setOptionStyle] = useState<'khmer' | 'latin'>('khmer');
   const [highlightKey, setHighlightKey] = useState(false);
-  const [imgSrc, setImgSrc] = useState('/Sovannphomi.png');
+  const [imgSrc, setImgSrc] = useState('/sovannaphumi.png');
   const [imageFailed, setImageFailed] = useState(false);
 
   const activeSubject = activeExam?.subjects.find(s => s.id === activeSubjectId) || activeExam?.subjects[0];
@@ -328,19 +351,20 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
   // Auto sync layout configurations when selected exam or subject changes
   useEffect(() => {
     if (activeExam) {
-      setExamCenter(activeExam.schoolName || '.....................................................');
+      const activeSchool = activeExam.schoolName || defaultSchool;
+      setExamCenter(activeSchool);
       setExamName(activeExam.title || '...................................');
       setGradeNumber(activeClassName || '..................');
       setExamSession(activeExam.examDate || '......../......../........');
       setDurationTime(activeExam.timeLimit || '................ នាទី');
-      setLogoText1(activeExam.schoolName || 'សាលារៀនសុវណ្ណភូមិ');
+      setLogoText1(activeSchool);
     }
     if (activeSubject) {
       setSubjectName(activeSubject.name || '');
       const qCount = activeSubject.questions.length;
       setTotalScore(`${qCount * 2} ពិន្ទុ`);
     }
-  }, [activeExam?.id, activeSubject?.id, activeClassName]);
+  }, [activeExam?.id, activeSubject?.id, activeClassName, activeExam?.schoolName, defaultSchool]);
 
   // Reload exams from localStorage whenever activeClassId changes to keep each classroom separate
   useEffect(() => {
@@ -348,7 +372,11 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
     let loadedExams: ExamPaper[] = [];
     if (saved) {
       try {
-        loadedExams = JSON.parse(saved);
+        const parsed: ExamPaper[] = JSON.parse(saved);
+        loadedExams = parsed.map(e => ({
+          ...e,
+          schoolName: e.schoolName || defaultSchool
+        }));
       } catch (e) {
         console.error("Failed to parse exams, using defaults", e);
         loadedExams = JSON.parse(JSON.stringify(DEFAULT_EXAMS));
@@ -519,13 +547,12 @@ Output the response in JSON format.`;
       id: `exam-${Date.now()}`,
       title: newTitle.trim(),
       type: newType,
-      schoolName: newSchool.trim() || 'សាលារៀនរដ្ឋ',
+      schoolName: newSchool.trim() || defaultSchool,
       timeLimit: newTime.trim() || '60 នាទី',
       examDate: newDate,
       createdAt: Date.now(),
       subjects: [
-        { id: `sub-p-${Date.now()}`, name: 'រូបវិទ្យា', questions: [...DEFAULT_PHYSICS_QUESTIONS] },
-        { id: `sub-c-${Date.now()}`, name: 'គីមីវិទ្យា', questions: [...DEFAULT_CHEMISTRY_QUESTIONS] }
+        { id: `sub-p-${Date.now()}`, name: 'រូបវិទ្យា', questions: [...DEFAULT_PHYSICS_QUESTIONS] }
       ]
     };
 
@@ -623,23 +650,34 @@ Output the response in JSON format.`;
 
   // Delete Subject
   const handleDeleteSubject = (subjectId: string) => {
-    if (!activeExam || activeExam.subjects.length <= 1) {
-      alert('ត្រូវតែមានមុខវិជ្ជាយ៉ាងហោចណាស់ ១ ក្នុងវិញ្ញាសានីមួយៗ!');
+    if (!activeExam) return;
+
+    const targetSub = activeExam.subjects.find(s => s.id === subjectId);
+    const subName = targetSub ? targetSub.name : 'មុខវិជ្ជានេះ';
+
+    if (!window.confirm(`តើអ្នកពិតជាចង់លុបមុខវិជ្ជា "${subName}" នេះមែនទេ?`)) {
       return;
     }
-    if (confirm('តើអ្នកពិតជាចង់លុបមុខវិជ្ជានេះពីវិញ្ញាសានេះមែនទេ?')) {
-      const updated = exams.map(e => {
-        if (e.id === activeExam.id) {
-          const filtered = e.subjects.filter(s => s.id !== subjectId);
-          return {
-            ...e,
-            subjects: filtered
-          };
-        }
-        return e;
-      });
-      saveState(updated);
+
+    const updated = exams.map(e => {
+      if (e.id === activeExam.id) {
+        const filtered = e.subjects.filter(s => s.id !== subjectId);
+        return {
+          ...e,
+          subjects: filtered
+        };
+      }
+      return e;
+    });
+
+    const currentExam = updated.find(e => e.id === activeExam.id);
+    if (currentExam && currentExam.subjects.length > 0) {
+      if (!currentExam.subjects.some(s => s.id === activeSubjectId)) {
+        setActiveSubjectId(currentExam.subjects[0].id);
+      }
     }
+
+    saveState(updated);
   };
 
   // Edit questions handler - open modal
@@ -2785,7 +2823,7 @@ Output the response in JSON format.`;
                           {exam.title}
                         </h4>
                         <p className={`text-[10px] mt-0.5 truncate ${isActive ? 'text-indigo-100' : 'text-slate-400'}`}>
-                          សាលា៖ {exam.schoolName} • {exam.subjects.length} មុខវិជ្ជា
+                          សាលា៖ {formatSchoolName(exam.schoolName)} • {exam.subjects.length} មុខវិជ្ជា
                         </p>
                       </div>
                     </div>
@@ -2904,7 +2942,7 @@ Output the response in JSON format.`;
                     <div className="flex flex-wrap items-center gap-y-1.5 gap-x-4 mt-2 text-[11px] font-bold text-slate-400 dark:text-slate-500">
                       <span className="flex items-center gap-1">
                         <School className="w-3 h-3 text-indigo-500" />
-                        {activeExam.schoolName}
+                        {formatSchoolName(activeExam.schoolName)}
                       </span>
                       <span>•</span>
                       <span className="flex items-center gap-1">
@@ -3022,17 +3060,18 @@ Output the response in JSON format.`;
                           📚 {sub.name} ({sub.questions.length})
                         </button>
                         
-                        {/* Option to delete non-default categories */}
-                        {activeExam.subjects.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={() => handleDeleteSubject(sub.id)}
-                            title="លុបមុខវិជ្ជា"
-                            className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center font-black text-[9px] shadow cursor-pointer transition-all border-none"
-                          >
-                            ×
-                          </button>
-                        )}
+                        {/* Option to delete category */}
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            handleDeleteSubject(sub.id);
+                          }}
+                          title="លុបមុខវិជ្ជា"
+                          className="absolute -top-1.5 -right-1.5 w-4.5 h-4.5 bg-red-500 hover:bg-red-600 text-white rounded-full flex items-center justify-center font-black text-[9px] shadow cursor-pointer transition-all border-none z-10 active:scale-90"
+                        >
+                          ×
+                        </button>
                       </div>
                     );
                   })}
@@ -4500,6 +4539,119 @@ Output the response in JSON format.`;
                             onChange={(e) => setLogoText2(e.target.value)}
                             className="w-full px-2.5 py-1.5 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg text-slate-800 dark:text-white"
                           />
+                        </div>
+                      </div>
+
+                      {/* Logo File Selector and Google Drive link block */}
+                      <div className="bg-slate-50 dark:bg-slate-950/40 p-3.5 rounded-xl border border-dashed border-slate-200 dark:border-slate-800 space-y-3">
+                        <div className="flex items-center justify-between">
+                          <label className="block text-[10px] font-black text-slate-600 dark:text-slate-400 uppercase tracking-wider">រូបសញ្ញាសាលារៀន (School Logo)</label>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setCustomLogo('/sovannaphumi.png');
+                              localStorage.setItem('teacher_custom_logo', '/sovannaphumi.png');
+                            }}
+                            className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 cursor-pointer"
+                            title="កំណត់យក Logo សាលារៀនសុវណ្ណភូមិពី Google Drive ស្វ័យប្រវត្តិ"
+                          >
+                            <Sparkles className="w-3 h-3 text-amber-500" />
+                            <span>ប្រើ Logo សុវណ្ណភូមិ (Google Drive)</span>
+                          </button>
+                        </div>
+
+                        <div className="flex items-center gap-3">
+                          {customLogo ? (
+                            <div className="relative w-12 h-12 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center p-1 overflow-hidden group shrink-0 shadow-xs">
+                              <img src={customLogo} alt="Custom School Logo Preview" className="w-full h-full object-contain" />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setCustomLogo(null);
+                                  localStorage.removeItem('teacher_custom_logo');
+                                }}
+                                className="absolute inset-0 bg-red-600/90 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity cursor-pointer text-[9px] font-bold"
+                                title="លុបឡូហ្គោចេញ"
+                              >
+                                លុបចេញ
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg flex items-center justify-center text-slate-400 text-[9px] font-black uppercase shrink-0">
+                              គំរូដើម
+                            </div>
+                          )}
+                          <div className="flex-1 min-w-0 space-y-2">
+                            {/* Google Drive / Web link input */}
+                            <div className="flex items-center gap-1.5">
+                              <div className="relative flex-1">
+                                <LinkIcon className="w-3.5 h-3.5 absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400" />
+                                <input
+                                  type="url"
+                                  placeholder="បិទភ្ជាប់ Google Drive Link ឬ Image URL..."
+                                  value={logoUrlInput}
+                                  onChange={(e) => setLogoUrlInput(e.target.value)}
+                                  onKeyDown={async (e) => {
+                                    if (e.key === 'Enter' && logoUrlInput.trim()) {
+                                      e.preventDefault();
+                                      const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
+                                      const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
+                                      setCustomLogo(transparentPng);
+                                      localStorage.setItem('teacher_custom_logo', transparentPng);
+                                      setLogoUrlInput('');
+                                    }
+                                  }}
+                                  className="w-full pl-8 pr-2 py-1 text-[11px] bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white placeholder:text-slate-400"
+                                />
+                              </div>
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (logoUrlInput.trim()) {
+                                    const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
+                                    const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
+                                    setCustomLogo(transparentPng);
+                                    localStorage.setItem('teacher_custom_logo', transparentPng);
+                                    setLogoUrlInput('');
+                                  }
+                                }}
+                                disabled={!logoUrlInput.trim()}
+                                className="px-2.5 py-1 bg-indigo-600 disabled:opacity-40 text-white rounded-lg text-[10px] font-bold cursor-pointer transition-all hover:bg-indigo-700 shrink-0"
+                              >
+                                ដាក់ចូល
+                              </button>
+                            </div>
+
+                            {/* File Upload Button */}
+                            <div className="flex items-center gap-2">
+                              <input
+                                type="file"
+                                accept="image/png, image/jpeg, image/gif"
+                                id="exams-custom-logo-uploader"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const file = e.target.files?.[0];
+                                  if (file) {
+                                    const reader = new FileReader();
+                                    reader.onload = async (event) => {
+                                      const base64 = event.target?.result as string;
+                                      const transparentPng = await removeWhiteBackgroundFromDataUrl(base64);
+                                      setCustomLogo(transparentPng);
+                                      localStorage.setItem('teacher_custom_logo', transparentPng);
+                                    };
+                                    reader.readAsDataURL(file);
+                                  }
+                                }}
+                              />
+                              <label
+                                htmlFor="exams-custom-logo-uploader"
+                                className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-slate-200/80 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300 text-[10px] font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                              >
+                                📂 ជ្រើសរើស File ពីកុំព្យូទ័រ
+                              </label>
+                              <span className="text-[9px] text-slate-400">គាំទ្រ Google Drive, Web Link, PNG, JPG</span>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     </div>

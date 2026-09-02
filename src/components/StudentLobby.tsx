@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { 
   Crown, QrCode, Award, Trophy, Sparkles, Timer, Check, Copy, 
   Plus, Users, CheckCircle, TrendingUp, UserCheck, Volume2, Tv, RefreshCw, Smartphone,
-  HelpCircle, AlertCircle, Play, ArrowRight, XCircle, Info, ChevronRight, Pencil, Trash2
+  HelpCircle, AlertCircle, Play, ArrowRight, XCircle, Info, ChevronRight, Pencil, Trash2,
+  GraduationCap, BookOpen, School
 } from 'lucide-react';
 import { doc, setDoc, deleteDoc } from 'firebase/firestore';
 import { db } from '../lib/firebase';
@@ -45,43 +46,12 @@ export default function StudentLobby({
   const [liveLeftTime, setLiveLeftTime] = useState<number>(25);
   const [selectedDomain, setSelectedDomain] = useState<'auto' | 'aistudio' | 'vercel'>('auto');
 
-  // Simulated Players State (fallback when no real approved players)
-  const isUsingSimulatedPlayers = students.filter(s => s.isApproved !== false).length === 0;
-  const [simulatedAnswers, setSimulatedAnswers] = useState<Record<string, { option: number; isCorrect: boolean; points: number }>>({});
-  const [simulatedScores, setSimulatedScores] = useState<Record<string, number>>({
-    "sim-1": 130,
-    "sim-2": 95,
-    "sim-3": 115,
-    "sim-4": 80,
-    "sim-5": 140
-  });
-
-  const baseSimulatedPlayers: Student[] = [
-    { id: "sim-1", name: "សូភក្តិ / Sophak", score: 130, emoji: "🧑‍🎓", gender: "ប្រុស", status: "សកម្ម", isApproved: true },
-    { id: "sim-2", name: "ចិន្តា / Chenda", score: 95, emoji: "🦊", gender: "ស្រី", status: "សកម្ម", isApproved: true },
-    { id: "sim-3", name: "វិសាល / Visal", score: 115, emoji: "🦁", gender: "ប្រុស", status: "សកម្ម", isApproved: true },
-    { id: "sim-4", name: "ដារ៉ា / Dara", score: 80, emoji: "🚀", gender: "ប្រុស", status: "សកម្ម", isApproved: true },
-    { id: "sim-5", name: "បូរី / Borey", score: 140, emoji: "🔥", gender: "ប្រុស", status: "សកម្ម", isApproved: true }
-  ];
-
   // Active question and metadata calculations
   const activeCard = cards.find(c => c.id === activeCardId) || null;
   const currentQuestion = activeCard?.question || null;
 
-  const simulatedPlayers = baseSimulatedPlayers.map(player => {
-    const simAns = simulatedAnswers[player.id];
-    const score = simulatedScores[player.id] ?? player.score;
-    return {
-      ...player,
-      score,
-      currentAnswerCardId: simAns ? activeCardId : undefined,
-      currentAnswerIndex: simAns ? simAns.option : undefined,
-      currentAnswerIsCorrect: simAns ? simAns.isCorrect : undefined
-    } as Student;
-  });
-
   // Filter approved and pending join requests
-  const approvedStudents = isUsingSimulatedPlayers ? simulatedPlayers : students.filter(s => s.isApproved !== false);
+  const approvedStudents = students.filter(s => s.isApproved !== false);
   const pendingApprovalStudents = students.filter(s => s.isApproved === false);
 
   const answeredStudents = approvedStudents.filter(s => s.currentAnswerCardId === activeCardId);
@@ -92,47 +62,7 @@ export default function StudentLobby({
   const wrongStudents = answeredStudents.filter(s => s.currentAnswerIsCorrect === false || s.currentAnswerIndex === -1);
   const pendingStudents = approvedStudents.filter(s => s.currentAnswerCardId !== activeCardId);
 
-  // Automated simulation of answers logic
-  useEffect(() => {
-    if (!isUsingSimulatedPlayers || !activeCardId || activeCardState !== 'answering' || !currentQuestion) {
-      setSimulatedAnswers({});
-      return;
-    }
 
-    const timeoutIds: any[] = [];
-    simulatedPlayers.forEach((player, idx) => {
-      const delay = 1000 + idx * 1200 + Math.random() * 600;
-      const t = setTimeout(() => {
-        const correctOpt = currentQuestion.correctIndex ?? 0;
-        const isCorrect = Math.random() > 0.25; // 75% correct
-        const chosenOpt = isCorrect ? correctOpt : (correctOpt + 1) % (currentQuestion.options?.length ?? 4);
-        const points = isCorrect ? Math.round(100 + Math.random() * 50) : 0;
-
-        setSimulatedAnswers(prev => ({
-          ...prev,
-          [player.id]: { option: chosenOpt, isCorrect, points }
-        }));
-      }, delay);
-      timeoutIds.push(t);
-    });
-
-    return () => timeoutIds.forEach(clearTimeout);
-  }, [activeCardId, activeCardState, isUsingSimulatedPlayers, currentQuestion]);
-
-  // Sync simulated answer scores to student simulatedScoreboard on reveal state
-  useEffect(() => {
-    if (activeCardState === 'revealed' && isUsingSimulatedPlayers) {
-      setSimulatedScores(prev => {
-        const next = { ...prev };
-        (Object.entries(simulatedAnswers) as [string, { option: number; isCorrect: boolean; points: number }][]).forEach(([pid, ans]) => {
-          if (ans.isCorrect) {
-            next[pid] = (next[pid] ?? 0) + ans.points;
-          }
-        });
-        return next;
-      });
-    }
-  }, [activeCardState]);
 
   const handleApproveStudent = async (studentId: string) => {
     if (!teacher || !activeClassId) return;
@@ -374,9 +304,107 @@ export default function StudentLobby({
     return `ស្វែងរកកំពូលម្ចាស់ជ័យលាភី${activeSubjectName}`;
   };
 
+  // Dedicated realistic Fireworks sound player (MP3 audio + Web Audio synthesizer fallback)
+  const playFireworksSound = () => {
+    // 1. Play real MP3 fireworks explosion SFX
+    try {
+      const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3');
+      audio.volume = 0.9;
+      audio.play().catch(() => {});
+    } catch (e) {}
+
+    // 2. Synthesize multi-stage fireworks sound (Launch whistle, deep bass explosion, filtered noise, crackle sparks)
+    try {
+      const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioContext) return;
+      const ctx = new AudioContext();
+
+      const triggerBurst = (offset: number) => {
+        const now = ctx.currentTime + offset;
+
+        // A) Whistle sound rising up
+        const whistleOsc = ctx.createOscillator();
+        const whistleGain = ctx.createGain();
+        whistleOsc.type = 'sine';
+        whistleOsc.frequency.setValueAtTime(320 + Math.random() * 200, now);
+        whistleOsc.frequency.exponentialRampToValueAtTime(1500 + Math.random() * 500, now + 0.35);
+        whistleGain.gain.setValueAtTime(0.15, now);
+        whistleGain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+        whistleOsc.connect(whistleGain);
+        whistleGain.connect(ctx.destination);
+        whistleOsc.start(now);
+        whistleOsc.stop(now + 0.35);
+
+        // B) Sub-bass Boom (Deep explosion kick)
+        const boomTime = now + 0.32;
+        const boomOsc = ctx.createOscillator();
+        const boomGain = ctx.createGain();
+        boomOsc.type = 'sine';
+        boomOsc.frequency.setValueAtTime(180, boomTime);
+        boomOsc.frequency.exponentialRampToValueAtTime(28, boomTime + 0.85);
+        boomGain.gain.setValueAtTime(0.6, boomTime);
+        boomGain.gain.exponentialRampToValueAtTime(0.001, boomTime + 0.85);
+        boomOsc.connect(boomGain);
+        boomGain.connect(ctx.destination);
+        boomOsc.start(boomTime);
+        boomOsc.stop(boomTime + 0.85);
+
+        // C) Filtered White Noise Explosion
+        const bufferSize = ctx.sampleRate * 1.3;
+        const noiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+        const output = noiseBuffer.getChannelData(0);
+        for (let i = 0; i < bufferSize; i++) {
+          output[i] = Math.random() * 2 - 1;
+        }
+        const noiseSource = ctx.createBufferSource();
+        noiseSource.buffer = noiseBuffer;
+
+        const filter = ctx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(1000, boomTime);
+        filter.frequency.exponentialRampToValueAtTime(100, boomTime + 1.1);
+
+        const noiseGain = ctx.createGain();
+        noiseGain.gain.setValueAtTime(0.4, boomTime);
+        noiseGain.gain.exponentialRampToValueAtTime(0.001, boomTime + 1.1);
+
+        noiseSource.connect(filter);
+        filter.connect(noiseGain);
+        noiseGain.connect(ctx.destination);
+        noiseSource.start(boomTime);
+        noiseSource.stop(boomTime + 1.1);
+
+        // D) Crackle & Sparkles
+        for (let i = 0; i < 8; i++) {
+          const crackleTime = boomTime + 0.12 + Math.random() * 1.0;
+          const cOsc = ctx.createOscillator();
+          const cGain = ctx.createGain();
+          cOsc.type = 'square';
+          cOsc.frequency.setValueAtTime(600 + Math.random() * 1200, crackleTime);
+          cGain.gain.setValueAtTime(0.08, crackleTime);
+          cGain.gain.exponentialRampToValueAtTime(0.001, crackleTime + 0.04);
+          cOsc.connect(cGain);
+          cGain.connect(ctx.destination);
+          cOsc.start(crackleTime);
+          cOsc.stop(crackleTime + 0.04);
+        }
+      };
+
+      // Play staggered firework explosions
+      triggerBurst(0);
+      triggerBurst(0.7);
+      triggerBurst(1.5);
+    } catch (err) {
+      console.warn('Firework audio synthesizer error:', err);
+    }
+  };
+
   // Sound Synthesizer function
   const playPodiumSound = (isChampion = false) => {
     try {
+      if (isChampion) {
+        playFireworksSound();
+      }
       const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
       if (!AudioContext) return;
       const ctx = new AudioContext();
@@ -551,10 +579,16 @@ export default function StudentLobby({
 
       const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
 
+      let burstCount = 0;
       const interval = setInterval(() => {
         const timeLeft = animationEnd - Date.now();
         if (timeLeft <= 0) {
           return clearInterval(interval);
+        }
+
+        burstCount++;
+        if (burstCount % 6 === 0) {
+          playFireworksSound();
         }
 
         const particleCount = 50 * (timeLeft / duration);
@@ -945,21 +979,75 @@ export default function StudentLobby({
               </div>
             </div>
 
-            {/* Dynamic QR Code Frame - Styled cleanly for dark or light backgrounds */}
-            <div className={`p-4 rounded-[2rem] shadow-md shrink-0 flex flex-col items-center gap-2 group hover:scale-[1.02] transition-all duration-300 relative ${
-              isDarkMode ? 'bg-slate-950 border border-indigo-950' : 'bg-slate-50 border border-slate-200/80'
-            }`}>
-              <img 
-                src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(studentJoinLink)}`}
-                alt="QR Code For Joining" 
-                className="w-36 h-36 object-contain rounded-xl select-none z-10 relative"
-              />
-              <span className={`text-[9.5px] font-black tracking-wider uppercase flex items-center gap-1.5 z-10 relative ${
-                isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
-              }`}>
-                <QrCode className={`w-3.5 h-3.5 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'} animate-pulse`} />
-                ស្កេនរូបដើម្បីចូលរួម (Scan QR)
-              </span>
+            {/* Beautiful White Educational Frame with Scholarly Ornamentation */}
+            <div className="w-full max-w-[270px] bg-white text-slate-800 rounded-[2rem] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)] border-2 border-amber-300/90 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 select-none">
+              
+              {/* Ornate Corner Elements (ក្បាច់ស៊ុមបែបអប់រំ / Classical Educational Diploma Corner Motifs) */}
+              <svg className="w-5 h-5 text-amber-500/90 absolute top-2 left-2 pointer-events-none" viewBox="0 0 24 24" fill="none">
+                <path d="M3 13V5C3 3.89543 3.89543 3 5 3H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M3 3L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="6" cy="6" r="1.5" fill="currentColor" />
+              </svg>
+              <svg className="w-5 h-5 text-amber-500/90 absolute top-2 right-2 pointer-events-none rotate-90" viewBox="0 0 24 24" fill="none">
+                <path d="M3 13V5C3 3.89543 3.89543 3 5 3H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M3 3L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="6" cy="6" r="1.5" fill="currentColor" />
+              </svg>
+              <svg className="w-5 h-5 text-amber-500/90 absolute bottom-2 left-2 pointer-events-none -rotate-90" viewBox="0 0 24 24" fill="none">
+                <path d="M3 13V5C3 3.89543 3.89543 3 5 3H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M3 3L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="6" cy="6" r="1.5" fill="currentColor" />
+              </svg>
+              <svg className="w-5 h-5 text-amber-500/90 absolute bottom-2 right-2 pointer-events-none rotate-180" viewBox="0 0 24 24" fill="none">
+                <path d="M3 13V5C3 3.89543 3.89543 3 5 3H13" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                <path d="M3 3L8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                <circle cx="6" cy="6" r="1.5" fill="currentColor" />
+              </svg>
+
+              {/* Inner Certificate Border with Educational Motifs */}
+              <div className="border border-dashed border-amber-300/80 rounded-[1.4rem] p-3 bg-gradient-to-b from-amber-50/40 via-white to-amber-50/30 flex flex-col items-center relative">
+                
+                {/* Educational Header Crest */}
+                <div className="flex items-center justify-center gap-1.5 mb-2 pb-1.5 border-b border-amber-200/70 w-full">
+                  <div className="w-6 h-6 rounded-full bg-gradient-to-br from-indigo-600 to-indigo-800 flex items-center justify-center text-white shadow-xs shrink-0">
+                    <GraduationCap className="w-3.5 h-3.5 text-amber-300" />
+                  </div>
+                  <div className="flex flex-col items-center leading-tight">
+                    <span className="text-[10.5px] font-black text-slate-800 tracking-tight flex items-center gap-1">
+                      <span>{teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ'}</span>
+                    </span>
+                    <span className="text-[8.5px] font-bold text-indigo-700 tracking-wider flex items-center gap-1">
+                      <BookOpen className="w-2.5 h-2.5 text-amber-600" />
+                      <span>បន្ទប់សិក្សាឌីជីថល • DIGITAL CLASS</span>
+                    </span>
+                  </div>
+                </div>
+
+                {/* QR Code Container with Crisp Contrast Stage */}
+                <div className="relative p-1.5 bg-white rounded-xl shadow-xs border border-slate-200/90 group-hover:border-amber-400 transition-colors">
+                  <img 
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(studentJoinLink)}`}
+                    alt="QR Code For Joining" 
+                    className="w-36 h-36 object-contain rounded-lg select-none block"
+                  />
+                </div>
+
+                {/* Educational Footer Ribbon & Instruction */}
+                <div className="mt-2.5 w-full flex flex-col items-center gap-1">
+                  <div className="px-3 py-1 bg-gradient-to-r from-amber-100 via-indigo-50 to-amber-100 text-indigo-950 border border-amber-300/80 rounded-full flex items-center gap-1.5 shadow-2xs">
+                    <QrCode className="w-3.5 h-3.5 text-indigo-600 animate-pulse" />
+                    <span className="text-[10px] font-black tracking-wide text-slate-900">
+                      ស្កេនរូបដើម្បីចូលរួម (SCAN QR)
+                    </span>
+                  </div>
+                  <span className="text-[8.5px] font-bold text-slate-500 flex items-center gap-1">
+                    <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                    <span>បើកកាមេរ៉ាទូរស័ព្ទស្កេនចូលរៀនភ្លាមៗ</span>
+                    <Sparkles className="w-2.5 h-2.5 text-amber-500" />
+                  </span>
+                </div>
+
+              </div>
             </div>
 
             {/* Quick Share Link - Minimal and elegant copy-trigger */}
@@ -1021,17 +1109,10 @@ export default function StudentLobby({
             }`}>
               <div className="space-y-1">
                 <span className="text-slate-400 block text-[10px] uppercase font-black">សកម្មភាពម៉ាស៊ីនបន្តផ្ទាល់</span>
-                {isUsingSimulatedPlayers ? (
-                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 inline-block animate-pulse shrink-0" />
-                    របៀបសាកល្បង (Sim Mode Live)
-                  </span>
-                ) : (
-                  <span className="text-emerald-400 font-bold flex items-center gap-1.5">
-                    <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
-                    កំពុងរង់ចាំសិស្សពិត
-                  </span>
-                )}
+                <span className="text-emerald-400 font-bold flex items-center gap-1.5">
+                  <span className="w-2 h-2 rounded-full bg-emerald-400 animate-ping inline-block shrink-0" />
+                  កំពុងរង់ចាំសិស្សចូលរួម
+                </span>
               </div>
               <div className="space-y-1">
                 <span className="text-slate-400 block text-[10px] uppercase font-black">សន្លឹកសំណួរក្នុងមេរៀន</span>

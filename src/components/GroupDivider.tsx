@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud } from 'lucide-react';
 import { Student, TeacherAccount } from '../types';
 import * as XLSX from 'xlsx';
-import { db } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
 
 interface GroupDividerProps {
@@ -96,6 +96,7 @@ export default function GroupDivider({
         }
       } catch (err) {
         console.error('Failed to load groups from Firestore:', err);
+        handleFirestoreError(err, OperationType.GET, `teachers/${teacher.id}/classes/${activeClassId}/groupsData/current`);
       } finally {
         setIsCloudLoading(false);
       }
@@ -126,6 +127,7 @@ export default function GroupDivider({
       } catch (err) {
         console.error('Failed to save groups to Firestore:', err);
         setCloudSynced(false);
+        handleFirestoreError(err, OperationType.WRITE, `teachers/${teacher.id}/classes/${activeClassId}/groupsData/current`);
       }
     }
   };
