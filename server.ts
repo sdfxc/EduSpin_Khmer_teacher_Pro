@@ -1,5 +1,6 @@
 import express from "express";
 import path from "path";
+import fs from "fs";
 import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
@@ -8,6 +9,11 @@ dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Health check routes for Cloud Run deployment health checks & uptime monitors
+app.get(["/api/health", "/health", "/_health"], (_req, res) => {
+  res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
+});
 
 // Force JSON parsing with increased payload limits for images and PDFs
 app.use(express.json({ limit: "50mb" }));
@@ -156,16 +162,6 @@ function extractCleanTextFromBinary(buffer: Buffer): string {
   
   return words16.length > words8.length ? words16 : words8;
 }
-
-// Initialize Gemini client on the server side
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY || "",
-  httpOptions: {
-    headers: {
-      'User-Agent': 'aistudio-build',
-    }
-  }
-});
 
 // API route to proxy Gemini API call
 app.post("/api/generate-questions", async (req, res) => {
@@ -483,10 +479,28 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    const cwdDist = path.join(process.cwd(), 'dist');
+    const localDist = path.join(__dirname, '../dist');
+    const directDist = __dirname;
+
+    let distPath = cwdDist;
+    if (fs.existsSync(path.join(cwdDist, 'index.html'))) {
+      distPath = cwdDist;
+    } else if (fs.existsSync(path.join(directDist, 'index.html'))) {
+      distPath = directDist;
+    } else if (fs.existsSync(path.join(localDist, 'index.html'))) {
+      distPath = localDist;
+    }
+
     app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+    app.get('*', (_req, res) => {
+      const indexPath = path.join(distPath, 'index.html');
+      res.sendFile(indexPath, (err) => {
+        if (err) {
+          console.error("Error serving index.html:", err);
+          res.status(200).send('<!DOCTYPE html><html><head><title>EduSpin Quiz Master</title></head><body><div id="root"></div></body></html>');
+        }
+      });
     });
   }
 
@@ -495,4 +509,7 @@ async function startServer() {
   });
 }
 
-startServer();
+startServer().catch((err) => {
+  console.error("Critical server startup error:", err);
+  process.exit(1);
+});
