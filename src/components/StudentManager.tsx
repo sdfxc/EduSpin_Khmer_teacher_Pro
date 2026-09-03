@@ -10,6 +10,7 @@ interface StudentManagerProps {
   isDarkMode?: boolean;
   onAddStudentDetail: (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
   onRemoveStudent: (id: string) => void;
+  onClearStudents?: () => void;
   onBulkAddStudents: (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[]) => void;
   onUpdateStudentDetail?: (id: string, fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
 }
@@ -21,6 +22,7 @@ export default function StudentManager({
   isDarkMode = false,
   onAddStudentDetail,
   onRemoveStudent,
+  onClearStudents,
   onBulkAddStudents,
   onUpdateStudentDetail
 }: StudentManagerProps) {
@@ -231,6 +233,21 @@ export default function StudentManager({
         </div>
 
         <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+          {onClearStudents && students.length > 0 && (
+            <button
+              onClick={onClearStudents}
+              title="លុបឈ្មោះសិស្សទាំងអស់ក្នុងថ្នាក់នេះ"
+              className={`px-3.5 py-2.5 border rounded-2xl shadow-sm cursor-pointer transition-all active:scale-95 flex items-center gap-1.5 text-xs font-bold ${
+                isDarkMode 
+                  ? 'bg-red-950/30 border-red-900/40 text-red-400 hover:bg-red-900/50' 
+                  : 'bg-red-50 border-red-200 text-red-600 hover:bg-red-100'
+              }`}
+            >
+              <Trash2 className="w-4 h-4" />
+              <span>លុបទាំងអស់</span>
+            </button>
+          )}
+
           <button
             onClick={exportToExcel}
             title="ទាញយក Excel"

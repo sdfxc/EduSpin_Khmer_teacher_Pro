@@ -195,31 +195,24 @@ export default function App() {
     }
   });
 
+  // Purge any stored student data immediately on load for hosting
   const [students, setStudents] = useState<Student[]>(() => {
-    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    if (savedTeacherObj === null) {
-      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-      const saved = localStorage.getItem(`students_class_${activeId}`);
-      if (!saved) return [];
-      try {
-        const parsed = JSON.parse(saved) as Student[];
-        return parsed.filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
-      } catch (e) {
-        return [];
+    try {
+      const keysToRemove: string[] = [];
+      for (let i = 0; i < localStorage.length; i++) {
+        const key = localStorage.key(i);
+        if (key && (
+          key.startsWith('students_class_') || 
+          key.startsWith('picked_students_class_') || 
+          key.startsWith('khmer_teacher_divided_groups_') ||
+          key.startsWith('selected_student_')
+        )) {
+          keysToRemove.push(key);
+        }
       }
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
-        if (!activeId) return [];
-        const saved = localStorage.getItem(`students_class_${activeId}`);
-        if (!saved) return [];
-        const parsed = JSON.parse(saved) as Student[];
-        return parsed.filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
-      } catch (e) {
-        return [];
-      }
-    }
+      keysToRemove.forEach(k => localStorage.removeItem(k));
+    } catch (e) {}
+    return [];
   });
   
   const [cards, setCards] = useState<QuizCard[]>(() => {
@@ -260,13 +253,29 @@ export default function App() {
     }
   });
 
-  // One-time cleanup effect to purge legacy mock student data and extra default subjects from localStorage
+  // One-time cleanup effect to purge all legacy student data from localStorage for hosting readiness
   useEffect(() => {
     try {
+      const HOSTING_CLEAN_KEY = 'khmer_students_hosting_clean_v1';
+      if (!localStorage.getItem(HOSTING_CLEAN_KEY)) {
+        localStorage.setItem(HOSTING_CLEAN_KEY, 'true');
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('students_class_') || key.startsWith('picked_students_class_') || key.startsWith('khmer_teacher_divided_groups_'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+        setStudents([]);
+        setPickedIds([]);
+      }
+
+      // Also clean up subjects
       const keysToClean: string[] = [];
       for (let i = 0; i < localStorage.length; i++) {
         const key = localStorage.key(i);
-        if (key && (key.startsWith('students_class_') || key.startsWith('khmer_teacher_divided_groups_') || key.startsWith('subjects_class_'))) {
+        if (key && key.startsWith('subjects_class_')) {
           keysToClean.push(key);
         }
       }
@@ -276,26 +285,11 @@ export default function App() {
           try {
             const list = JSON.parse(val);
             if (Array.isArray(list)) {
-              if (key.startsWith('students_class_')) {
-                const cleaned = list.filter((s: any) => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
-                localStorage.setItem(key, JSON.stringify(cleaned));
-              } else if (key.startsWith('khmer_teacher_divided_groups_')) {
-                const cleanedGroups = list.map((g: any) => ({
-                  ...g,
-                  members: (g.members || []).filter((s: any) => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'))
-                })).filter((g: any) => g.members.length > 0);
-                if (cleanedGroups.length === 0) {
-                  localStorage.removeItem(key);
-                } else {
-                  localStorage.setItem(key, JSON.stringify(cleanedGroups));
-                }
-              } else if (key.startsWith('subjects_class_')) {
-                const cleanedSubs = list.filter((s: any) => s && s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
-                if (cleanedSubs.length > 0) {
-                  localStorage.setItem(key, JSON.stringify(cleanedSubs));
-                } else {
-                  localStorage.removeItem(key);
-                }
+              const cleanedSubs = list.filter((s: any) => s && s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
+              if (cleanedSubs.length > 0) {
+                localStorage.setItem(key, JSON.stringify(cleanedSubs));
+              } else {
+                localStorage.removeItem(key);
               }
             }
           } catch (e) {}
@@ -724,7 +718,7 @@ export default function App() {
       if (loadedStudents) {
         try {
           const parsed = JSON.parse(loadedStudents) as Student[];
-          setStudents(parsed.filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-')));
+          setStudents(parsed.filter(s => s && s.id && !s.id.startsWith('sim-')));
         } catch (e) {
           setStudents([]);
         }
@@ -945,34 +939,15 @@ export default function App() {
         let loadedStudents: Student[] = [];
         studentsSnap.forEach(docSnap => {
           const data = docSnap.data() as Student;
-          if (data && data.id && !data.id.startsWith('s-') && !data.id.startsWith('sim-')) {
+          if (data && data.id && !data.id.startsWith('sim-')) {
             loadedStudents.push(data);
           }
         });
         
-        // Fallback to local guest data if cloud has 0 students to prevent overwriting newly added local students
-        if (loadedStudents.length === 0) {
-          const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
-          if (localStudentsStr) {
-            try {
-              const localStudents = (JSON.parse(localStudentsStr) as Student[]).filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
-              if (localStudents.length > 0) {
-                loadedStudents = localStudents;
-                // Upload local students to cloud Firestore so they persist on cloud too
-                if (!isQuotaExceeded()) {
-                  for (const std of localStudents) {
-                    if (std && std.id) {
-                      await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std);
-                    }
-                  }
-                }
-              }
-            } catch (err) {
-              console.error('Failed to parse local students fallback:', err);
-            }
-          }
-        }
         setStudents(loadedStudents);
+        if (activeClassId) {
+          localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(loadedStudents));
+        }
         lastLoadedClassId.current = activeClassId;
       } catch (err) {
         console.error('Failed to load class details from Firestore:', err);
@@ -991,19 +966,6 @@ export default function App() {
     const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
     const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
       if (snapshot.empty) {
-        // Fallback to local storage of students to avoid overwriting rich state with empty array
-        const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
-        if (localStudentsStr) {
-          try {
-            const localStudents = (JSON.parse(localStudentsStr) as Student[]).filter(s => s && s.id && !s.id.startsWith('s-') && !s.id.startsWith('sim-'));
-            if (localStudents.length > 0) {
-              setStudents(localStudents);
-              return;
-            }
-          } catch (e) {
-            console.error('Failed to parse local students fallback in onSnapshot:', e);
-          }
-        }
         setStudents([]);
         return;
       }
@@ -1011,7 +973,7 @@ export default function App() {
       let loadedStudents: Student[] = [];
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as Student;
-        if (data && data.id && !data.id.startsWith('s-') && !data.id.startsWith('sim-')) {
+        if (data && data.id && !data.id.startsWith('sim-')) {
           loadedStudents.push(data);
         }
       });
@@ -1965,23 +1927,31 @@ export default function App() {
     } catch (err) {
       console.error(err);
     }
-    setStudents(prev => prev.filter(s => s.id !== id));
+    setStudents(prev => {
+      const filtered = prev.filter(s => s.id !== id);
+      if (activeClassId) {
+        localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(filtered));
+      }
+      return filtered;
+    });
     if (selectedStudentId === id) setSelectedStudentId(null);
   }, [selectedStudentId, teacher, activeClassId]);
 
   const clearStudents = useCallback(async () => {
-    if (window.confirm('តើអ្នកពិតជាចង់លុបឈ្មោះសិស្សទាំងអស់មែនទេ?')) {
-      const currentTeacherId = teacher?.id || 'local';
-      try {
-        for (const s of students) {
-          await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id));
-        }
-      } catch (err) {
-        console.error(err);
+    const currentTeacherId = teacher?.id || 'local';
+    try {
+      for (const s of students) {
+        safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id)).catch(() => {});
       }
-      setStudents([]);
-      setSelectedStudentId(null);
-      setPickedIds([]);
+    } catch (err) {
+      console.error(err);
+    }
+    setStudents([]);
+    setSelectedStudentId(null);
+    setPickedIds([]);
+    if (activeClassId) {
+      localStorage.removeItem(`students_class_${activeClassId}`);
+      localStorage.removeItem(`picked_students_class_${activeClassId}`);
     }
   }, [students, teacher, activeClassId]);
 
@@ -2577,6 +2547,7 @@ export default function App() {
               isDarkMode={isDarkMode}
               onAddStudentDetail={addStudentDetail}
               onRemoveStudent={removeStudent}
+              onClearStudents={clearStudents}
               onUpdateStudentDetail={updateStudentDetail}
               onBulkAddStudents={handleBulkAddStudents}
             />
