@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle, Loader2 } from 'lucide-react';
 import { TeacherAccount } from '../types';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, safeSetDoc } from '../lib/firebase';
 
 interface TeacherAuthModalProps {
   isOpen: boolean;
@@ -124,7 +124,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: Te
       };
 
       // 3. Write to Firestore cloud
-      await setDoc(teacherDocRef, newTeacher);
+      await safeSetDoc(teacherDocRef, newTeacher);
 
       localStorage.setItem('logged_in_teacher', JSON.stringify(newTeacher));
       onLoginSuccess(newTeacher);

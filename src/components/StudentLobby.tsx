@@ -5,8 +5,8 @@ import {
   HelpCircle, AlertCircle, Play, ArrowRight, XCircle, Info, ChevronRight, Pencil, Trash2,
   GraduationCap, BookOpen, School
 } from 'lucide-react';
-import { doc, setDoc, deleteDoc } from 'firebase/firestore';
-import { db } from '../lib/firebase';
+import { doc } from 'firebase/firestore';
+import { db, safeSetDoc, safeDeleteDoc } from '../lib/firebase';
 import FormulaRenderer from './FormulaRenderer';
 import { Student, QuizCard } from '../types';
 import confetti from 'canvas-confetti';
@@ -68,7 +68,7 @@ export default function StudentLobby({
     if (!teacher || !activeClassId) return;
     try {
       const studentDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', studentId);
-      await setDoc(studentDocRef, { isApproved: true }, { merge: true });
+      await safeSetDoc(studentDocRef, { isApproved: true }, { merge: true });
     } catch (err) {
       console.error("Student approval failed:", err);
     }
@@ -80,7 +80,7 @@ export default function StudentLobby({
       await Promise.all(
         pendingApprovalStudents.map(student => {
           const studentDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', student.id);
-          return setDoc(studentDocRef, { isApproved: true }, { merge: true });
+          return safeSetDoc(studentDocRef, { isApproved: true }, { merge: true });
         })
       );
     } catch (err) {
@@ -93,7 +93,7 @@ export default function StudentLobby({
     if (!activeClassId) return;
     try {
       const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
-      await deleteDoc(studentDocRef);
+      await safeDeleteDoc(studentDocRef);
     } catch (err) {
       console.error("Decline student failed:", err);
     }
@@ -106,7 +106,7 @@ export default function StudentLobby({
       const currentTeacherId = teacher?.id || 'local';
       try {
         const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
-        await setDoc(studentDocRef, { name: trimmedName }, { merge: true });
+        await safeSetDoc(studentDocRef, { name: trimmedName }, { merge: true });
       } catch (err) {
         console.error("Failed to update student name in lobby:", err);
       }
@@ -118,7 +118,7 @@ export default function StudentLobby({
       const currentTeacherId = teacher?.id || 'local';
       try {
         const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
-        await deleteDoc(studentDocRef);
+        await safeDeleteDoc(studentDocRef);
       } catch (err) {
         console.error("Failed to delete student in lobby:", err);
       }
@@ -131,7 +131,7 @@ export default function StudentLobby({
     if (!teacher || !activeClassId) return;
     try {
       const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
-      await setDoc(classDocRef, {
+      await safeSetDoc(classDocRef, {
         activeCardState: 'revealed'
       }, { merge: true });
     } catch (err) {
@@ -192,7 +192,7 @@ export default function StudentLobby({
       
       try {
         const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
-        await setDoc(classDocRef, {
+        await safeSetDoc(classDocRef, {
           activeCardId: nextCard.id,
           activeCardState: 'answering',
           activeCard: nextCard
@@ -205,7 +205,7 @@ export default function StudentLobby({
       setActiveCardId(null);
       try {
         const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
-        await setDoc(classDocRef, {
+        await safeSetDoc(classDocRef, {
           activeCardId: null,
           activeCardState: 'answering',
           activeCard: null
@@ -234,7 +234,7 @@ export default function StudentLobby({
     const currentTeacherId = teacher?.id || 'local';
     try {
       const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
-      await setDoc(classDocRef, {
+      await safeSetDoc(classDocRef, {
         activeCardId: null,
         activeCardState: 'answering',
         activeCard: null
@@ -254,7 +254,7 @@ export default function StudentLobby({
       setActiveCardState('answering');
       try {
         const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
-        await setDoc(classDocRef, {
+        await safeSetDoc(classDocRef, {
           activeCardId: firstQ.id,
           activeCardState: 'answering',
           activeCard: firstQ

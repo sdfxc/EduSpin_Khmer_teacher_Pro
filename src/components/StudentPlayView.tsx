@@ -3,8 +3,8 @@ import {
   Award, Trophy, Smartphone, Sparkles, User, RefreshCw, CheckCircle2, 
   XCircle, Timer, AlertCircle, HelpCircle, ArrowRight, Heart
 } from 'lucide-react';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, getDoc, setDoc, onSnapshot, collection, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeOnSnapshot } from '../lib/firebase';
+import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
 import { Student, QuizCard, Question } from '../types';
 import confetti from 'canvas-confetti';
 import FormulaRenderer from './FormulaRenderer';
@@ -99,7 +99,7 @@ export default function StudentPlayView() {
     if (!classId || !teacherId) return;
 
     const classDocRef = doc(db, 'teachers', teacherId, 'classes', classId);
-    const unsubscribe = onSnapshot(classDocRef, (snapshot) => {
+    const unsubscribe = safeOnSnapshot(classDocRef, (snapshot: any) => {
       if (snapshot.exists()) {
         const data = snapshot.data();
         console.log("Student play view class doc update:", data);
@@ -150,7 +150,7 @@ export default function StudentPlayView() {
     if (!classId || !teacherId) return;
 
     const studentsCollRef = collection(db, 'teachers', teacherId, 'classes', classId, 'students');
-    const unsubscribe = onSnapshot(studentsCollRef, (snapshot) => {
+    const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
       let roster: Student[] = [];
       snapshot.forEach(docSnap => {
         roster.push(docSnap.data() as Student);
@@ -291,7 +291,7 @@ export default function StudentPlayView() {
     
     // Set status and answer values on cloud
     try {
-      await setDoc(doc(db, 'teachers', teacherId, 'classes', classId, 'students', studentId), {
+      await safeSetDoc(doc(db, 'teachers', teacherId, 'classes', classId, 'students', studentId), {
         status: 'កំពុងរីកចម្រើន',
         currentAnswerCardId: activeCardId,
         currentAnswerIndex: -1,
@@ -338,7 +338,7 @@ export default function StudentPlayView() {
     // Update student's score & active answer state in firestore subcollection
     try {
       const nextScore = (joinedStudent.score || 0) + calculatedPoints;
-      await setDoc(doc(db, 'teachers', teacherId, 'classes', classId, 'students', studentId), {
+      await safeSetDoc(doc(db, 'teachers', teacherId, 'classes', classId, 'students', studentId), {
         score: nextScore,
         status: isCorrect ? 'ឆ្នើម' : 'កំពុងរីកចម្រើន',
         currentAnswerCardId: activeCardId,
@@ -390,7 +390,7 @@ export default function StudentPlayView() {
         };
 
         const docRef = doc(db, 'teachers', teacherId, 'classes', classId, 'students', newId);
-        await setDoc(docRef, newStud);
+        await safeSetDoc(docRef, newStud);
 
         localStorage.setItem(`my_student_id_${classId}`, newId);
         setStudentId(newId);

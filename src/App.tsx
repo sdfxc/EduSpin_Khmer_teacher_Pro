@@ -15,8 +15,8 @@ import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
 import StudentManager from './components/StudentManager';
 import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject } from './types';
-import { collection, doc, getDoc, getDocs, setDoc, deleteDoc, onSnapshot } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from './lib/firebase';
+import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, isQuotaExceeded, safeSetDoc, safeDeleteDoc, safeOnSnapshot } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
@@ -93,6 +93,17 @@ export default function App() {
     const params = new URLSearchParams(window.location.search);
     return params.get('mode') === 'student';
   });
+
+  const [quotaExceeded, setQuotaExceeded] = useState(isQuotaExceeded());
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (isQuotaExceeded() && !quotaExceeded) {
+        setQuotaExceeded(true);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [quotaExceeded]);
 
   if (studentMode) {
     return <StudentPlayView />;
@@ -430,18 +441,20 @@ export default function App() {
       const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
         localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
-        (async () => {
-          try {
-            for (let i = 0; i < finalizedClasses.length; i++) {
-              const cls = finalizedClasses[i];
-              await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                order: i
-              }, { merge: true });
+        if (!isQuotaExceeded()) {
+          (async () => {
+            try {
+              for (let i = 0; i < finalizedClasses.length; i++) {
+                const cls = finalizedClasses[i];
+                await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                  order: i
+                }, { merge: true });
+              }
+            } catch (err) {
+              console.error("Failed to save reordered classes to Firestore:", err);
             }
-          } catch (err) {
-            console.error("Failed to save reordered classes to Firestore:", err);
-          }
-        })();
+          })();
+        }
       } else {
         localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
@@ -464,18 +477,20 @@ export default function App() {
       const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
         localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
-        (async () => {
-          try {
-            for (let i = 0; i < finalizedClasses.length; i++) {
-              const cls = finalizedClasses[i];
-              await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                order: i
-              }, { merge: true });
+        if (!isQuotaExceeded()) {
+          (async () => {
+            try {
+              for (let i = 0; i < finalizedClasses.length; i++) {
+                const cls = finalizedClasses[i];
+                await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                  order: i
+                }, { merge: true });
+              }
+            } catch (err) {
+              console.error("Failed to save reordered classes to Firestore:", err);
             }
-          } catch (err) {
-            console.error("Failed to save reordered classes to Firestore:", err);
-          }
-        })();
+          })();
+        }
       } else {
         localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
@@ -485,11 +500,15 @@ export default function App() {
 
   // Load teacher classes from Cloud when logged in
   useEffect(() => {
-    if (!teacher) {
-      const savedClasses = localStorage.getItem('khmer_teacher_classes');
+    if (!teacher || isQuotaExceeded()) {
+      const savedClasses = teacher?.id 
+        ? (localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes'))
+        : localStorage.getItem('khmer_teacher_classes');
       setClasses(sortClasses(savedClasses ? JSON.parse(savedClasses) : DEFAULT_CLASSES));
       
-      const savedActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+      const savedActiveId = teacher?.id
+        ? (localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a')
+        : (localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a');
       setActiveClassId(savedActiveId);
       return;
     }
@@ -506,7 +525,11 @@ export default function App() {
             const cloudTeacher = teacherSnap.data() as TeacherAccount;
             if (cloudTeacher) {
               setTeacher(prev => {
-                const updated = prev ? { ...prev, ...cloudTeacher } : cloudTeacher;
+                if (!prev) return cloudTeacher;
+                if (prev.schoolName === cloudTeacher.schoolName && prev.name === cloudTeacher.name && prev.avatarUrl === cloudTeacher.avatarUrl && prev.id === cloudTeacher.id) {
+                  return prev;
+                }
+                const updated = { ...prev, ...cloudTeacher };
                 localStorage.setItem('logged_in_teacher', JSON.stringify(updated));
                 return updated;
               });
@@ -543,14 +566,14 @@ export default function App() {
          // Clean up empty or duplicate classes right away in Firestore
          for (const classId of classesToDelete) {
            try {
-             await deleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
+             await safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
            } catch (deleteErr) {
              console.error(`Failed to delete nameless or duplicate class ${classId}:`, deleteErr);
            }
          }
 
          // If the cloud account has 0 classes, migrate local classes that the user added previously to their cloud account
-         if (true) {
+         if (fetchedClasses.length === 0 && !isQuotaExceeded()) {
            const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
            if (localClassesStr) {
              try {
@@ -604,7 +627,7 @@ export default function App() {
                    }
                    
                    // Write Class Metadata to Cloud
-                   await setDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
+                   await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
                      id: lc.id,
                      name: lc.name.trim(),
                      subjects: finalSubjects,
@@ -619,7 +642,7 @@ export default function App() {
                      const localStudents = JSON.parse(localStudentsStr) as Student[];
                      for (const std of localStudents) {
                        if (std && std.id) {
-                         await setDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id, 'students', std.id), std);
+                         await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id, 'students', std.id), std);
                        }
                      }
                    }
@@ -669,7 +692,7 @@ export default function App() {
 
         for (let i = 0; i < sortedCloudClasses.length; i++) {
           const c = sortedCloudClasses[i];
-          setDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { order: i }, { merge: true }).catch(() => {});
+          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { order: i }, { merge: true }).catch(() => {});
         }
         
         const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || (fetchedClasses[0]?.id || '');
@@ -683,7 +706,7 @@ export default function App() {
     };
 
     loadTeacherClasses();
-  }, [teacher]);
+  }, [teacher?.id]);
 
   // Load students, cards, and picked status when activeClassId shifts
   useEffect(() => {
@@ -695,7 +718,7 @@ export default function App() {
       localStorage.setItem('khmer_teacher_active_class_id', activeClassId);
     }
 
-    if (!teacher) {
+    if (!teacher || isQuotaExceeded()) {
       // Local fallback
       const loadedStudents = localStorage.getItem(`students_class_${activeClassId}`);
       if (loadedStudents) {
@@ -801,6 +824,7 @@ export default function App() {
     }
 
     const loadClassDetails = async () => {
+      if (isQuotaExceeded()) return;
       try {
         setLoadingCloudData(true);
         
@@ -853,7 +877,7 @@ export default function App() {
             loadedActiveSubjectId = migration.activeSubjectId;
             
             // Sync the migrated subjects back to cloud!
-            await setDoc(classDocRef, {
+            await safeSetDoc(classDocRef, {
               subjects: loadedSubjects,
               activeSubjectId: loadedActiveSubjectId
             }, { merge: true });
@@ -882,7 +906,7 @@ export default function App() {
           const localClassObj = classes.find(c => c.id === activeClassId);
           const classNameToSave = localClassObj?.name || 'ថ្នាក់ថ្មី';
           
-          await setDoc(classDocRef, {
+          await safeSetDoc(classDocRef, {
             id: activeClassId,
             name: classNameToSave,
             subjects: loadedSubjects,
@@ -935,9 +959,11 @@ export default function App() {
               if (localStudents.length > 0) {
                 loadedStudents = localStudents;
                 // Upload local students to cloud Firestore so they persist on cloud too
-                for (const std of localStudents) {
-                  if (std && std.id) {
-                    await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std);
+                if (!isQuotaExceeded()) {
+                  for (const std of localStudents) {
+                    if (std && std.id) {
+                      await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std);
+                    }
                   }
                 }
               }
@@ -956,14 +982,14 @@ export default function App() {
     };
 
     loadClassDetails();
-  }, [activeClassId, teacher]);
+  }, [activeClassId, teacher?.id]);
 
   // Real-time Student Synchronization for cloud sessions (only for logged-in teachers)
   useEffect(() => {
-    if (!activeClassId || !teacher) return;
+    if (!activeClassId || !teacher || isQuotaExceeded()) return;
 
     const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
-    const unsubscribe = onSnapshot(studentsCollRef, (snapshot) => {
+    const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
       if (snapshot.empty) {
         // Fallback to local storage of students to avoid overwriting rich state with empty array
         const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
@@ -995,19 +1021,19 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [activeClassId, teacher]);
+  }, [activeClassId, teacher?.id]);
 
   // Sync active quiz state to Class document in Firestore for student phones
   useEffect(() => {
-    if (!activeClassId) return;
-    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId || !teacher?.id || isQuotaExceeded()) return;
+    const currentTeacherId = teacher.id;
 
     const syncClassInfo = async () => {
       try {
         const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
         const currentActiveCard = cards.find(c => c.id === activeCardId) || null;
         
-        await setDoc(classDocRef, {
+        await safeSetDoc(classDocRef, {
           activeCardId: activeCardId,
           activeRoomId: activeRoomId,
           activeTab: activeTab,
@@ -1112,7 +1138,7 @@ export default function App() {
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       try {
-        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
           subjects: updatedSubjects,
           chapters: updatedChapters, // backward compatibility
           activeRoomId: activeRoomId,
@@ -1135,7 +1161,7 @@ export default function App() {
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       try {
-        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId), {
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId), {
           score: newScore
         }, { merge: true });
       } catch (err) {
@@ -1174,7 +1200,7 @@ export default function App() {
           return sub;
         });
 
-        setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+        safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
           subjects: updatedSubjects,
           chapters: updatedChapters,
           activeRoomId: activeRoomId,
@@ -1202,7 +1228,7 @@ export default function App() {
       if (!teacher && activeClassId) {
         localStorage.setItem(`active_room_id_${activeClassId}`, roomId);
       } else if (teacher && activeClassId) {
-        setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
           activeRoomId: roomId
         }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
       }
@@ -1245,7 +1271,7 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: newRoom.id
@@ -1308,7 +1334,7 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: nextActiveId
@@ -1349,7 +1375,7 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to rename room in cloud:', err));
@@ -1381,7 +1407,7 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to create chapter in cloud:', err));
@@ -1412,7 +1438,7 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to rename chapter in cloud:', err));
@@ -1474,7 +1500,7 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: nextActiveRoomId
@@ -1495,7 +1521,7 @@ export default function App() {
     if (!teacher && activeClassId) {
       localStorage.setItem(`active_subject_id_${activeClassId}`, subjectId);
     } else if (teacher && activeClassId) {
-      setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         activeSubjectId: subjectId
       }, { merge: true }).catch(err => console.error('Failed to sync activeSubjectId:', err));
     }
@@ -1511,7 +1537,7 @@ export default function App() {
         if (!teacher && activeClassId) {
           localStorage.setItem(`active_room_id_${activeClassId}`, firstRoom.id);
         } else if (teacher && activeClassId) {
-          setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
             activeRoomId: firstRoom.id
           }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
         }
@@ -1522,7 +1548,7 @@ export default function App() {
         if (!teacher && activeClassId) {
           localStorage.removeItem(`active_room_id_${activeClassId}`);
         } else if (teacher && activeClassId) {
-          setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
             activeRoomId: null
           }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
         }
@@ -1564,7 +1590,7 @@ export default function App() {
 
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
-      setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
         activeSubjectId: newSubject.id,
         activeRoomId: defaultRoom.id,
@@ -1590,7 +1616,7 @@ export default function App() {
 
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
-      setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects
       }, { merge: true }).catch(err => console.error('Failed to rename subject in cloud:', err));
     } else if (activeClassId) {
@@ -1657,7 +1683,7 @@ export default function App() {
 
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
-      setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
         activeSubjectId: nextSubjectId,
         activeRoomId: nextActiveRoomId,
@@ -1694,7 +1720,7 @@ export default function App() {
 
       if (teacher) {
         try {
-          await setDoc(doc(db, 'teachers', teacher.id, 'classes', newClassId), {
+          await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', newClassId), {
             id: newClassId,
             name: className.trim(),
             order: newOrder,
@@ -1739,7 +1765,7 @@ export default function App() {
       
       const currentTeacherId = teacher?.id || 'local';
       try {
-        await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
+        await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
       } catch (err) {
         console.error(err);
       }
@@ -1779,7 +1805,7 @@ export default function App() {
       
       const currentTeacherId = teacher?.id || 'local';
       try {
-        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId), {
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId), {
           id: classId,
           name: trimmedName
         }, { merge: true });
@@ -1803,7 +1829,7 @@ export default function App() {
 
     const currentTeacherId = teacher?.id || 'local';
     try {
-      await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
+      await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
     } catch (err) {
       console.error(err);
     }
@@ -1829,7 +1855,7 @@ export default function App() {
     const currentTeacherId = teacher?.id || 'local';
     if (fields.classId === activeClassId) {
       try {
-        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
       } catch (err) {
         console.error(err);
       }
@@ -1839,7 +1865,7 @@ export default function App() {
       });
     } else {
       try {
-        await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', fields.classId, 'students', newStudent.id), newStudent);
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', fields.classId, 'students', newStudent.id), newStudent);
       } catch (err) {
         console.error(err);
       }
@@ -1868,7 +1894,7 @@ export default function App() {
     try {
       await Promise.all(
         newStudents.map(student => 
-          setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', student.id), student)
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', student.id), student)
         )
       );
     } catch (err) {
@@ -1902,8 +1928,8 @@ export default function App() {
         
         (async () => {
           try {
-            await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', oldClassId, 'students', id));
-            await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', newClassId, 'students', id), updatedStudent!);
+            await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', oldClassId, 'students', id));
+            await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', newClassId, 'students', id), updatedStudent!);
           } catch (err) {
             console.error(err);
           }
@@ -1922,7 +1948,7 @@ export default function App() {
       } else {
         (async () => {
           try {
-            await setDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id), updatedStudent!);
+            await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id), updatedStudent!);
           } catch (err) {
             console.error(err);
           }
@@ -1935,7 +1961,7 @@ export default function App() {
   const removeStudent = useCallback(async (id: string) => {
     const currentTeacherId = teacher?.id || 'local';
     try {
-      await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id));
+      await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id));
     } catch (err) {
       console.error(err);
     }
@@ -1948,7 +1974,7 @@ export default function App() {
       const currentTeacherId = teacher?.id || 'local';
       try {
         for (const s of students) {
-          await deleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id));
+          await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id));
         }
       } catch (err) {
         console.error(err);
@@ -2014,7 +2040,7 @@ export default function App() {
       if (teacher && activeClassId) {
         try {
           for (const s of students) {
-            await setDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id), {
+            await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id), {
               score: 0
             }, { merge: true });
           }
@@ -2094,6 +2120,11 @@ export default function App() {
 
   return (
     <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
+      {quotaExceeded && (
+        <div className="fixed top-0 inset-x-0 z-50 bg-red-600 text-white p-2 text-center text-sm font-bold shadow-lg">
+          ដែនកំណត់ Firestore បានអស់! មុខងារ Sync ទៅ Cloud ត្រូវបានផ្អាក។ កម្មវិធីកំពុងដំណើរការក្នុងរបៀប Local-only។
+        </div>
+      )}
       {/* Header */}
       <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
         isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
@@ -2114,19 +2145,13 @@ export default function App() {
               </h1>
             </div>
             <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-none flex items-center gap-1.5 mt-1">
-              <span className="truncate max-w-[180px] sm:max-w-[260px] md:max-w-[340px]" title={teacher?.schoolName || 'សាលារៀន'}>
+              <span className="truncate max-w-[160px] sm:max-w-[220px]" title={teacher?.schoolName || 'សាលារៀន'}>
                 {teacher ? (teacher.schoolName || 'មិនទាន់បញ្ចូលឈ្មោះសាលា') : 'សាលារៀនសុវណ្ណភូមិ'}
               </span>
-              {loadingCloudData && (
-                <span className="inline-flex items-center gap-1 text-indigo-500 dark:text-indigo-400 animate-pulse font-bold text-[10px]">
-                  <Loader2 className="w-3 h-3 animate-spin" />
-                  <span>Sync...</span>
-                </span>
-              )}
-              {teacher && !loadingCloudData && (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[10px] bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.2 rounded-md">
-                  <Cloud className="w-2.5 h-2.5" />
-                  <span>Cloud Active</span>
+              {teacher && (
+                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md shrink-0">
+                  <Cloud className={`w-2.5 h-2.5 ${loadingCloudData ? 'animate-pulse text-indigo-500' : ''}`} />
+                  <span>{loadingCloudData ? 'Syncing...' : 'Cloud'}</span>
                 </span>
               )}
             </div>
@@ -2134,7 +2159,7 @@ export default function App() {
         </div>
 
         {/* Dynamic Telegram iOS Liquid Glass Water Droplet Navigation Tabs */}
-        <nav className="flex items-center gap-1 bg-slate-200/50 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-white/80 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.05)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
+        <nav className="flex items-center gap-1 bg-slate-200/50 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-white/80 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.05)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0">
           {[
             { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass },
             { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon },

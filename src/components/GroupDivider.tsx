@@ -3,7 +3,8 @@ import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, T
 import { Student, TeacherAccount } from '../types';
 import * as XLSX from 'xlsx';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { doc, getDoc } from 'firebase/firestore';
+import { safeSetDoc } from '../lib/firebase';
 
 interface GroupDividerProps {
   students: Student[];
@@ -118,7 +119,7 @@ export default function GroupDivider({
     if (teacher && activeClassId) {
       try {
         const docRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'groupsData', 'current');
-        await setDoc(docRef, {
+        await safeSetDoc(docRef, {
           groups: updatedGroups,
           numGroups: numG,
           updatedAt: new Date().toISOString()

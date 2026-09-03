@@ -18,8 +18,8 @@ import {
   LogOut
 } from 'lucide-react';
 import { TeacherAccount } from '../types';
-import { doc, setDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
+import { doc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, safeSetDoc } from '../lib/firebase';
 import { compressAndResizeImage } from '../lib/imageUtils';
 import { formatGoogleDriveImageUrl } from '../lib/driveUtils';
 
@@ -126,7 +126,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
 
       // 2. Sync to Firestore cloud
       const teacherDocRef = doc(db, 'teachers', teacher.id);
-      await setDoc(teacherDocRef, updatedTeacher, { merge: true });
+      await safeSetDoc(teacherDocRef, updatedTeacher, { merge: true });
 
       // 3. Update parent React state
       onUpdateTeacher(updatedTeacher);
