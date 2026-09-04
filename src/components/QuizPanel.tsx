@@ -5,6 +5,7 @@ import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../li
 import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import confetti from 'canvas-confetti';
 import { Question, QuizCard, Student, QuizRoom, QuizChapter, QuizSubject } from '../types';
+import { useConfirm } from '../context/ConfirmContext.tsx';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
 import { 
   Document, 
@@ -105,6 +106,8 @@ export default function QuizPanel({
   onRenameSubject,
   onDeleteSubject
 }: QuizPanelProps) {
+  const { confirmAction } = useConfirm();
+
   const activeRoom = chapters.reduce<QuizRoom | null>((found, ch) => {
     if (found) return found;
     return ch.rooms?.find(r => r.id === activeRoomId) || null;
@@ -133,24 +136,36 @@ export default function QuizPanel({
   const [viewMode, setViewMode] = useState<'quiz' | 'manage'>('quiz');
   
   const handleDeleteLocalQuestion = (index: number) => {
-    if (confirm('តើអ្នកពិតជាចង់លុបសំណួរនេះមែនទេ?')) {
-      const updated = localEditCards.filter((_, idx) => idx !== index);
-      const reindexed = updated.map((card, i) => ({
-        ...card,
-        number: i + 1
-      }));
-      setLocalEditCards(reindexed);
-      if (selectedEditIndex >= reindexed.length) {
-        setSelectedEditIndex(Math.max(0, reindexed.length - 1));
+    confirmAction({
+      title: 'លុបសំណួរ',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសំណួរទី ${index + 1} នេះមែនទេ?`,
+      confirmText: 'បាទ/ចាស លុប',
+      variant: 'danger',
+      onConfirm: () => {
+        const updated = localEditCards.filter((_, idx) => idx !== index);
+        const reindexed = updated.map((card, i) => ({
+          ...card,
+          number: i + 1
+        }));
+        setLocalEditCards(reindexed);
+        if (selectedEditIndex >= reindexed.length) {
+          setSelectedEditIndex(Math.max(0, reindexed.length - 1));
+        }
       }
-    }
+    });
   };
 
   const handleDeleteAllLocalQuestions = () => {
-    if (confirm('តើអ្នកពិតជាចង់លុបសំណួរទាំងអស់មែនទេ?')) {
-      setLocalEditCards([]);
-      setSelectedEditIndex(0);
-    }
+    confirmAction({
+      title: 'លុបសំណួរទាំងអស់',
+      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសំណួរទាំងអស់ក្នុងបន្ទប់នេះមែនទេ?',
+      confirmText: 'បាទ/ចាស លុបទាំងអស់',
+      variant: 'danger',
+      onConfirm: () => {
+        setLocalEditCards([]);
+        setSelectedEditIndex(0);
+      }
+    });
   };
 
   const handleAddLocalQuestion = () => {

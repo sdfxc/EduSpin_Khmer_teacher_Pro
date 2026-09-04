@@ -10,6 +10,7 @@ import { db, safeSetDoc, safeDeleteDoc } from '../lib/firebase';
 import FormulaRenderer from './FormulaRenderer';
 import { Student, QuizCard } from '../types';
 import confetti from 'canvas-confetti';
+import { useConfirm } from '../context/ConfirmContext.tsx';
 
 interface StudentLobbyProps {
   activeClassId: string;
@@ -40,6 +41,7 @@ export default function StudentLobby({
   setActiveCardState,
   activeSubjectName
 }: StudentLobbyProps) {
+  const { confirmAction } = useConfirm();
   const [copied, setCopied] = useState(false);
   const [showPodium, setShowPodium] = useState(false);
   const [revealStep, setRevealStep] = useState(0); // 0 = none, 1 = Rank 5, 2 = Rank 4, 3 = Rank 3, 4 = Rank 2, 5 = Rank 1
@@ -113,16 +115,22 @@ export default function StudentLobby({
     }
   };
 
-  const handleRemoveStudentFromLobby = async (studentId: string, studentName: string) => {
-    if (window.confirm(`តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសិស្ស «${studentName}» នេះចេញមែនទេ?`)) {
-      const currentTeacherId = teacher?.id || 'local';
-      try {
-        const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
-        await safeDeleteDoc(studentDocRef);
-      } catch (err) {
-        console.error("Failed to delete student in lobby:", err);
+  const handleRemoveStudentFromLobby = (studentId: string, studentName: string) => {
+    confirmAction({
+      title: 'លុបសិស្សចេញពីបន្ទប់',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសិស្ស «${studentName}» នេះចេញពីបន្ទប់មែនទេ?`,
+      confirmText: 'បាទ/ចាស លុបចេញ',
+      variant: 'danger',
+      onConfirm: async () => {
+        const currentTeacherId = teacher?.id || 'local';
+        try {
+          const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
+          await safeDeleteDoc(studentDocRef);
+        } catch (err) {
+          console.error("Failed to delete student in lobby:", err);
+        }
       }
-    }
+    });
   };
 
   // 1. Reveal answer triggers (both teacher state update and db write)

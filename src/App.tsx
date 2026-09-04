@@ -21,6 +21,8 @@ import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
 import SovannaphumiLogo from './components/SovannaphumiLogo';
+import { useConfirm } from './context/ConfirmContext.tsx';
+import { ClassModal } from './components/ClassModal';
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
@@ -109,6 +111,8 @@ export default function App() {
     return <StudentPlayView />;
   }
 
+  const { confirmAction } = useConfirm();
+
   const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'students' | 'student-lobby' | 'exams-room'>('wheel');
   const [showWheelBulk, setShowWheelBulk] = useState(false);
   const [loadingCloudData, setLoadingCloudData] = useState(false);
@@ -125,92 +129,78 @@ export default function App() {
     let rawClasses: ClassInfo[] = [];
     if (savedTeacherObj === null) {
       const saved = localStorage.getItem('khmer_teacher_classes');
-      rawClasses = saved ? JSON.parse(saved) as ClassInfo[] : DEFAULT_CLASSES;
+      if (saved) {
+        try {
+          rawClasses = JSON.parse(saved) as ClassInfo[];
+        } catch (e) {}
+      }
     } else {
       try {
         const teacherObj = JSON.parse(savedTeacherObj);
-        const saved = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`);
-        rawClasses = saved ? JSON.parse(saved) as ClassInfo[] : DEFAULT_CLASSES;
-      } catch (e) {
-        rawClasses = DEFAULT_CLASSES;
-      }
+        const saved = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_classes');
+        if (saved) {
+          rawClasses = JSON.parse(saved) as ClassInfo[];
+        }
+      } catch (e) {}
     }
 
-    const merged = [...rawClasses];
-    DEFAULT_CLASSES.forEach(pc => {
-      if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
-        merged.push(pc);
-      }
-    });
-
-    return sortClasses(merged);
+    const clean = (rawClasses || []).filter(c => c && c.name && c.name.trim() !== '');
+    if (clean.length > 0) {
+      return sortClasses(clean);
+    }
+    return sortClasses(DEFAULT_CLASSES);
   });
 
   const [activeClassId, setActiveClassId] = useState<string>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    let savedActiveId: string | null = null;
+    let savedClassesRaw: string | null = null;
     if (savedTeacherObj === null) {
-      const saved = localStorage.getItem('khmer_teacher_active_class_id');
-      return saved || 'class-7a';
+      savedActiveId = localStorage.getItem('khmer_teacher_active_class_id');
+      savedClassesRaw = localStorage.getItem('khmer_teacher_classes');
     } else {
       try {
         const teacherObj = JSON.parse(savedTeacherObj);
-        const savedActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`);
-        
-        let availableClasses: ClassInfo[] = [];
-        const savedClasses = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`);
-        if (savedClasses) {
-          const parsed = JSON.parse(savedClasses) as ClassInfo[];
-          const clean = parsed.filter(c => c && c.name && c.name.trim() !== '');
-          availableClasses = clean;
-        } else {
-          availableClasses = DEFAULT_CLASSES;
-        }
-        
-        const merged = [...availableClasses];
-        DEFAULT_CLASSES.forEach(pc => {
-          if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
-            merged.push(pc);
-          }
-        });
-
-        const uniqueIds = new Set<string>();
-        const uniqueNames = new Set<string>();
-        const cleanAvailable = merged.filter(c => {
-          if (!c || !c.name) return false;
-          const trimmedName = c.name.trim();
-          if (uniqueIds.has(c.id) || uniqueNames.has(trimmedName)) return false;
-          uniqueIds.add(c.id);
-          uniqueNames.add(trimmedName);
-          return true;
-        });
-
-        if (savedActiveId && cleanAvailable.some(c => c.id === savedActiveId)) {
-          return savedActiveId;
-        }
-        if (cleanAvailable.length > 0) return cleanAvailable[0].id;
-        return 'class-7a';
-      } catch (e) {
-        return 'class-7a';
-      }
+        savedActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_active_class_id');
+        savedClassesRaw = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_classes');
+      } catch (e) {}
     }
+    
+    let availableClasses: ClassInfo[] = [];
+    if (savedClassesRaw) {
+      try {
+        availableClasses = (JSON.parse(savedClassesRaw) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
+      } catch (e) {}
+    }
+    if (availableClasses.length === 0) {
+      availableClasses = DEFAULT_CLASSES;
+    }
+
+    if (savedActiveId && availableClasses.some(c => c.id === savedActiveId)) {
+      return savedActiveId;
+    }
+    return availableClasses[0]?.id || 'class-7a';
   });
 
-  // Purge any stored student data immediately on load for hosting
   const [students, setStudents] = useState<Student[]>(() => {
     try {
-      const keysToRemove: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && (
-          key.startsWith('students_class_') || 
-          key.startsWith('picked_students_class_') || 
-          key.startsWith('khmer_teacher_divided_groups_') ||
-          key.startsWith('selected_student_')
-        )) {
-          keysToRemove.push(key);
+      const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+      let currentActiveId = 'class-7a';
+      if (savedTeacherObj) {
+        try {
+          const t = JSON.parse(savedTeacherObj);
+          currentActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${t.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+        } catch {}
+      } else {
+        currentActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+      }
+      const raw = localStorage.getItem(`students_class_${currentActiveId}`);
+      if (raw) {
+        const parsed = JSON.parse(raw);
+        if (Array.isArray(parsed)) {
+          return parsed.filter((s: any) => s && s.id && !s.id.startsWith('sim-'));
         }
       }
-      keysToRemove.forEach(k => localStorage.removeItem(k));
     } catch (e) {}
     return [];
   });
@@ -270,31 +260,6 @@ export default function App() {
         setStudents([]);
         setPickedIds([]);
       }
-
-      // Also clean up subjects
-      const keysToClean: string[] = [];
-      for (let i = 0; i < localStorage.length; i++) {
-        const key = localStorage.key(i);
-        if (key && key.startsWith('subjects_class_')) {
-          keysToClean.push(key);
-        }
-      }
-      keysToClean.forEach(key => {
-        const val = localStorage.getItem(key);
-        if (val) {
-          try {
-            const list = JSON.parse(val);
-            if (Array.isArray(list)) {
-              const cleanedSubs = list.filter((s: any) => s && s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
-              if (cleanedSubs.length > 0) {
-                localStorage.setItem(key, JSON.stringify(cleanedSubs));
-              } else {
-                localStorage.removeItem(key);
-              }
-            }
-          } catch (e) {}
-        }
-      });
     } catch (e) {
       console.error("Cleanup error:", e);
     }
@@ -316,8 +281,7 @@ export default function App() {
       try {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
-          const filtered = parsed.filter((s: any) => s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
-          if (filtered.length > 0) return filtered;
+          return parsed;
         }
       } catch (e) {}
     }
@@ -379,6 +343,17 @@ export default function App() {
   const [isAuthModalOpen, setIsAuthModalOpen] = useState(false);
   const [isProfileModalOpen, setIsProfileModalOpen] = useState(false);
   const [isLogoutModalOpen, setIsLogoutModalOpen] = useState(false);
+  const [classModalState, setClassModalState] = useState<{
+    isOpen: boolean;
+    mode: 'add' | 'rename';
+    classId?: string;
+    currentName?: string;
+  }>({
+    isOpen: false,
+    mode: 'add',
+    classId: undefined,
+    currentName: ''
+  });
 
   const [teacher, setTeacher] = useState<TeacherAccount | null>(() => {
     const saved = localStorage.getItem('logged_in_teacher');
@@ -674,24 +649,38 @@ export default function App() {
           return { ...cls, order: idx };
         });
 
-        const merged = [...fetchedClasses];
-        DEFAULT_CLASSES.forEach(pc => {
-          if (!merged.some(m => m.id === pc.id || m.name.trim() === pc.name.trim())) {
-            merged.push(pc);
+        let finalClassesToUse: ClassInfo[] = [];
+        if (fetchedClasses.length > 0) {
+          finalClassesToUse = fetchedClasses;
+        } else {
+          finalClassesToUse = DEFAULT_CLASSES;
+          for (let i = 0; i < DEFAULT_CLASSES.length; i++) {
+            const defCls = DEFAULT_CLASSES[i];
+            const { subjects: defSubs, activeSubjectId: defSubId } = getMigratedSubjects([]);
+            safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', defCls.id), {
+              id: defCls.id,
+              name: defCls.name,
+              order: i,
+              subjects: defSubs,
+              activeSubjectId: defSubId,
+              activeRoomId: defSubs[0]?.chapters[0]?.rooms[0]?.id || null,
+              createdAt: new Date().toISOString()
+            }, { merge: true }).catch(() => {});
           }
-        });
-        const sortedCloudClasses = sortClasses(merged);
+        }
+        const sortedCloudClasses = sortClasses(finalClassesToUse);
         setClasses(sortedCloudClasses);
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedCloudClasses));
 
         for (let i = 0; i < sortedCloudClasses.length; i++) {
           const c = sortedCloudClasses[i];
-          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { order: i }, { merge: true }).catch(() => {});
+          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { id: c.id, name: c.name, order: i }, { merge: true }).catch(() => {});
         }
         
-        const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || (fetchedClasses[0]?.id || '');
-        const exists = fetchedClasses.some(c => c.id === lastActiveId);
-        setActiveClassId(exists ? lastActiveId : (fetchedClasses[0]?.id || ''));
+        const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || (sortedCloudClasses[0]?.id || '');
+        const exists = sortedCloudClasses.some(c => c.id === lastActiveId);
+        setActiveClassId(exists ? lastActiveId : (sortedCloudClasses[0]?.id || ''));
       } catch (err) {
         console.error('Failed to load classes from cloud Firestore:', err);
       } finally {
@@ -946,6 +935,14 @@ export default function App() {
         
         setStudents(loadedStudents);
         if (activeClassId) {
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(loadedSubjects));
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(loadedChapters));
+          if (loadedActiveSubjectId) {
+            localStorage.setItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
+          }
+          if (loadedActiveRoomId) {
+            localStorage.setItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
+          }
           localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(loadedStudents));
         }
         lastLoadedClassId.current = activeClassId;
@@ -1020,43 +1017,43 @@ export default function App() {
   }, [classes, teacher]);
 
   useEffect(() => {
-    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId) {
       localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(students));
     }
   }, [students, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId) {
       localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
     }
   }, [cards, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId) {
       localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
     }
   }, [pickedIds, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId && subjects.length > 0) {
       localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(subjects));
     }
   }, [subjects, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId && chapters.length > 0) {
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(chapters));
     }
   }, [chapters, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeSubjectId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId && activeSubjectId) {
       localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
     }
   }, [activeSubjectId, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeClassId === lastLoadedClassId.current) {
+    if (activeClassId) {
       if (activeRoomId) {
         localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
       } else if (activeRoomId === null) {
@@ -1110,7 +1107,7 @@ export default function App() {
         console.error('Failed to save class metadata to cloud:', err);
       }
     }
-    if (!teacher && activeClassId) {
+    if (activeClassId) {
       localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters)); // backward compatibility
       localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
@@ -1232,85 +1229,108 @@ export default function App() {
     });
     setSubjects(updatedSubjects);
 
-    if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+    if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+      localStorage.setItem(`active_room_id_${activeClassId}`, newRoom.id);
+    }
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters,
         activeRoomId: newRoom.id
       }, { merge: true }).catch(err => console.error('Failed to save new room to cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
-      localStorage.setItem(`active_room_id_${activeClassId}`, newRoom.id);
     }
   }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
   const handleDeleteRoom = useCallback((roomId: string) => {
     const totalRooms = chapters.reduce((total, ch) => total + ch.rooms.length, 0);
     if (totalRooms <= 1) {
-      alert('មិនអាចលុបបន្ទប់ទាំងអស់គ្រាប់បានទេ! ត្រូវតែមានយ៉ាងហោចណាស់បន្ទប់មួយនៅក្នុងជំពូកណាមួយ។');
-      return;
-    }
-    if (!window.confirm('តើអ្នកពិតជាចង់លុបបន្ទប់ក្ដារសំណួរនេះមែនទេ?​​ រាល់សំណួរនៅក្នុងបន្ទប់នេះនឹងត្រូវបាត់បង់ទាំងអស់។')) {
+      confirmAction({
+        title: 'មិនអាចលុបបានទេ',
+        message: 'មិនអាចលុបបន្ទប់ទាំងអស់បានទេ! ត្រូវតែមានយ៉ាងហោចណាស់បន្ទប់មួយនៅក្នុងជំពូកណាមួយ។',
+        confirmText: 'យល់ព្រម',
+        variant: 'warning',
+        onConfirm: () => {}
+      });
       return;
     }
 
-    const updatedChapters = chapters.map(ch => {
-      return {
-        ...ch,
-        rooms: ch.rooms.filter(r => r.id !== roomId)
-      };
-    });
+    let roomName = 'បន្ទប់នេះ';
+    for (const ch of chapters) {
+      const r = ch.rooms.find(rm => rm.id === roomId);
+      if (r) { roomName = r.name; break; }
+    }
 
-    let nextActiveId = activeRoomId;
-    if (activeRoomId === roomId) {
-      let foundRoom = false;
-      for (const ch of updatedChapters) {
-        if (ch.rooms.length > 0) {
-          nextActiveId = ch.rooms[0].id;
-          setCards(ch.rooms[0].cards || []);
-          setPickedIds(ch.rooms[0].pickedIds || []);
-          foundRoom = true;
-          break;
+    confirmAction({
+      title: 'លុបបន្ទប់ក្ដារសំណួរ',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបបន្ទប់ «${roomName}» នេះមែនទេ?​​ រាល់សំណួរនៅក្នុងបន្ទប់នេះនឹងត្រូវបាត់បង់ទាំងអស់។`,
+      confirmText: 'បាទ/ចាស លុបបន្ទប់',
+      variant: 'danger',
+      onConfirm: () => {
+        const updatedChapters = chapters.map(ch => {
+          return {
+            ...ch,
+            rooms: ch.rooms.filter(r => r.id !== roomId)
+          };
+        });
+
+        let nextActiveId = activeRoomId;
+        if (activeRoomId === roomId) {
+          let foundRoom = false;
+          for (const ch of updatedChapters) {
+            if (ch.rooms.length > 0) {
+              nextActiveId = ch.rooms[0].id;
+              setCards(ch.rooms[0].cards || []);
+              setPickedIds(ch.rooms[0].pickedIds || []);
+              foundRoom = true;
+              break;
+            }
+          }
+          if (!foundRoom) {
+            nextActiveId = null;
+            setCards([]);
+            setPickedIds([]);
+          }
+        }
+
+        setChapters(updatedChapters);
+        setActiveRoomId(nextActiveId);
+
+        const updatedSubjects = subjects.map(sub => {
+          if (sub.id === activeSubjectId) {
+            return {
+              ...sub,
+              chapters: updatedChapters
+            };
+          }
+          return sub;
+        });
+        setSubjects(updatedSubjects);
+
+        if (activeClassId) {
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+          if (nextActiveId) {
+            localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveId);
+          } else {
+            localStorage.removeItem(`active_room_id_${activeClassId}`);
+          }
+        }
+
+        const currentTeacherId = teacher?.id || 'local';
+        if (activeClassId) {
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+            subjects: updatedSubjects,
+            chapters: updatedChapters,
+            activeRoomId: nextActiveId
+          }, { merge: true }).catch(err => console.error('Failed to sync room deletion to cloud:', err));
         }
       }
-      if (!foundRoom) {
-        nextActiveId = null;
-        setCards([]);
-        setPickedIds([]);
-      }
-    }
-
-    setChapters(updatedChapters);
-    setActiveRoomId(nextActiveId);
-
-    const updatedSubjects = subjects.map(sub => {
-      if (sub.id === activeSubjectId) {
-        return {
-          ...sub,
-          chapters: updatedChapters
-        };
-      }
-      return sub;
     });
-    setSubjects(updatedSubjects);
-
-    if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
-        subjects: updatedSubjects,
-        chapters: updatedChapters,
-        activeRoomId: nextActiveId
-      }, { merge: true }).catch(err => console.error('Failed to sync room deletion to cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
-      if (nextActiveId) {
-        localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveId);
-      } else {
-        localStorage.removeItem(`active_room_id_${activeClassId}`);
-      }
-    }
-  }, [chapters, subjects, activeSubjectId, activeRoomId, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, activeRoomId, teacher, activeClassId, confirmAction]);
 
   const handleRenameRoom = useCallback((roomId: string, newName: string) => {
     const updatedChapters = chapters.map(ch => {
@@ -1336,14 +1356,17 @@ export default function App() {
     });
     setSubjects(updatedSubjects);
 
-    if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+    if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+    }
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to rename room in cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
   }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
@@ -1368,14 +1391,17 @@ export default function App() {
     });
     setSubjects(updatedSubjects);
 
-    if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+    if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+    }
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to create chapter in cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
   }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
@@ -1399,91 +1425,112 @@ export default function App() {
     });
     setSubjects(updatedSubjects);
 
-    if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+    if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+    }
+
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
         chapters: updatedChapters
       }, { merge: true }).catch(err => console.error('Failed to rename chapter in cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
   }, [chapters, subjects, activeSubjectId, teacher, activeClassId]);
 
   const handleDeleteChapter = useCallback((chapterId: string) => {
     if (chapters.length <= 1) {
-      alert('មិនអាចលុបជំពូកទាំងអស់បានទេ! ត្រូវតែមានយ៉ាងហោចណាស់ជំពូកមួយ។');
+      confirmAction({
+        title: 'មិនអាចលុបបានទេ',
+        message: 'មិនអាចលុបជំពូកទាំងអស់បានទេ! ត្រូវតែមានយ៉ាងហោចណាស់ជំពូកមួយ។',
+        confirmText: 'យល់ព្រម',
+        variant: 'warning',
+        onConfirm: () => {}
+      });
       return;
     }
-    if (!window.confirm('តើអ្នកពិតជាចង់លុបជំពូកនេះមែនទេ? រាល់បន្ទប់ និងសំណួរទាំងអស់នៅក្នុងជំពូកនេះនឹងត្រូវបាត់បង់ទាំងស្រុងពីប្រព័ន្ធ។')) {
-      return;
-    }
 
-    const updatedChapters = chapters.filter(ch => ch.id !== chapterId);
-    setChapters(updatedChapters);
+    const targetChapter = chapters.find(ch => ch.id === chapterId);
+    const chapterName = targetChapter ? targetChapter.name : 'ជំពូកនេះ';
 
-    // If active room was in deleted chapter, reset active room id
-    let isDeletedActive = false;
-    const deletedChapter = chapters.find(ch => ch.id === chapterId);
-    if (deletedChapter && activeRoomId) {
-      isDeletedActive = deletedChapter.rooms.some(r => r.id === activeRoomId);
-    }
+    confirmAction({
+      title: 'លុបជំពូក',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបជំពូក «${chapterName}» នេះមែនទេ? រាល់បន្ទប់ និងសំណួរទាំងអស់នៅក្នុងជំពូកនេះនឹងត្រូវបាត់បង់ទាំងស្រុងពីប្រព័ន្ធ។`,
+      confirmText: 'បាទ/ចាស លុបជំពូក',
+      variant: 'danger',
+      onConfirm: () => {
+        const updatedChapters = chapters.filter(ch => ch.id !== chapterId);
+        setChapters(updatedChapters);
 
-    let nextActiveRoomId = activeRoomId;
-    if (isDeletedActive) {
-      let foundRoom = false;
-      for (const ch of updatedChapters) {
-        if (ch.rooms.length > 0) {
-          nextActiveRoomId = ch.rooms[0].id;
-          setCards(ch.rooms[0].cards || []);
-          setPickedIds(ch.rooms[0].pickedIds || []);
-          foundRoom = true;
-          break;
+        // If active room was in deleted chapter, reset active room id
+        let isDeletedActive = false;
+        if (targetChapter && activeRoomId) {
+          isDeletedActive = targetChapter.rooms.some(r => r.id === activeRoomId);
+        }
+
+        let nextActiveRoomId = activeRoomId;
+        if (isDeletedActive) {
+          let foundRoom = false;
+          for (const ch of updatedChapters) {
+            if (ch.rooms.length > 0) {
+              nextActiveRoomId = ch.rooms[0].id;
+              setCards(ch.rooms[0].cards || []);
+              setPickedIds(ch.rooms[0].pickedIds || []);
+              foundRoom = true;
+              break;
+            }
+          }
+          if (!foundRoom) {
+            nextActiveRoomId = null;
+            setCards([]);
+            setPickedIds([]);
+          }
+        }
+
+        setActiveRoomId(nextActiveRoomId);
+
+        const updatedSubjects = subjects.map(sub => {
+          if (sub.id === activeSubjectId) {
+            return {
+              ...sub,
+              chapters: updatedChapters
+            };
+          }
+          return sub;
+        });
+        setSubjects(updatedSubjects);
+
+        if (activeClassId) {
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+          if (nextActiveRoomId) {
+            localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
+          } else {
+            localStorage.removeItem(`active_room_id_${activeClassId}`);
+          }
+        }
+
+        const currentTeacherId = teacher?.id || 'local';
+        if (activeClassId) {
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+            subjects: updatedSubjects,
+            chapters: updatedChapters,
+            activeRoomId: nextActiveRoomId
+          }, { merge: true }).catch(err => console.error('Failed to delete chapter in cloud:', err));
         }
       }
-      if (!foundRoom) {
-        nextActiveRoomId = null;
-        setCards([]);
-        setPickedIds([]);
-      }
-    }
-
-    setActiveRoomId(nextActiveRoomId);
-
-    const updatedSubjects = subjects.map(sub => {
-      if (sub.id === activeSubjectId) {
-        return {
-          ...sub,
-          chapters: updatedChapters
-        };
-      }
-      return sub;
     });
-    setSubjects(updatedSubjects);
-
-    if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
-        subjects: updatedSubjects,
-        chapters: updatedChapters,
-        activeRoomId: nextActiveRoomId
-      }, { merge: true }).catch(err => console.error('Failed to delete chapter in cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
-      if (nextActiveRoomId) {
-        localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
-      } else {
-        localStorage.removeItem(`active_room_id_${activeClassId}`);
-      }
-    }
-  }, [chapters, subjects, activeSubjectId, activeRoomId, teacher, activeClassId]);
+  }, [chapters, subjects, activeSubjectId, activeRoomId, teacher, activeClassId, confirmAction]);
 
   const handleSelectSubject = useCallback((subjectId: string) => {
     setActiveSubjectId(subjectId);
-    if (!teacher && activeClassId) {
+    if (activeClassId) {
       localStorage.setItem(`active_subject_id_${activeClassId}`, subjectId);
-    } else if (teacher && activeClassId) {
-      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+    }
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         activeSubjectId: subjectId
       }, { merge: true }).catch(err => console.error('Failed to sync activeSubjectId:', err));
     }
@@ -1496,10 +1543,11 @@ export default function App() {
         setActiveRoomId(firstRoom.id);
         setCards(firstRoom.cards || []);
         setPickedIds(firstRoom.pickedIds || []);
-        if (!teacher && activeClassId) {
+        if (activeClassId) {
           localStorage.setItem(`active_room_id_${activeClassId}`, firstRoom.id);
-        } else if (teacher && activeClassId) {
-          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        }
+        if (activeClassId) {
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
             activeRoomId: firstRoom.id
           }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
         }
@@ -1507,10 +1555,11 @@ export default function App() {
         setActiveRoomId(null);
         setCards([]);
         setPickedIds([]);
-        if (!teacher && activeClassId) {
+        if (activeClassId) {
           localStorage.removeItem(`active_room_id_${activeClassId}`);
-        } else if (teacher && activeClassId) {
-          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        }
+        if (activeClassId) {
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
             activeRoomId: null
           }, { merge: true }).catch(err => console.error('Failed to sync activeRoomId:', err));
         }
@@ -1550,6 +1599,13 @@ export default function App() {
     setCards([]);
     setPickedIds([]);
 
+    if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`active_subject_id_${activeClassId}`, newSubject.id);
+      localStorage.setItem(`active_room_id_${activeClassId}`, defaultRoom.id);
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(newSubject.chapters));
+    }
+
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
@@ -1558,12 +1614,6 @@ export default function App() {
         activeRoomId: defaultRoom.id,
         chapters: newSubject.chapters
       }, { merge: true }).catch(err => console.error('Failed to create subject in cloud:', err));
-    }
-    if (!teacher && activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      localStorage.setItem(`active_subject_id_${activeClassId}`, newSubject.id);
-      localStorage.setItem(`active_room_id_${activeClassId}`, defaultRoom.id);
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(newSubject.chapters));
     }
   }, [subjects, teacher, activeClassId]);
 
@@ -1576,13 +1626,15 @@ export default function App() {
     });
     setSubjects(updatedSubjects);
 
+    if (activeClassId) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+    }
+
     const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects
       }, { merge: true }).catch(err => console.error('Failed to rename subject in cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
     }
   }, [subjects, teacher, activeClassId]);
 
@@ -1590,191 +1642,222 @@ export default function App() {
     const targetSub = subjects.find(s => s.id === subjectId);
     const subName = targetSub ? targetSub.name : 'មុខវិជ្ជានេះ';
     
-    if (!window.confirm(`តើអ្នកពិតជាចង់លុបមុខវិជ្ជា "${subName}" នេះមែនទេ? ជំពូក មេរៀន និងកាតសំណួរទាំងអស់ក្នុងមុខវិជ្ជានេះនឹងត្រូវបាត់បង់។`)) {
-      return;
-    }
+    confirmAction({
+      title: 'លុបមុខវិជ្ជា',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបមុខវិជ្ជា «${subName}» នេះមែនទេ? ជំពូក មេរៀន និងកាតសំណួរទាំងអស់ក្នុងមុខវិជ្ជានេះនឹងត្រូវបាត់បង់។`,
+      confirmText: 'បាទ/ចាស លុបមុខវិជ្ជា',
+      variant: 'danger',
+      onConfirm: () => {
+        let updatedSubjects = subjects.filter(s => s.id !== subjectId);
 
-    let updatedSubjects = subjects.filter(s => s.id !== subjectId);
-
-    // If all subjects deleted, reset with a fresh default subject
-    if (updatedSubjects.length === 0) {
-      const freshSubject: QuizSubject = {
-        id: `subj-physics-${Date.now()}`,
-        name: 'រូបវិទ្យា',
-        chapters: [
-          {
-            id: `chapter-${Date.now()}`,
-            name: 'ជំពូកទី១',
-            rooms: [
+        // If all subjects deleted, reset with a fresh default subject
+        if (updatedSubjects.length === 0) {
+          const freshSubject: QuizSubject = {
+            id: `subj-physics-${Date.now()}`,
+            name: 'រូបវិទ្យា',
+            chapters: [
               {
-                id: `room-${Date.now()}`,
-                name: 'មេរៀនទី១',
-                cards: [],
-                pickedIds: [],
+                id: `chapter-${Date.now()}`,
+                name: 'ជំពូកទី១',
+                rooms: [
+                  {
+                    id: `room-${Date.now()}`,
+                    name: 'មេរៀនទី១',
+                    cards: [],
+                    pickedIds: [],
+                    createdAt: Date.now()
+                  }
+                ],
                 createdAt: Date.now()
               }
             ],
             createdAt: Date.now()
+          };
+          updatedSubjects = [freshSubject];
+        }
+
+        setSubjects(updatedSubjects);
+
+        let nextSubjectId = activeSubjectId;
+        let nextChapters = chapters;
+        let nextActiveRoomId = activeRoomId;
+
+        if (activeSubjectId === subjectId || !updatedSubjects.some(s => s.id === activeSubjectId)) {
+          const fallbackSubject = updatedSubjects[0];
+          nextSubjectId = fallbackSubject.id;
+          nextChapters = fallbackSubject.chapters;
+          
+          const activeRoom = nextChapters.length > 0 && nextChapters[0].rooms.length > 0 ? nextChapters[0].rooms[0] : null;
+          nextActiveRoomId = activeRoom ? activeRoom.id : null;
+          setChapters(nextChapters);
+          setActiveRoomId(nextActiveRoomId);
+          setCards(activeRoom ? activeRoom.cards || [] : []);
+          setPickedIds(activeRoom ? activeRoom.pickedIds || [] : []);
+        }
+
+        setActiveSubjectId(nextSubjectId);
+
+        if (activeClassId) {
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+          if (nextSubjectId) {
+            localStorage.setItem(`active_subject_id_${activeClassId}`, nextSubjectId);
           }
-        ],
-        createdAt: Date.now()
-      };
-      updatedSubjects = [freshSubject];
-    }
+          if (nextActiveRoomId) {
+            localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
+          }
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(nextChapters));
+        }
 
-    setSubjects(updatedSubjects);
-
-    let nextSubjectId = activeSubjectId;
-    let nextChapters = chapters;
-    let nextActiveRoomId = activeRoomId;
-
-    if (activeSubjectId === subjectId || !updatedSubjects.some(s => s.id === activeSubjectId)) {
-      const fallbackSubject = updatedSubjects[0];
-      nextSubjectId = fallbackSubject.id;
-      nextChapters = fallbackSubject.chapters;
-      
-      const activeRoom = nextChapters.length > 0 && nextChapters[0].rooms.length > 0 ? nextChapters[0].rooms[0] : null;
-      nextActiveRoomId = activeRoom ? activeRoom.id : null;
-      setChapters(nextChapters);
-      setActiveRoomId(nextActiveRoomId);
-      setCards(activeRoom ? activeRoom.cards || [] : []);
-      setPickedIds(activeRoom ? activeRoom.pickedIds || [] : []);
-    }
-
-    setActiveSubjectId(nextSubjectId);
-
-    const currentTeacherId = teacher?.id || 'local';
-    if (activeClassId) {
-      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
-        subjects: updatedSubjects,
-        activeSubjectId: nextSubjectId,
-        activeRoomId: nextActiveRoomId,
-        chapters: nextChapters
-      }, { merge: true }).catch(err => console.error('Failed to delete subject in cloud:', err));
-    } else if (activeClassId) {
-      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
-      if (nextSubjectId) {
-        localStorage.setItem(`active_subject_id_${activeClassId}`, nextSubjectId);
+        const currentTeacherId = teacher?.id || 'local';
+        if (activeClassId) {
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
+            subjects: updatedSubjects,
+            activeSubjectId: nextSubjectId,
+            activeRoomId: nextActiveRoomId,
+            chapters: nextChapters
+          }, { merge: true }).catch(err => console.error('Failed to delete subject in cloud:', err));
+        }
       }
-      if (nextActiveRoomId) {
-        localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
-      }
-      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(nextChapters));
-    }
-  }, [subjects, activeSubjectId, chapters, activeRoomId, teacher, activeClassId]);
+    });
+  }, [subjects, activeSubjectId, chapters, activeRoomId, teacher, activeClassId, confirmAction]);
 
   // Handler for switching class
   const handleSwitchClass = (classId: string) => {
     setActiveClassId(classId);
     setSelectedStudentId(null);
     setActiveCardId(null);
+    if (teacher) {
+      localStorage.setItem(`khmer_teacher_active_class_id_${teacher.id}`, classId);
+    }
+    localStorage.setItem('khmer_teacher_active_class_id', classId);
   };
 
-  const handleAddClass = async () => {
-    const className = window.prompt('សូមបញ្ចូលឈ្មោះថ្នាក់រៀនថ្មី៖', 'ថ្នាក់ទី១០ក');
-    if (className && className.trim()) {
+  const handleOpenAddClass = () => {
+    setClassModalState({
+      isOpen: true,
+      mode: 'add',
+      currentName: 'ថ្នាក់ទី១០ក'
+    });
+  };
+
+  const handleOpenRenameClass = (e: React.MouseEvent, classId: string, currentName: string) => {
+    e.stopPropagation();
+    setClassModalState({
+      isOpen: true,
+      mode: 'rename',
+      classId,
+      currentName
+    });
+  };
+
+  const handleSaveClassModal = async (enteredName: string) => {
+    const trimmed = enteredName.trim();
+    if (!trimmed) return;
+
+    if (classModalState.mode === 'add') {
       const newClassId = `class-${Date.now()}`;
       const newOrder = classes.length;
-      const newClass: ClassInfo = { id: newClassId, name: className.trim(), order: newOrder };
+      const newClass: ClassInfo = { id: newClassId, name: trimmed, order: newOrder };
       
       const { subjects: defaultSubjects, activeSubjectId: defaultActiveSubjectId } = getMigratedSubjects([]);
       const defaultActiveRoomId = defaultSubjects[0]?.chapters[0]?.rooms[0]?.id || null;
 
-      if (teacher) {
-        try {
-          await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', newClassId), {
-            id: newClassId,
-            name: className.trim(),
-            order: newOrder,
-            subjects: defaultSubjects,
-            activeSubjectId: defaultActiveSubjectId,
-            activeRoomId: defaultActiveRoomId,
-            pickedIds: [],
-            cards: [],
-            createdAt: new Date().toISOString()
-          });
-        } catch (err) {
-          handleFirestoreError(err, OperationType.CREATE, `teachers/${teacher.id}/classes/${newClassId}`);
-        }
-      } else {
-        localStorage.setItem(`subjects_class_${newClassId}`, JSON.stringify(defaultSubjects));
-        localStorage.setItem(`active_subject_id_${newClassId}`, defaultActiveSubjectId || '');
-        if (defaultActiveRoomId) {
-          localStorage.setItem(`active_room_id_${newClassId}`, defaultActiveRoomId);
-        }
+      localStorage.setItem(`subjects_class_${newClassId}`, JSON.stringify(defaultSubjects));
+      if (defaultActiveSubjectId) {
+        localStorage.setItem(`active_subject_id_${newClassId}`, defaultActiveSubjectId);
       }
+      if (defaultActiveRoomId) {
+        localStorage.setItem(`active_room_id_${newClassId}`, defaultActiveRoomId);
+      }
+
+      const currentTeacherId = teacher?.id || 'local';
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', newClassId), {
+        id: newClassId,
+        name: trimmed,
+        order: newOrder,
+        subjects: defaultSubjects,
+        activeSubjectId: defaultActiveSubjectId,
+        activeRoomId: defaultActiveRoomId,
+        pickedIds: [],
+        cards: [],
+        createdAt: new Date().toISOString()
+      }, { merge: true }).catch(err => console.error('Failed to create class in Cloud:', err));
       
       const sortedClasses = sortClasses([...classes, newClass]);
       setClasses(sortedClasses);
       if (teacher) {
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
-      } else {
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       }
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       
       handleSwitchClass(newClassId);
+    } else if (classModalState.mode === 'rename' && classModalState.classId) {
+      const targetId = classModalState.classId;
+      const updatedClasses = classes.map(c => c.id === targetId ? { ...c, name: trimmed } : c);
+      const sortedClasses = sortClasses(updatedClasses);
+      setClasses(sortedClasses);
+      
+      if (teacher) {
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
+      }
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
+      
+      const currentTeacherId = teacher?.id || 'local';
+      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetId), {
+        id: targetId,
+        name: trimmed
+      }, { merge: true }).catch(err => console.error("Failed to rename class in Cloud:", err));
     }
   };
 
   const handleRemoveClass = async (e: React.MouseEvent, classId: string, className: string) => {
     e.stopPropagation(); // prevent switching to it
     if (classes.length <= 1) {
-      alert('ត្រូវតែមានថ្នាក់រៀនយ៉ាងហោចណាស់មួយ!');
+      confirmAction({
+        title: 'មិនអាចលុបបានទេ',
+        message: 'ត្រូវតែមានថ្នាក់រៀនយ៉ាងហោចណាស់មួយនៅក្នុងប្រព័ន្ធ!',
+        confirmText: 'យល់ព្រម',
+        variant: 'warning',
+        onConfirm: () => {}
+      });
       return;
     }
-    if (window.confirm(`តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបថ្នាក់ទី «${className}» នេះចោលមែនទេ?`)) {
-      const updatedClasses = classes.filter(c => c.id !== classId);
-      
-      const currentTeacherId = teacher?.id || 'local';
-      try {
-        await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
-      } catch (err) {
-        console.error(err);
-      }
-      
-      const sortedClasses = sortClasses(updatedClasses);
-      setClasses(sortedClasses);
-      if (teacher) {
-        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
-      } else {
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
-      }
 
-      localStorage.removeItem(`students_class_${classId}`);
-      localStorage.removeItem(`quiz_cards_class_${classId}`);
-      localStorage.removeItem(`picked_students_class_${classId}`);
-      
-      if (activeClassId === classId) {
-        handleSwitchClass(updatedClasses[0].id);
-      }
-    }
-  };
-
-  const handleRenameClass = async (e: React.MouseEvent, classId: string, currentName: string) => {
-    e.stopPropagation();
-    const newName = window.prompt('សូមបញ្ចូលឈ្មោះថ្នាក់រៀនថ្មី៖', currentName);
-    if (newName && newName.trim() && newName.trim() !== currentName) {
-      const trimmedName = newName.trim();
-      const updatedClasses = classes.map(c => c.id === classId ? { ...c, name: trimmedName } : c);
-      const sortedClasses = sortClasses(updatedClasses);
-      setClasses(sortedClasses);
-      
-      if (teacher) {
-        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
-      } else {
+    confirmAction({
+      title: 'លុបថ្នាក់ទី',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបថ្នាក់ទី «${className}» នេះចោលមែនទេ? រាល់បញ្ជីឈ្មោះសិស្ស និងកាតសំណួរទាំងអស់ក្នុងថ្នាក់នេះនឹងត្រូវបាត់បង់ទាំងស្រុង។`,
+      confirmText: 'បាទ/ចាស លុបថ្នាក់',
+      variant: 'danger',
+      onConfirm: async () => {
+        const updatedClasses = classes.filter(c => c.id !== classId);
+        
+        const currentTeacherId = teacher?.id || 'local';
+        try {
+          await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
+        } catch (err) {
+          console.error(err);
+        }
+        
+        const sortedClasses = sortClasses(updatedClasses);
+        setClasses(sortedClasses);
+        if (teacher) {
+          localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
+        }
         localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
+
+        localStorage.removeItem(`students_class_${classId}`);
+        localStorage.removeItem(`quiz_cards_class_${classId}`);
+        localStorage.removeItem(`picked_students_class_${classId}`);
+        localStorage.removeItem(`subjects_class_${classId}`);
+        localStorage.removeItem(`chapters_class_${classId}`);
+        localStorage.removeItem(`active_subject_id_${classId}`);
+        localStorage.removeItem(`active_room_id_${classId}`);
+        
+        if (activeClassId === classId) {
+          handleSwitchClass(sortedClasses[0].id);
+        }
       }
-      
-      const currentTeacherId = teacher?.id || 'local';
-      try {
-        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId), {
-          id: classId,
-          name: trimmedName
-        }, { merge: true });
-      } catch (err) {
-        console.error("Failed to rename class in Cloud:", err);
-      }
-    }
+    });
   };
 
   const addStudent = useCallback(async (name: string) => {
@@ -1920,40 +2003,61 @@ export default function App() {
     });
   }, [activeClassId, teacher]);
 
-  const removeStudent = useCallback(async (id: string) => {
-    const currentTeacherId = teacher?.id || 'local';
-    try {
-      await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id));
-    } catch (err) {
-      console.error(err);
-    }
-    setStudents(prev => {
-      const filtered = prev.filter(s => s.id !== id);
-      if (activeClassId) {
-        localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(filtered));
-      }
-      return filtered;
-    });
-    if (selectedStudentId === id) setSelectedStudentId(null);
-  }, [selectedStudentId, teacher, activeClassId]);
+  const removeStudent = useCallback((id: string) => {
+    const student = students.find(s => s.id === id);
+    const studentName = student ? student.name : 'សិស្សនេះ';
 
-  const clearStudents = useCallback(async () => {
-    const currentTeacherId = teacher?.id || 'local';
-    try {
-      for (const s of students) {
-        safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id)).catch(() => {});
+    confirmAction({
+      title: 'លុបឈ្មោះសិស្ស',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបឈ្មោះសិស្ស «${studentName}» នេះចេញពីថ្នាក់មែនទេ? សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។`,
+      confirmText: 'បាទ/ចាស លុប',
+      variant: 'danger',
+      onConfirm: async () => {
+        const currentTeacherId = teacher?.id || 'local';
+        try {
+          await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id));
+        } catch (err) {
+          console.error(err);
+        }
+        setStudents(prev => {
+          const filtered = prev.filter(s => s.id !== id);
+          if (activeClassId) {
+            localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(filtered));
+          }
+          return filtered;
+        });
+        if (selectedStudentId === id) setSelectedStudentId(null);
       }
-    } catch (err) {
-      console.error(err);
-    }
-    setStudents([]);
-    setSelectedStudentId(null);
-    setPickedIds([]);
-    if (activeClassId) {
-      localStorage.removeItem(`students_class_${activeClassId}`);
-      localStorage.removeItem(`picked_students_class_${activeClassId}`);
-    }
-  }, [students, teacher, activeClassId]);
+    });
+  }, [students, selectedStudentId, teacher, activeClassId, confirmAction]);
+
+  const clearStudents = useCallback(() => {
+    if (students.length === 0) return;
+
+    confirmAction({
+      title: 'លុបឈ្មោះសិស្សទាំងអស់',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបឈ្មោះសិស្សទាំងអស់ (${students.length} នាក់) ក្នុងថ្នាក់នេះមែនទេ? រាល់ឈ្មោះ និងពិន្ទុទាំងអស់នឹងត្រូវបាត់បង់ទាំងស្រុងពីប្រព័ន្ធ។`,
+      confirmText: 'បាទ/ចាស លុបទាំងអស់',
+      variant: 'danger',
+      onConfirm: async () => {
+        const currentTeacherId = teacher?.id || 'local';
+        try {
+          for (const s of students) {
+            safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id)).catch(() => {});
+          }
+        } catch (err) {
+          console.error(err);
+        }
+        setStudents([]);
+        setSelectedStudentId(null);
+        setPickedIds([]);
+        if (activeClassId) {
+          localStorage.removeItem(`students_class_${activeClassId}`);
+          localStorage.removeItem(`picked_students_class_${activeClassId}`);
+        }
+      }
+    });
+  }, [students, teacher, activeClassId, confirmAction]);
 
   const handleQuestionsGenerated = useCallback((questions: Question[]) => {
     const newCards: QuizCard[] = questions.map((q, i) => ({
@@ -2006,44 +2110,56 @@ export default function App() {
   }, [activeCardId, selectedStudentId, cards, pickedIds, saveClassMetadata, saveStudentScore]);
 
   const resetMatch = useCallback(async () => {
-    if (window.confirm('តើអ្នកពិតជាចង់កំណត់ពិន្ទុ និងការបើកសន្លឹកប័ណ្ណឡើងវិញមែនទេ?')) {
-      if (teacher && activeClassId) {
-        try {
-          for (const s of students) {
-            await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id), {
-              score: 0
-            }, { merge: true });
+    confirmAction({
+      title: 'កំណត់ពិន្ទុ និងកាតឡើងវិញ',
+      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់កំណត់ពិន្ទុសិស្ស និងការបើកសន្លឹកប័ណ្ណឡើងវិញទាំងអស់មែនទេ?',
+      confirmText: 'បាទ/ចាស កំណត់ឡើងវិញ',
+      variant: 'warning',
+      onConfirm: async () => {
+        if (teacher && activeClassId) {
+          try {
+            for (const s of students) {
+              await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id), {
+                score: 0
+              }, { merge: true });
+            }
+          } catch (err) {
+            console.error(err);
           }
-        } catch (err) {
-          console.error(err);
         }
+        
+        setStudents(prev => prev.map(s => ({ ...s, score: 0 })));
+        
+        const resetCards = cards.map(c => ({ ...c, isRevealed: false, status: 'idle' as any }));
+        setCards(resetCards);
+        setSelectedStudentId(null);
+        setPickedIds([]);
+        setActiveCardId(null);
+        
+        saveClassMetadata(resetCards, []);
       }
-      
-      setStudents(prev => prev.map(s => ({ ...s, score: 0 })));
-      
-      const resetCards = cards.map(c => ({ ...c, isRevealed: false, status: 'idle' as any }));
-      setCards(resetCards);
-      setSelectedStudentId(null);
-      setPickedIds([]);
-      setActiveCardId(null);
-      
-      saveClassMetadata(resetCards, []);
-    }
-  }, [students, cards, teacher, activeClassId, saveClassMetadata]);
+    });
+  }, [students, cards, teacher, activeClassId, saveClassMetadata, confirmAction]);
 
   const resetAll = useCallback(() => {
-    if (window.confirm('តើអ្នកពិតជាចង់កំណត់កម្មវិធីឡើងវិញទាំងស្រុងមែនទេ?')) {
-      localStorage.clear();
-      setStudents([]);
-      setCards([]);
-      setSelectedStudentId(null);
-      setPickedIds([]);
-      setActiveCardId(null);
-      setTeacher(null);
-      setClasses(DEFAULT_CLASSES);
-      setActiveClassId('class-7a');
-    }
-  }, []);
+    confirmAction({
+      title: 'កំណត់កម្មវិធីឡើងវិញទាំងស្រុង',
+      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់កំណត់កម្មវិធីឡើងវិញទាំងស្រុង (Factory Reset) មែនទេ? រាល់ទិន្នន័យទាំងអស់នឹងត្រូវជម្រះ។',
+      confirmText: 'បាទ/ចាស កំណត់ឡើងវិញទាំងអស់',
+      variant: 'danger',
+      onConfirm: () => {
+        localStorage.clear();
+        setStudents([]);
+        setCards([]);
+        setSelectedStudentId(null);
+        setPickedIds([]);
+        setActiveCardId(null);
+        setTeacher(null);
+        setClasses(DEFAULT_CLASSES);
+        setActiveClassId('class-7a');
+      }
+    });
+  }, [confirmAction]);
 
   const handleLogout = () => {
     setIsLogoutModalOpen(true);
@@ -2369,7 +2485,7 @@ export default function App() {
                       </button>
                     )}
                     <button
-                      onClick={(e) => handleRenameClass(e, cls.id, cls.name)}
+                      onClick={(e) => handleOpenRenameClass(e, cls.id, cls.name)}
                       className={`p-0.5 rounded transition-colors ${
                         isActive 
                           ? 'hover:bg-white/20 text-white' 
@@ -2398,7 +2514,7 @@ export default function App() {
             })}
 
             <button
-              onClick={handleAddClass}
+              onClick={handleOpenAddClass}
               className={`px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
                 isDarkMode 
                   ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-400 hover:bg-slate-800/50' 
@@ -2607,6 +2723,14 @@ export default function App() {
           }}
         />
       )}
+
+      <ClassModal
+        isOpen={classModalState.isOpen}
+        mode={classModalState.mode}
+        currentName={classModalState.currentName}
+        onClose={() => setClassModalState(prev => ({ ...prev, isOpen: false }))}
+        onSave={handleSaveClassModal}
+      />
 
       {/* Logout Confirmation Modal */}
       <AnimatePresence>

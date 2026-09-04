@@ -523,11 +523,7 @@ export default function StudentManager({
                     <Pencil className="w-4.5 h-4.5" />
                   </button>
                   <button
-                    onClick={() => {
-                      if (window.confirm(`តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបឈ្មោះសិស្ស «${student.name}» នេះចោលមែនទេ?`)) {
-                        onRemoveStudent(student.id);
-                      }
-                    }}
+                    onClick={() => onRemoveStudent(student.id)}
                     className={`p-2 rounded-xl cursor-pointer transition-all duration-200 ${
                       isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
                     }`}

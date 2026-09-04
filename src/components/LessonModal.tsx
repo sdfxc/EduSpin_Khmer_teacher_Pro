@@ -4,6 +4,7 @@ import { Sparkles, X, BookOpen, Loader2, Info, Upload, FileText, Trash2, FileSpr
 import { generateQuestions, getSavedApiKey, saveApiKey, FileData } from '../lib/gemini';
 import { Question } from '../types';
 import { PREBUILT_LESSONS } from '../lib/templates';
+import { useConfirm } from '../context/ConfirmContext.tsx';
 
 interface LessonModalProps {
   isOpen: boolean;
@@ -32,6 +33,7 @@ const getMimeTypeFromExtension = (filename: string): string => {
 };
 
 export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: LessonModalProps) {
+  const { confirmAction } = useConfirm();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
   const [count, setCount] = useState(25);
@@ -48,6 +50,45 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
   const [isDragging, setIsDragging] = useState(false);
   
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleRemoveImage = (index: number) => {
+    const fileName = uploadedImages[index]?.name || `រូបភាព ${index + 1}`;
+    confirmAction({
+      title: 'លុបរូបភាព',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ដករូបភាព «${fileName}» នេះចេញមែនទេ?`,
+      confirmText: 'បាទ/ចាស ដកចេញ',
+      variant: 'danger',
+      onConfirm: () => {
+        setUploadedImages(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+  };
+
+  const handleRemovePdf = (index: number) => {
+    const fileName = uploadedPdfs[index]?.name || `ឯកសារ PDF ${index + 1}`;
+    confirmAction({
+      title: 'លុបឯកសារ PDF',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ដកឯកសារ «${fileName}» នេះចេញមែនទេ?`,
+      confirmText: 'បាទ/ចាស ដកចេញ',
+      variant: 'danger',
+      onConfirm: () => {
+        setUploadedPdfs(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+  };
+
+  const handleRemoveOfficeFile = (index: number) => {
+    const fileName = uploadedOfficeFiles[index]?.name || `ឯកសារ ${index + 1}`;
+    confirmAction({
+      title: 'លុបឯកសារ',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ដកឯកសារ «${fileName}» នេះចេញមែនទេ?`,
+      confirmText: 'បាទ/ចាស ដកចេញ',
+      variant: 'danger',
+      onConfirm: () => {
+        setUploadedOfficeFiles(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+  };
 
   const processFiles = (files: File[]) => {
     files.forEach(file => {
@@ -446,7 +487,7 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setUploadedImages(prev => prev.filter((_, i) => i !== idx));
+                              handleRemoveImage(idx);
                             }}
                             className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                           >
@@ -470,7 +511,7 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                             type="button"
                             onClick={(e) => {
                               e.stopPropagation();
-                              setUploadedPdfs(prev => prev.filter((_, i) => i !== idx));
+                              handleRemovePdf(idx);
                             }}
                             className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                           >
@@ -521,7 +562,7 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                               type="button"
                               onClick={(e) => {
                                 e.stopPropagation();
-                                setUploadedOfficeFiles(prev => prev.filter((_, i) => i !== idx));
+                                handleRemoveOfficeFile(idx);
                               }}
                               className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
                             >

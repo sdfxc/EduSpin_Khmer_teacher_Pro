@@ -22,6 +22,7 @@ import { doc } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, safeSetDoc } from '../lib/firebase';
 import { compressAndResizeImage } from '../lib/imageUtils';
 import { formatGoogleDriveImageUrl } from '../lib/driveUtils';
+import { useConfirm } from '../context/ConfirmContext.tsx';
 
 interface TeacherProfileModalProps {
   isOpen: boolean;
@@ -38,6 +39,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   onUpdateTeacher,
   onLogout,
 }) => {
+  const { confirmAction } = useConfirm();
   const [avatarUrl, setAvatarUrl] = useState<string>(teacher.avatarUrl || '');
   const [name, setName] = useState<string>(teacher.name || '');
   const [schoolName, setSchoolName] = useState<string>(teacher.schoolName || '');
@@ -95,10 +97,18 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   };
 
   const handleRemovePhoto = () => {
-    setAvatarUrl('');
-    setStatusMsg({
-      type: 'success',
-      text: 'បានលុបរូបភាព Profile ចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+    confirmAction({
+      title: 'លុបរូបភាព Profile',
+      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបរូបភាព Profile នេះចេញមែនទេ?',
+      confirmText: 'បាទ/ចាស លុបរូប',
+      variant: 'danger',
+      onConfirm: () => {
+        setAvatarUrl('');
+        setStatusMsg({
+          type: 'success',
+          text: 'បានលុបរូបភាព Profile ចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+        });
+      }
     });
   };
 

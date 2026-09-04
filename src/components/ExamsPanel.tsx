@@ -28,6 +28,7 @@ import {
 import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
 import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import { generateQuestions, getSavedApiKey, saveApiKey } from '../lib/gemini';
+import { useConfirm } from '../context/ConfirmContext.tsx';
 import { PREBUILT_LESSONS } from '../lib/templates';
 import { Question } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
@@ -228,6 +229,7 @@ const DEFAULT_EXAMS: ExamPaper[] = [
 ];
 
 export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode, teacher }: ExamsPanelProps) {
+  const { confirmAction } = useConfirm();
   const defaultSchool = teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ';
 
   const formatSchoolName = (name?: string) => {
@@ -245,7 +247,7 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
         return parsed.map(e => ({
           ...e,
           schoolName: formatSchoolName(e.schoolName),
-          subjects: (e.subjects || []).filter(s => s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា' && s.id !== 'sub-c' && s.id !== 'sub-m')
+          subjects: e.subjects || []
         }));
       } catch (e) {
         console.error("Failed to parse exams, using defaults", e);
@@ -600,13 +602,21 @@ Output the response in JSON format.`;
 
   // Delete Exam Paper
   const handleDeleteExam = (id: string) => {
-    if (confirm('តើអ្នកពិតជាចង់លុបវិញ្ញាសានេះមែនទេ?')) {
-      const remaining = exams.filter(e => e.id !== id);
-      saveState(remaining);
-      if (selectedExamId === id && remaining.length > 0) {
-        setSelectedExamId(remaining[0].id);
+    const targetExam = exams.find(e => e.id === id);
+    const examTitle = targetExam?.title || 'វិញ្ញាសានេះ';
+    confirmAction({
+      title: 'លុបវិញ្ញាសា',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបវិញ្ញាសា «${examTitle}» នេះមែនទេ? សកម្មភាពនេះមិនអាចត្រឡប់វិញបានទេ។`,
+      confirmText: 'បាទ/ចាស លុបវិញ្ញាសា',
+      variant: 'danger',
+      onConfirm: () => {
+        const remaining = exams.filter(e => e.id !== id);
+        saveState(remaining);
+        if (selectedExamId === id && remaining.length > 0) {
+          setSelectedExamId(remaining[0].id);
+        }
       }
-    }
+    });
   };
 
   // Add custom new subject
@@ -655,29 +665,33 @@ Output the response in JSON format.`;
     const targetSub = activeExam.subjects.find(s => s.id === subjectId);
     const subName = targetSub ? targetSub.name : 'មុខវិជ្ជានេះ';
 
-    if (!window.confirm(`តើអ្នកពិតជាចង់លុបមុខវិជ្ជា "${subName}" នេះមែនទេ?`)) {
-      return;
-    }
+    confirmAction({
+      title: 'លុបមុខវិជ្ជា',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបមុខវិជ្ជា «${subName}» នេះមែនទេ?`,
+      confirmText: 'បាទ/ចាស លុបមុខវិជ្ជា',
+      variant: 'danger',
+      onConfirm: () => {
+        const updated = exams.map(e => {
+          if (e.id === activeExam.id) {
+            const filtered = e.subjects.filter(s => s.id !== subjectId);
+            return {
+              ...e,
+              subjects: filtered
+            };
+          }
+          return e;
+        });
 
-    const updated = exams.map(e => {
-      if (e.id === activeExam.id) {
-        const filtered = e.subjects.filter(s => s.id !== subjectId);
-        return {
-          ...e,
-          subjects: filtered
-        };
+        const currentExam = updated.find(e => e.id === activeExam.id);
+        if (currentExam && currentExam.subjects.length > 0) {
+          if (!currentExam.subjects.some(s => s.id === activeSubjectId)) {
+            setActiveSubjectId(currentExam.subjects[0].id);
+          }
+        }
+
+        saveState(updated);
       }
-      return e;
     });
-
-    const currentExam = updated.find(e => e.id === activeExam.id);
-    if (currentExam && currentExam.subjects.length > 0) {
-      if (!currentExam.subjects.some(s => s.id === activeSubjectId)) {
-        setActiveSubjectId(currentExam.subjects[0].id);
-      }
-    }
-
-    saveState(updated);
   };
 
   // Edit questions handler - open modal
@@ -730,18 +744,30 @@ Output the response in JSON format.`;
 
   // Delete question from temporary local list
   const handleDeleteLocalQuestion = (index: number) => {
-    if (confirm('តើអ្នកពិតជាចង់លុបសំណួរនេះមែនទេ?')) {
-      const filtered = localQuestions.filter((_, idx) => idx !== index);
-      setLocalQuestions(filtered);
-      setSelectedQIndex(Math.max(0, index - 1));
-    }
+    confirmAction({
+      title: 'លុបសំណួរ',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសំណួរទី ${index + 1} នេះមែនទេ?`,
+      confirmText: 'បាទ/ចាស លុប',
+      variant: 'danger',
+      onConfirm: () => {
+        const filtered = localQuestions.filter((_, idx) => idx !== index);
+        setLocalQuestions(filtered);
+        setSelectedQIndex(Math.max(0, index - 1));
+      }
+    });
   };
 
   const handleDeleteAllLocalQuestions = () => {
-    if (confirm('តើអ្នកពិតជាចង់លុបសំណួរទាំងអស់មែនទេ?')) {
-      setLocalQuestions([]);
-      setSelectedQIndex(0);
-    }
+    confirmAction({
+      title: 'លុបសំណួរទាំងអស់',
+      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសំណួរទាំងអស់ក្នុងវិញ្ញាសានេះមែនទេ?',
+      confirmText: 'បាទ/ចាស លុបទាំងអស់',
+      variant: 'danger',
+      onConfirm: () => {
+        setLocalQuestions([]);
+        setSelectedQIndex(0);
+      }
+    });
   };
 
   // AI Generation triggers
