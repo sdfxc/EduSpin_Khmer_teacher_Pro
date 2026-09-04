@@ -9,11 +9,18 @@ interface TeacherAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (account: TeacherAccount) => void;
+  initialMode?: 'login' | 'register';
 }
 
-export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess }: TeacherAuthModalProps) {
-  const [isLoginView, setIsLoginView] = useState(true);
+export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, initialMode = 'login' }: TeacherAuthModalProps) {
+  const [isLoginView, setIsLoginView] = useState(initialMode === 'login');
   const [isLoading, setIsLoading] = useState(false);
+  
+  useEffect(() => {
+    if (isOpen) {
+      setIsLoginView(initialMode === 'login');
+    }
+  }, [initialMode, isOpen]);
   
   // Login fields
   const [loginUsername, setLoginUsername] = useState('');

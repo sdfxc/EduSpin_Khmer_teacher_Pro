@@ -1,12 +1,12 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { X, GraduationCap, Check } from 'lucide-react';
+import { X, GraduationCap, Check, Loader2 } from 'lucide-react';
 
 interface ClassModalProps {
   isOpen: boolean;
   mode: 'add' | 'rename';
   currentName?: string;
   onClose: () => void;
-  onSave: (name: string) => void;
+  onSave: (name: string) => Promise<void> | void;
 }
 
 export const ClassModal: React.FC<ClassModalProps> = ({
@@ -18,12 +18,14 @@ export const ClassModal: React.FC<ClassModalProps> = ({
 }) => {
   const [className, setClassName] = useState('');
   const [error, setError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isOpen) {
       setClassName(mode === 'rename' ? currentName : '');
       setError('');
+      setIsSubmitting(false);
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.focus();
@@ -35,8 +37,10 @@ export const ClassModal: React.FC<ClassModalProps> = ({
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSubmitting) return;
+
     const trimmed = className.trim();
     if (!trimmed) {
       setError('សូមបញ្ចូលឈ្មោះថ្នាក់រៀន!');
@@ -46,8 +50,17 @@ export const ClassModal: React.FC<ClassModalProps> = ({
       onClose();
       return;
     }
-    onSave(trimmed);
-    onClose();
+
+    try {
+      setIsSubmitting(true);
+      await onSave(trimmed);
+      onClose();
+    } catch (err) {
+      console.error('Failed to save class:', err);
+      setError('មានបញ្ហាក្នុងការរក្សាទុក។ សូមព្យាយាមម្ដងទៀត!');
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   return (
@@ -74,7 +87,8 @@ export const ClassModal: React.FC<ClassModalProps> = ({
           <button
             type="button"
             onClick={onClose}
-            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+            disabled={isSubmitting}
+            className="p-1.5 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors disabled:opacity-50"
           >
             <X className="w-5 h-5" />
           </button>
@@ -90,12 +104,13 @@ export const ClassModal: React.FC<ClassModalProps> = ({
               ref={inputRef}
               type="text"
               value={className}
+              disabled={isSubmitting}
               onChange={(e) => {
                 setClassName(e.target.value);
                 if (error) setError('');
               }}
-              placeholder="ឧទាហរណ៍៖ ថ្នាក់ទី១០ក, ថ្នាក់ទី១១ខ..."
-              className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:outline-none focus:ring-2 ${
+              placeholder="ឧទាហរណ៍៖ ថ្នាក់ទី៨ក១, ថ្នាក់ទី៧ក..."
+              className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:outline-none focus:ring-2 disabled:opacity-60 ${
                 error
                   ? 'border-red-400 focus:ring-red-400/20 focus:border-red-500'
                   : 'border-slate-200 dark:border-slate-700 focus:ring-indigo-500/20 focus:border-indigo-500'
@@ -108,16 +123,27 @@ export const ClassModal: React.FC<ClassModalProps> = ({
             <button
               type="button"
               onClick={onClose}
-              className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors"
+              disabled={isSubmitting}
+              className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
             >
               បោះបង់
             </button>
             <button
               type="submit"
-              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl shadow-xs flex items-center gap-1.5 transition-all"
+              disabled={isSubmitting}
+              className="px-5 py-2 text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:bg-indigo-700 rounded-xl shadow-xs flex items-center gap-1.5 transition-all disabled:opacity-60 disabled:cursor-not-allowed"
             >
-              <Check className="w-4 h-4" />
-              <span>{mode === 'rename' ? 'រក្សាទុក' : 'បង្កើតថ្នាក់'}</span>
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                  <span>កំពុងរក្សាទុក...</span>
+                </>
+              ) : (
+                <>
+                  <Check className="w-4 h-4" />
+                  <span>{mode === 'rename' ? 'រក្សាទុក' : 'បង្កើតថ្នាក់'}</span>
+                </>
+              )}
             </button>
           </div>
         </form>

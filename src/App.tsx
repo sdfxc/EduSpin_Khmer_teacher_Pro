@@ -16,7 +16,7 @@ import GroupDivider from './components/GroupDivider';
 import StudentManager from './components/StudentManager';
 import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject } from './types';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, isQuotaExceeded, safeSetDoc, safeDeleteDoc, safeOnSnapshot } from './lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
@@ -96,16 +96,7 @@ export default function App() {
     return params.get('mode') === 'student';
   });
 
-  const [quotaExceeded, setQuotaExceeded] = useState(isQuotaExceeded());
-
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (isQuotaExceeded() && !quotaExceeded) {
-        setQuotaExceeded(true);
-      }
-    }, 1000);
-    return () => clearInterval(interval);
-  }, [quotaExceeded]);
+  const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
 
   if (studentMode) {
     return <StudentPlayView />;
@@ -126,74 +117,52 @@ export default function App() {
 
   const [classes, setClasses] = useState<ClassInfo[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    let rawClasses: ClassInfo[] = [];
-    if (savedTeacherObj === null) {
-      const saved = localStorage.getItem('khmer_teacher_classes');
+    if (!savedTeacherObj) {
+      return [];
+    }
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const saved = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_classes');
       if (saved) {
-        try {
-          rawClasses = JSON.parse(saved) as ClassInfo[];
-        } catch (e) {}
-      }
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        const saved = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_classes');
-        if (saved) {
-          rawClasses = JSON.parse(saved) as ClassInfo[];
+        const rawClasses = JSON.parse(saved) as ClassInfo[];
+        const clean = (rawClasses || []).filter(c => c && c.name && c.name.trim() !== '');
+        if (clean.length > 0) {
+          return sortClasses(clean);
         }
-      } catch (e) {}
-    }
-
-    const clean = (rawClasses || []).filter(c => c && c.name && c.name.trim() !== '');
-    if (clean.length > 0) {
-      return sortClasses(clean);
-    }
-    return sortClasses(DEFAULT_CLASSES);
+      }
+    } catch (e) {}
+    return [];
   });
 
   const [activeClassId, setActiveClassId] = useState<string>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    let savedActiveId: string | null = null;
-    let savedClassesRaw: string | null = null;
-    if (savedTeacherObj === null) {
-      savedActiveId = localStorage.getItem('khmer_teacher_active_class_id');
-      savedClassesRaw = localStorage.getItem('khmer_teacher_classes');
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        savedActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_active_class_id');
-        savedClassesRaw = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_classes');
-      } catch (e) {}
+    if (!savedTeacherObj) {
+      return '';
     }
-    
-    let availableClasses: ClassInfo[] = [];
-    if (savedClassesRaw) {
-      try {
-        availableClasses = (JSON.parse(savedClassesRaw) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
-      } catch (e) {}
-    }
-    if (availableClasses.length === 0) {
-      availableClasses = DEFAULT_CLASSES;
-    }
-
-    if (savedActiveId && availableClasses.some(c => c.id === savedActiveId)) {
-      return savedActiveId;
-    }
-    return availableClasses[0]?.id || 'class-7a';
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const savedActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_active_class_id');
+      const savedClassesRaw = localStorage.getItem(`khmer_teacher_classes_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_classes');
+      if (savedClassesRaw) {
+        const availableClasses = (JSON.parse(savedClassesRaw) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
+        if (savedActiveId && availableClasses.some(c => c.id === savedActiveId)) {
+          return savedActiveId;
+        }
+        return availableClasses[0]?.id || '';
+      }
+    } catch (e) {}
+    return '';
   });
 
   const [students, setStudents] = useState<Student[]>(() => {
+    const savedTeacherObj = localStorage.getItem('logged_in_teacher');
+    if (!savedTeacherObj) {
+      return [];
+    }
     try {
-      const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-      let currentActiveId = 'class-7a';
-      if (savedTeacherObj) {
-        try {
-          const t = JSON.parse(savedTeacherObj);
-          currentActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${t.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-        } catch {}
-      } else {
-        currentActiveId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-      }
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const currentActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || '';
+      if (!currentActiveId) return [];
       const raw = localStorage.getItem(`students_class_${currentActiveId}`);
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -207,128 +176,88 @@ export default function App() {
   
   const [cards, setCards] = useState<QuizCard[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    if (savedTeacherObj === null) {
-      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+    if (!savedTeacherObj) return [];
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+      if (!activeId) return [];
       const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
       return saved ? JSON.parse(saved) : [];
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
-        if (!activeId) return [];
-        const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
-        return saved ? JSON.parse(saved) : [];
-      } catch (e) {
-        return [];
-      }
+    } catch (e) {
+      return [];
     }
   });
 
   const [pickedIds, setPickedIds] = useState<string[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    if (savedTeacherObj === null) {
-      const activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
+    if (!savedTeacherObj) return [];
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+      if (!activeId) return [];
       const saved = localStorage.getItem(`picked_students_class_${activeId}`);
       return saved ? JSON.parse(saved) : [];
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
-        if (!activeId) return [];
-        const saved = localStorage.getItem(`picked_students_class_${activeId}`);
-        return saved ? JSON.parse(saved) : [];
-      } catch (e) {
-        return [];
-      }
+    } catch (e) {
+      return [];
     }
   });
 
-  // One-time cleanup effect to purge all legacy student data from localStorage for hosting readiness
-  useEffect(() => {
-    try {
-      const HOSTING_CLEAN_KEY = 'khmer_students_hosting_clean_v1';
-      if (!localStorage.getItem(HOSTING_CLEAN_KEY)) {
-        localStorage.setItem(HOSTING_CLEAN_KEY, 'true');
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith('students_class_') || key.startsWith('picked_students_class_') || key.startsWith('khmer_teacher_divided_groups_'))) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-        setStudents([]);
-        setPickedIds([]);
-      }
-    } catch (e) {
-      console.error("Cleanup error:", e);
-    }
-  }, []);
-
   const [subjects, setSubjects] = useState<QuizSubject[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    let activeId = 'class-7a';
-    if (savedTeacherObj === null) {
-      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
-      } catch (e) {}
-    }
-    const saved = localStorage.getItem(`subjects_class_${activeId}`);
-    if (saved) {
-      try {
+    if (!savedTeacherObj) return [];
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+      if (!activeId) return [];
+      const saved = localStorage.getItem(`subjects_class_${activeId}`);
+      if (saved) {
         const parsed = JSON.parse(saved);
         if (Array.isArray(parsed) && parsed.length > 0) {
           return parsed;
         }
-      } catch (e) {}
-    }
-    return getMigratedSubjects([]).subjects;
+      }
+    } catch (e) {}
+    return [];
   });
 
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    let activeId = 'class-7a';
-    if (savedTeacherObj === null) {
-      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
-      } catch (e) {}
+    if (!savedTeacherObj) return null;
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+      if (!activeId) return null;
+      return localStorage.getItem(`active_subject_id_${activeId}`);
+    } catch {
+      return null;
     }
-    return localStorage.getItem(`active_subject_id_${activeId}`);
   });
 
   const [chapters, setChapters] = useState<QuizChapter[]>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    let activeId = 'class-7a';
-    if (savedTeacherObj === null) {
-      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
-      } catch (e) {}
+    if (!savedTeacherObj) return [];
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+      if (!activeId) return [];
+      const saved = localStorage.getItem(`chapters_class_${activeId}`);
+      return saved ? JSON.parse(saved) : [];
+    } catch (e) {
+      return [];
     }
-    const saved = localStorage.getItem(`chapters_class_${activeId}`);
-    return saved ? JSON.parse(saved) : [];
   });
 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(() => {
     const savedTeacherObj = localStorage.getItem('logged_in_teacher');
-    let activeId = 'class-7a';
-    if (savedTeacherObj === null) {
-      activeId = localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a';
-    } else {
-      try {
-        const teacherObj = JSON.parse(savedTeacherObj);
-        activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || 'class-7a';
-      } catch (e) {}
+    if (!savedTeacherObj) return null;
+    try {
+      const teacherObj = JSON.parse(savedTeacherObj);
+      const activeId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherObj.id}`) || '';
+      if (!activeId) return null;
+      return localStorage.getItem(`active_room_id_${activeId}`);
+    } catch {
+      return null;
     }
-    return localStorage.getItem(`active_room_id_${activeId}`);
   });
 
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
@@ -410,20 +339,18 @@ export default function App() {
       const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
         localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
-        if (!isQuotaExceeded()) {
-          (async () => {
-            try {
-              for (let i = 0; i < finalizedClasses.length; i++) {
-                const cls = finalizedClasses[i];
-                await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                  order: i
-                }, { merge: true });
-              }
-            } catch (err) {
-              console.error("Failed to save reordered classes to Firestore:", err);
+        (async () => {
+          try {
+            for (let i = 0; i < finalizedClasses.length; i++) {
+              const cls = finalizedClasses[i];
+              await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                order: i
+              }, { merge: true });
             }
-          })();
-        }
+          } catch (err) {
+            console.error("Failed to save reordered classes to Firestore:", err);
+          }
+        })();
       } else {
         localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
@@ -446,20 +373,18 @@ export default function App() {
       const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
         localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
-        if (!isQuotaExceeded()) {
-          (async () => {
-            try {
-              for (let i = 0; i < finalizedClasses.length; i++) {
-                const cls = finalizedClasses[i];
-                await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                  order: i
-                }, { merge: true });
-              }
-            } catch (err) {
-              console.error("Failed to save reordered classes to Firestore:", err);
+        (async () => {
+          try {
+            for (let i = 0; i < finalizedClasses.length; i++) {
+              const cls = finalizedClasses[i];
+              await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                order: i
+              }, { merge: true });
             }
-          })();
-        }
+          } catch (err) {
+            console.error("Failed to save reordered classes to Firestore:", err);
+          }
+        })();
       } else {
         localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
@@ -469,16 +394,15 @@ export default function App() {
 
   // Load teacher classes from Cloud when logged in
   useEffect(() => {
-    if (!teacher || isQuotaExceeded()) {
-      const savedClasses = teacher?.id 
-        ? (localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes'))
-        : localStorage.getItem('khmer_teacher_classes');
-      setClasses(sortClasses(savedClasses ? JSON.parse(savedClasses) : DEFAULT_CLASSES));
-      
-      const savedActiveId = teacher?.id
-        ? (localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a')
-        : (localStorage.getItem('khmer_teacher_active_class_id') || 'class-7a');
-      setActiveClassId(savedActiveId);
+    if (!teacher) {
+      setClasses([]);
+      setActiveClassId('');
+      setStudents([]);
+      setSubjects([]);
+      setChapters([]);
+      setCards([]);
+      setPickedIds([]);
+      setLoadingCloudData(false);
       return;
     }
 
@@ -511,134 +435,72 @@ export default function App() {
         const classesCollRef = collection(db, 'teachers', teacher.id, 'classes');
         const classesSnap = await getDocs(classesCollRef);
         
-         let fetchedClasses: ClassInfo[] = [];
-         let classesToDelete: string[] = [];
-         let found7a = false;
-         
-         classesSnap.forEach(docSnap => {
-           const clsData = docSnap.data() as ClassInfo;
-           clsData.id = clsData.id || docSnap.id;
-           if (clsData && clsData.name && clsData.name.trim() !== '') {
-             if (clsData.name.trim() === 'ថ្នាក់ទី៧ក') {
-               if (found7a) {
-                 classesToDelete.push(docSnap.id);
-                 return;
-               }
-               found7a = true;
-             }
-             fetchedClasses.push(clsData);
-           } else {
-             classesToDelete.push(docSnap.id);
-           }
-         });
- 
-         // Clean up empty or duplicate classes right away in Firestore
-         for (const classId of classesToDelete) {
-           try {
-             await safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
-           } catch (deleteErr) {
-             console.error(`Failed to delete nameless or duplicate class ${classId}:`, deleteErr);
-           }
-         }
+        let fetchedClasses: ClassInfo[] = [];
+        const seenIds = new Set<string>();
+        
+        classesSnap.forEach(docSnap => {
+          const clsData = docSnap.data() as ClassInfo;
+          const id = clsData.id || docSnap.id;
+          clsData.id = id;
+          if (clsData && clsData.name && clsData.name.trim() !== '') {
+            if (!seenIds.has(id)) {
+              seenIds.add(id);
+              fetchedClasses.push(clsData);
+            }
+          }
+        });
 
-         // If the cloud account has 0 classes, migrate local classes that the user added previously to their cloud account
-         if (fetchedClasses.length === 0 && !isQuotaExceeded()) {
-           const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
-           if (localClassesStr) {
-             try {
-               const localClasses = JSON.parse(localClassesStr) as ClassInfo[];
-               const validLocalClasses = localClasses.filter(c => c && c.name && c.name.trim() !== '');
-               
-               if (validLocalClasses.length > 0) {
-                 for (const lc of validLocalClasses) {
-                   try {
-                     if (fetchedClasses.some(fc => fc.id === lc.id)) {
-                       continue;
-                     }
-                   // 1. Load subjects, activeSubjectId, activeRoomId
-                   const localSubjectsStr = localStorage.getItem(`subjects_class_${lc.id}`);
-                   let finalSubjects: QuizSubject[] = [];
-                   let finalActiveSubjectId: string | null = null;
-                   let finalActiveRoomId: string | null = null;
-                   
-                   if (localSubjectsStr) {
-                     finalSubjects = JSON.parse(localSubjectsStr);
-                     finalActiveSubjectId = localStorage.getItem(`active_subject_id_${lc.id}`) || (finalSubjects[0]?.id || null);
-                     finalActiveRoomId = localStorage.getItem(`active_room_id_${lc.id}`);
-                   } else {
-                     // Fallback migration of chapters
-                     const localChaptersStr = localStorage.getItem(`chapters_class_${lc.id}`);
-                     let tempChapters: QuizChapter[] = [];
-                     if (localChaptersStr) {
-                       tempChapters = JSON.parse(localChaptersStr);
-                     } else {
-                       const localCardsStr = localStorage.getItem(`quiz_cards_class_${lc.id}`);
-                       const localPickedStr = localStorage.getItem(`picked_students_class_${lc.id}`);
-                       const localCards = localCardsStr ? JSON.parse(localCardsStr) : [];
-                       const localPicked = localPickedStr ? JSON.parse(localPickedStr) : [];
-                       const defaultRoom: QuizRoom = {
-                         id: `room-default-${Date.now()}`,
-                         name: 'មេរៀនទី១',
-                         cards: localCards,
-                         pickedIds: localPicked,
-                         createdAt: Date.now()
-                       };
-                       tempChapters = [{
-                         id: `chapter-default-${Date.now()}`,
-                         name: 'ជំពូកទី១',
-                         rooms: [defaultRoom],
-                         createdAt: Date.now()
-                       }];
-                     }
-                     const migrationObj = getMigratedSubjects(tempChapters);
-                     finalSubjects = migrationObj.subjects;
-                     finalActiveSubjectId = migrationObj.activeSubjectId;
-                   }
-                   
-                   // Write Class Metadata to Cloud
-                   await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
-                     id: lc.id,
-                     name: lc.name.trim(),
-                     subjects: finalSubjects,
-                     activeSubjectId: finalActiveSubjectId,
-                     activeRoomId: finalActiveRoomId,
-                     createdAt: new Date().toISOString()
-                   });
-                   
-                   // 2. Load and write students
-                   const localStudentsStr = localStorage.getItem(`students_class_${lc.id}`);
-                   if (localStudentsStr) {
-                     const localStudents = JSON.parse(localStudentsStr) as Student[];
-                     for (const std of localStudents) {
-                       if (std && std.id) {
-                         await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id, 'students', std.id), std);
-                       }
-                     }
-                   }
-                   
-                   fetchedClasses.push(lc);
-                 } catch (classSyncErr) {
-                   console.error(`Failed to migrate local class ${lc.name || lc.id}:`, classSyncErr);
-                 }
-               }
-             }
-             } catch (syncErr) {
-               console.error('Failed to migrate local classes directly to cloud account:', syncErr);
-             }
-           }
-         }
-
+        // Get locally saved classes to ensure no newly created classes are lost
         const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
+        let parsedLocals: ClassInfo[] = [];
         let localClassesMap = new Map<string, number>();
         if (localClassesStr) {
           try {
-            const parsedLocals = JSON.parse(localClassesStr) as ClassInfo[];
+            parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
             parsedLocals.forEach((lc, index) => {
               if (lc && lc.id) {
                 localClassesMap.set(lc.id, typeof lc.order === 'number' ? lc.order : index);
               }
             });
           } catch (e) {}
+        }
+
+        // Merge local classes: Any valid class that exists in localStorage but is not yet in Cloud must be preserved and uploaded to Cloud!
+        for (const lc of parsedLocals) {
+          const existsInFetched = fetchedClasses.some(fc => fc.id === lc.id || fc.name.trim() === lc.name.trim());
+          if (!existsInFetched) {
+            fetchedClasses.push(lc);
+            // Write to Cloud Firestore immediately to guarantee persistence
+            const localSubjectsStr = localStorage.getItem(`subjects_class_${lc.id}`);
+            let finalSubs: QuizSubject[] = [];
+            let finalActiveSubId: string | null = null;
+            let finalActiveRmId: string | null = null;
+            if (localSubjectsStr) {
+              try {
+                finalSubs = JSON.parse(localSubjectsStr);
+                finalActiveSubId = localStorage.getItem(`active_subject_id_${lc.id}`) || (finalSubs[0]?.id || null);
+                finalActiveRmId = localStorage.getItem(`active_room_id_${lc.id}`);
+              } catch {}
+            }
+            if (finalSubs.length === 0) {
+              const migration = getMigratedSubjects([]);
+              finalSubs = migration.subjects;
+              finalActiveSubId = migration.activeSubjectId;
+              finalActiveRmId = finalSubs[0]?.chapters[0]?.rooms[0]?.id || null;
+            }
+
+            safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
+              id: lc.id,
+              name: lc.name.trim(),
+              order: typeof lc.order === 'number' ? lc.order : fetchedClasses.length,
+              subjects: finalSubs,
+              activeSubjectId: finalActiveSubId,
+              activeRoomId: finalActiveRmId,
+              pickedIds: [],
+              cards: [],
+              createdAt: new Date().toISOString()
+            }, { merge: true }).catch(err => console.error(`Failed to sync local class ${lc.name} to cloud:`, err));
+          }
         }
 
         fetchedClasses = fetchedClasses.map((cls, idx) => {
@@ -649,26 +511,7 @@ export default function App() {
           return { ...cls, order: idx };
         });
 
-        let finalClassesToUse: ClassInfo[] = [];
-        if (fetchedClasses.length > 0) {
-          finalClassesToUse = fetchedClasses;
-        } else {
-          finalClassesToUse = DEFAULT_CLASSES;
-          for (let i = 0; i < DEFAULT_CLASSES.length; i++) {
-            const defCls = DEFAULT_CLASSES[i];
-            const { subjects: defSubs, activeSubjectId: defSubId } = getMigratedSubjects([]);
-            safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', defCls.id), {
-              id: defCls.id,
-              name: defCls.name,
-              order: i,
-              subjects: defSubs,
-              activeSubjectId: defSubId,
-              activeRoomId: defSubs[0]?.chapters[0]?.rooms[0]?.id || null,
-              createdAt: new Date().toISOString()
-            }, { merge: true }).catch(() => {});
-          }
-        }
-        const sortedCloudClasses = sortClasses(finalClassesToUse);
+        const sortedCloudClasses = sortClasses(fetchedClasses);
         setClasses(sortedCloudClasses);
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
         localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedCloudClasses));
@@ -678,9 +521,13 @@ export default function App() {
           safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { id: c.id, name: c.name, order: i }, { merge: true }).catch(() => {});
         }
         
-        const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || (sortedCloudClasses[0]?.id || '');
-        const exists = sortedCloudClasses.some(c => c.id === lastActiveId);
-        setActiveClassId(exists ? lastActiveId : (sortedCloudClasses[0]?.id || ''));
+        if (sortedCloudClasses.length > 0) {
+          const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || sortedCloudClasses[0].id;
+          const exists = sortedCloudClasses.some(c => c.id === lastActiveId);
+          setActiveClassId(exists ? lastActiveId : sortedCloudClasses[0].id);
+        } else {
+          setActiveClassId('');
+        }
       } catch (err) {
         console.error('Failed to load classes from cloud Firestore:', err);
       } finally {
@@ -701,113 +548,19 @@ export default function App() {
       localStorage.setItem('khmer_teacher_active_class_id', activeClassId);
     }
 
-    if (!teacher || isQuotaExceeded()) {
-      // Local fallback
-      const loadedStudents = localStorage.getItem(`students_class_${activeClassId}`);
-      if (loadedStudents) {
-        try {
-          const parsed = JSON.parse(loadedStudents) as Student[];
-          setStudents(parsed.filter(s => s && s.id && !s.id.startsWith('sim-')));
-        } catch (e) {
-          setStudents([]);
-        }
-      } else {
-        setStudents([]);
-      }
-
-      const loadedSubjectsStr = localStorage.getItem(`subjects_class_${activeClassId}`);
-      let loadedSubjects: QuizSubject[] = [];
-      let loadedActiveSubjectId: string | null = null;
-      let loadedChapters: QuizChapter[] = [];
-      let loadedActiveRoomId: string | null = null;
-
-      if (loadedSubjectsStr) {
-        try {
-          const parsed = JSON.parse(loadedSubjectsStr);
-          if (Array.isArray(parsed)) {
-            loadedSubjects = parsed.filter((s: any) => s && s.name !== 'គីមីវិទ្យា' && s.name !== 'គណិតវិទ្យា');
-          }
-        } catch (e) {}
-        loadedActiveSubjectId = localStorage.getItem(`active_subject_id_${activeClassId}`) || (loadedSubjects[0]?.id || null);
-      }
-
-      if (loadedSubjects.length === 0) {
-        // Try migrating from chapters
-        const loadedChaptersStr = localStorage.getItem(`chapters_class_${activeClassId}`);
-        let tempChapters: QuizChapter[] = [];
-        if (loadedChaptersStr) {
-          tempChapters = JSON.parse(loadedChaptersStr);
-        } else {
-          // Try migrating from legacy rooms
-          const loadedRoomsStr = localStorage.getItem(`rooms_class_${activeClassId}`);
-          if (loadedRoomsStr) {
-            const loadedRooms: QuizRoom[] = JSON.parse(loadedRoomsStr);
-            tempChapters = [{
-              id: `chapter-default-${Date.now()}`,
-              name: 'ជំពូកទី១',
-              rooms: loadedRooms,
-              createdAt: Date.now()
-            }];
-          } else {
-            // Migration of legacy cards data
-            const legacyCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
-            const legacyPickedStr = localStorage.getItem(`picked_students_class_${activeClassId}`);
-            const legacyCards = legacyCardsStr ? JSON.parse(legacyCardsStr) : [];
-            const legacyPicked = legacyPickedStr ? JSON.parse(legacyPickedStr) : [];
-
-            const defaultRoom: QuizRoom = {
-              id: `room-default-${Date.now()}`,
-              name: 'មេរៀនទី១',
-              cards: legacyCards,
-              pickedIds: legacyPicked,
-              createdAt: Date.now()
-            };
-            tempChapters = [{
-              id: `chapter-default-${Date.now()}`,
-              name: 'ជំពូកទី១',
-              rooms: [defaultRoom],
-              createdAt: Date.now()
-            }];
-          }
-        }
-
-        const migration = getMigratedSubjects(tempChapters);
-        loadedSubjects = migration.subjects;
-        loadedActiveSubjectId = migration.activeSubjectId;
-
-        localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(loadedSubjects));
-        localStorage.setItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
-      }
-
-      // Find chapters of currently active subject
-      const activeSub = loadedSubjects.find(s => s.id === loadedActiveSubjectId) || loadedSubjects[0];
-      loadedChapters = activeSub?.chapters || [];
-
-      // Determine active roomId
-      loadedActiveRoomId = localStorage.getItem(`active_room_id_${activeClassId}`);
-      let activeRoom: QuizRoom | undefined;
-      for (const ch of loadedChapters) {
-        activeRoom = ch.rooms.find(r => r.id === loadedActiveRoomId);
-        if (activeRoom) break;
-      }
-      if (!activeRoom && loadedChapters.length > 0) {
-        activeRoom = loadedChapters[0].rooms[0];
-        loadedActiveRoomId = activeRoom?.id || null;
-      }
-
-      setSubjects(loadedSubjects);
-      setActiveSubjectId(loadedActiveSubjectId);
-      setChapters(loadedChapters);
-      setActiveRoomId(loadedActiveRoomId);
-
-      setCards(activeRoom?.cards || []);
-      setPickedIds(activeRoom?.pickedIds || []);
-      lastLoadedClassId.current = activeClassId;
+    if (!teacher) {
+      setStudents([]);
+      setSubjects([]);
+      setActiveSubjectId(null);
+      setChapters([]);
+      setActiveRoomId(null);
+      setCards([]);
+      setPickedIds([]);
+      lastLoadedClassId.current = '';
       return;
     }
 
     const loadClassDetails = async () => {
-      if (isQuotaExceeded()) return;
       try {
         setLoadingCloudData(true);
         
@@ -932,6 +685,24 @@ export default function App() {
             loadedStudents.push(data);
           }
         });
+
+        // Merge locally saved students in case any were added before sync or offline
+        const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
+        if (localStudentsStr) {
+          try {
+            const parsedLocals = JSON.parse(localStudentsStr) as Student[];
+            if (Array.isArray(parsedLocals)) {
+              for (const std of parsedLocals) {
+                if (std && std.id && !std.id.startsWith('sim-')) {
+                  if (!loadedStudents.some(s => s.id === std.id)) {
+                    loadedStudents.push(std);
+                    safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
+                  }
+                }
+              }
+            }
+          } catch (e) {}
+        }
         
         setStudents(loadedStudents);
         if (activeClassId) {
@@ -958,11 +729,26 @@ export default function App() {
 
   // Real-time Student Synchronization for cloud sessions (only for logged-in teachers)
   useEffect(() => {
-    if (!activeClassId || !teacher || isQuotaExceeded()) return;
+    if (!activeClassId || !teacher) return;
 
     const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
     const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
       if (snapshot.empty) {
+        // Protect local students from being wiped if snapshot reports empty during network latency
+        const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
+        if (localStudentsStr) {
+          try {
+            const parsed = JSON.parse(localStudentsStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              for (const std of parsed) {
+                if (std && std.id && !std.id.startsWith('sim-')) {
+                  safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
+                }
+              }
+              return;
+            }
+          } catch {}
+        }
         setStudents([]);
         return;
       }
@@ -975,6 +761,7 @@ export default function App() {
         }
       });
       setStudents(loadedStudents);
+      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(loadedStudents));
     }, (err) => {
       console.error("Real-time snapshot error for students collection:", err);
     });
@@ -984,7 +771,7 @@ export default function App() {
 
   // Sync active quiz state to Class document in Firestore for student phones
   useEffect(() => {
-    if (!activeClassId || !teacher?.id || isQuotaExceeded()) return;
+    if (!activeClassId || !teacher?.id) return;
     const currentTeacherId = teacher.id;
 
     const syncClassInfo = async () => {
@@ -1733,10 +1520,15 @@ export default function App() {
   };
 
   const handleOpenAddClass = () => {
+    if (!teacher) {
+      setAuthModalMode('login');
+      setIsAuthModalOpen(true);
+      return;
+    }
     setClassModalState({
       isOpen: true,
       mode: 'add',
-      currentName: 'ថ្នាក់ទី១០ក'
+      currentName: ''
     });
   };
 
@@ -1771,18 +1563,16 @@ export default function App() {
       }
 
       const currentTeacherId = teacher?.id || 'local';
-      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', newClassId), {
-        id: newClassId,
-        name: trimmed,
-        order: newOrder,
-        subjects: defaultSubjects,
-        activeSubjectId: defaultActiveSubjectId,
-        activeRoomId: defaultActiveRoomId,
-        pickedIds: [],
-        cards: [],
-        createdAt: new Date().toISOString()
-      }, { merge: true }).catch(err => console.error('Failed to create class in Cloud:', err));
-      
+      const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
+      const deletedClassesStr = localStorage.getItem(deletedKey);
+      if (deletedClassesStr) {
+        try {
+          const set = new Set<string>(JSON.parse(deletedClassesStr));
+          set.delete(newClassId);
+          localStorage.setItem(deletedKey, JSON.stringify(Array.from(set)));
+        } catch {}
+      }
+
       const sortedClasses = sortClasses([...classes, newClass]);
       setClasses(sortedClasses);
       if (teacher) {
@@ -1791,6 +1581,22 @@ export default function App() {
       localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       
       handleSwitchClass(newClassId);
+
+      try {
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', newClassId), {
+          id: newClassId,
+          name: trimmed,
+          order: newOrder,
+          subjects: defaultSubjects,
+          activeSubjectId: defaultActiveSubjectId,
+          activeRoomId: defaultActiveRoomId,
+          pickedIds: [],
+          cards: [],
+          createdAt: new Date().toISOString()
+        }, { merge: true });
+      } catch (err) {
+        console.error('Failed to create class in Cloud:', err);
+      }
     } else if (classModalState.mode === 'rename' && classModalState.classId) {
       const targetId = classModalState.classId;
       const updatedClasses = classes.map(c => c.id === targetId ? { ...c, name: trimmed } : c);
@@ -1803,10 +1609,14 @@ export default function App() {
       localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       
       const currentTeacherId = teacher?.id || 'local';
-      safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetId), {
-        id: targetId,
-        name: trimmed
-      }, { merge: true }).catch(err => console.error("Failed to rename class in Cloud:", err));
+      try {
+        await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetId), {
+          id: targetId,
+          name: trimmed
+        }, { merge: true });
+      } catch (err) {
+        console.error("Failed to rename class in Cloud:", err);
+      }
     }
   };
 
@@ -1832,6 +1642,17 @@ export default function App() {
         const updatedClasses = classes.filter(c => c.id !== classId);
         
         const currentTeacherId = teacher?.id || 'local';
+        const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
+        const deletedClassesStr = localStorage.getItem(deletedKey);
+        let deletedSet = new Set<string>();
+        if (deletedClassesStr) {
+          try {
+            deletedSet = new Set<string>(JSON.parse(deletedClassesStr));
+          } catch {}
+        }
+        deletedSet.add(classId);
+        localStorage.setItem(deletedKey, JSON.stringify(Array.from(deletedSet)));
+
         try {
           await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
         } catch (err) {
@@ -2206,11 +2027,6 @@ export default function App() {
 
   return (
     <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
-      {quotaExceeded && (
-        <div className="fixed top-0 inset-x-0 z-50 bg-red-600 text-white p-2 text-center text-sm font-bold shadow-lg">
-          ដែនកំណត់ Firestore បានអស់! មុខងារ Sync ទៅ Cloud ត្រូវបានផ្អាក។ កម្មវិធីកំពុងដំណើរការក្នុងរបៀប Local-only។
-        </div>
-      )}
       {/* Header */}
       <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
         isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
@@ -2366,13 +2182,28 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <button
-              onClick={() => setIsAuthModalOpen(true)}
-              className="px-3.5 py-2 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
-            >
-              <LogIn className="w-4 h-4" />
-              <span className="hidden sm:inline">ចូលគណនីគ្រូ</span>
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setAuthModalMode('login');
+                  setIsAuthModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">ចូលគណនី</span>
+              </button>
+              <button
+                onClick={() => {
+                  setAuthModalMode('register');
+                  setIsAuthModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
+              >
+                <User className="w-3.5 h-3.5" />
+                <span>ចុះឈ្មោះគ្រូ</span>
+              </button>
+            </div>
           )}
 
           <div className={`h-6 w-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-0.5`} />
@@ -2422,7 +2253,36 @@ export default function App() {
 
           {/* Class Pills */}
           <div className="flex items-center gap-1.5 flex-wrap">
-            {classes.map((cls, idx) => {
+            {!teacher ? (
+              <div className="flex items-center gap-2">
+                <span className="text-xs text-slate-500 dark:text-slate-400 italic">
+                  មិនទាន់មានគណនីចូលប្រើ — ទិន្នន័យទទេរ
+                </span>
+                <button
+                  onClick={() => {
+                    setAuthModalMode('login');
+                    setIsAuthModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
+                >
+                  ចូលគណនី
+                </button>
+                <button
+                  onClick={() => {
+                    setAuthModalMode('register');
+                    setIsAuthModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 cursor-pointer"
+                >
+                  ចុះឈ្មោះគ្រូ
+                </button>
+              </div>
+            ) : classes.length === 0 ? (
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+                មិនទាន់មានថ្នាក់នៅឡើយទេ ចុច «បន្ថែមថ្នាក់» ដើម្បីបង្កើត
+              </span>
+            ) : (
+              classes.map((cls, idx) => {
               const isActive = activeClassId === cls.id;
               return (
                 <div 
@@ -2511,20 +2371,22 @@ export default function App() {
                   </div>
                 </div>
               );
-            })}
+            }))}
 
-            <button
-              onClick={handleOpenAddClass}
-              className={`px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                isDarkMode 
-                  ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-400 hover:bg-slate-800/50' 
-                  : 'border-slate-300 hover:border-indigo-500 hover:text-indigo-600 text-slate-500 hover:bg-indigo-50/50'
-              }`}
-              title="បន្ថែមថ្នាក់ថ្មី"
-            >
-              <Plus className="w-3.5 h-3.5" />
-              <span>បន្ថែមថ្នាក់</span>
-            </button>
+            {teacher && (
+              <button
+                onClick={handleOpenAddClass}
+                className={`px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
+                  isDarkMode 
+                    ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-400 hover:bg-slate-800/50' 
+                    : 'border-slate-300 hover:border-indigo-500 hover:text-indigo-600 text-slate-500 hover:bg-indigo-50/50'
+                }`}
+                title="បន្ថែមថ្នាក់ថ្មី"
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>បន្ថែមថ្នាក់</span>
+              </button>
+            )}
           </div>
         </div>
 
@@ -2709,6 +2571,7 @@ export default function App() {
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
         onLoginSuccess={(acc) => setTeacher(acc)}
+        initialMode={authModalMode}
       />
 
       {teacher && (
