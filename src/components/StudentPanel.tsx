@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { UserPlus, RotateCw, Trophy, Trash2, Users, FileSpreadsheet } from 'lucide-react';
+import { UserPlus, RotateCw, Trophy, Trash2, Users, FileSpreadsheet, ClipboardList } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import confetti from 'canvas-confetti';
 import { Student } from '../types';
+import { StudentQuickEditModal } from './StudentQuickEditModal';
 
 const TICK_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
 const FIREWORK_URL = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
@@ -55,6 +56,8 @@ interface StudentPanelProps {
   onSelectStudent: (student: Student) => void;
   selectedStudent: Student | null;
   isDarkMode?: boolean;
+  activeClassName?: string;
+  onBatchSyncStudents?: (names: string[], mode: 'replace' | 'append') => void | Promise<void>;
 }
 
 export default function StudentPanel({ 
@@ -66,12 +69,15 @@ export default function StudentPanel({
   onClearStudents,
   onSelectStudent,
   selectedStudent,
-  isDarkMode = false
+  isDarkMode = false,
+  activeClassName = 'ថ្នាក់រៀន',
+  onBatchSyncStudents
 }: StudentPanelProps) {
   const [newName, setNewName] = useState('');
   const [isSpinning, setIsSpinning] = useState(false);
   const [showBulkInput, setShowBulkInput] = useState(false);
   const [bulkText, setBulkText] = useState('');
+  const [showQuickEditModal, setShowQuickEditModal] = useState(false);
 
   const tickAudio = useRef<HTMLAudioElement | null>(null);
   const fireworkAudio = useRef<HTMLAudioElement | null>(null);
@@ -246,21 +252,32 @@ export default function StudentPanel({
         }`}>
           បញ្ជីឈ្មោះសិស្ស ({students.length})
         </h2>
-        <div className="flex items-center justify-end gap-2 overflow-x-auto custom-scrollbar-hide flex-nowrap">
+        <div className="flex items-center justify-end gap-1.5 overflow-x-auto custom-scrollbar-hide flex-wrap">
+          {/* Quick View / Edit / Copy / Paste All button */}
+          <button 
+            type="button"
+            onClick={() => setShowQuickEditModal(true)}
+            className="shrink-0 flex items-center gap-1.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300 bg-indigo-50 dark:bg-indigo-950/40 hover:bg-indigo-100 dark:hover:bg-indigo-950/70 px-2.5 py-1.5 rounded-full transition-all shadow-xs border border-indigo-200 dark:border-indigo-800/60 cursor-pointer active:scale-95"
+            title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
+          >
+            <ClipboardList className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+            <span>📋 មើល & កែទាំងអស់</span>
+          </button>
+
           {students.length > 0 && (
             <button 
               onClick={exportToExcel}
               className="shrink-0 group flex items-center gap-1.5 text-[10px] font-bold text-green-700 dark:text-green-400 bg-green-50 dark:bg-green-950/20 hover:bg-green-100 dark:hover:bg-green-950/40 px-2.5 py-1.5 rounded-full uppercase transition-all shadow-sm border border-green-100 dark:border-green-900/30 cursor-pointer"
             >
               <FileSpreadsheet className="w-3 h-3" />
-              ទាញយក Excel
+              Excel
             </button>
           )}
           <button 
             onClick={() => setShowBulkInput(!showBulkInput)}
             className="shrink-0 text-[10px] font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/20 hover:bg-indigo-100 dark:hover:bg-indigo-950/40 px-2.5 py-1.5 rounded-full uppercase transition-all shadow-sm border border-indigo-100 dark:border-indigo-900/30 cursor-pointer"
           >
-            បន្ថែមច្រើន
+            + បន្ថែមច្រើន
           </button>
           {students.length > 0 && (
             <button 
@@ -268,7 +285,7 @@ export default function StudentPanel({
               className="shrink-0 flex items-center gap-1 text-[10px] font-bold text-red-600 dark:text-red-400 bg-red-50 dark:bg-red-950/20 hover:bg-red-100 dark:hover:bg-red-950/40 px-2.5 py-1.5 rounded-full uppercase transition-all shadow-sm border border-red-100 dark:border-red-900/30 active:scale-95 cursor-pointer"
             >
               <Trash2 className="w-3 h-3" />
-              លុបឈ្មោះទាំងអស់
+              លុបទាំងអស់
             </button>
           )}
         </div>
@@ -386,9 +403,17 @@ export default function StudentPanel({
 
       <div className="flex-1 overflow-y-auto pr-1 space-y-2 mb-4 custom-scrollbar">
         {students.length === 0 ? (
-          <div className="text-center py-12 text-slate-400 dark:text-slate-500 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl">
+          <div className="text-center py-12 text-slate-400 dark:text-slate-500 border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-2xl p-4">
             <Users className="w-10 h-10 mx-auto mb-2 opacity-20" />
             <p className="text-sm font-semibold">សូមបន្ថែមឈ្មោះសិស្សដើម្បីចាប់ផ្ដើម!</p>
+            <button
+              type="button"
+              onClick={() => setShowQuickEditModal(true)}
+              className="mt-3 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer mx-auto active:scale-95"
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>📋 បញ្ចូល ឬ បិទភ្ជាប់ឈ្មោះទាំងអស់</span>
+            </button>
           </div>
         ) : (
           students.map((student) => (
@@ -447,6 +472,22 @@ export default function StudentPanel({
           </button>
         </form>
       </div>
+
+      {/* Quick View, Edit, Copy & Paste Modal */}
+      <StudentQuickEditModal
+        isOpen={showQuickEditModal}
+        onClose={() => setShowQuickEditModal(false)}
+        students={students}
+        className={activeClassName}
+        isDarkMode={isDarkMode}
+        onSave={async (names, mode) => {
+          if (onBatchSyncStudents) {
+            await onBatchSyncStudents(names, mode);
+          } else {
+            names.forEach(n => onAddStudent(n));
+          }
+        }}
+      />
     </div>
   );
 }

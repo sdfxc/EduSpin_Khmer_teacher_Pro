@@ -54,6 +54,16 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["groups", "numGroups"]
+    },
+    "ExamsData": {
+      "title": "ExamsData",
+      "description": "Represent exam papers data for a class",
+      "type": "object",
+      "properties": {
+        "exams": { "type": "array" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["exams"]
     }
   },
   "firestore": {
@@ -72,6 +82,10 @@
     "/teachers/{teacherId}/classes/{classId}/groupsData/{docId}": {
       "schema": "GroupsData",
       "description": "Divided groups data for a class."
+    },
+    "/teachers/{teacherId}/classes/{classId}/examsData/{docId}": {
+      "schema": "ExamsData",
+      "description": "Exams papers data for a class."
     }
   }
 }

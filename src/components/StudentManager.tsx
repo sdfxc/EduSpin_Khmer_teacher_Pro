@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil } from 'lucide-react';
+import { Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil, ClipboardList } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
+import { StudentQuickEditModal } from './StudentQuickEditModal';
 
 interface StudentManagerProps {
   students: Student[];
@@ -12,6 +13,7 @@ interface StudentManagerProps {
   onRemoveStudent: (id: string) => void;
   onClearStudents?: () => void;
   onBulkAddStudents: (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[], targetClassId?: string) => void;
+  onBatchSyncStudents?: (names: string[], mode: 'replace' | 'append', targetClassId?: string) => void | Promise<void>;
   onUpdateStudentDetail?: (id: string, fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
   onSwitchClass?: (classId: string) => void;
 }
@@ -25,11 +27,13 @@ export default function StudentManager({
   onRemoveStudent,
   onClearStudents,
   onBulkAddStudents,
+  onBatchSyncStudents,
   onUpdateStudentDetail,
   onSwitchClass
 }: StudentManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClassId, setFilterClassId] = useState<string>(activeClassId || 'all');
+  const [showQuickEditModal, setShowQuickEditModal] = useState(false);
   
   // Single student form toggle & states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -205,17 +209,16 @@ export default function StudentManager({
         {/* Grade Selector Dropdown */}
         <div className="w-full sm:w-auto">
           <select
-            value={filterClassId}
+            value={filterClassId || activeClassId}
             onChange={(e) => {
               const val = e.target.value;
               setFilterClassId(val);
-              if (val !== 'all' && onSwitchClass) {
+              if (onSwitchClass) {
                 onSwitchClass(val);
               }
             }}
             className="w-full sm:w-48 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 cursor-pointer"
           >
-            <option value="all">ថ្នាក់ទាំងអស់</option>
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
@@ -252,6 +255,21 @@ export default function StudentManager({
           >
             <Plus className="w-4 h-4" />
             <span>+ បន្ថែមច្រើន (Bulk)</span>
+          </button>
+
+          {/* View, Copy, Paste, & Quick Edit All Students Button */}
+          <button
+            type="button"
+            onClick={() => setShowQuickEditModal(true)}
+            className={`px-4 py-2.5 rounded-2xl text-xs font-bold flex items-center gap-2 border transition-all cursor-pointer shadow-sm active:scale-95 ${
+              isDarkMode 
+                ? 'bg-purple-950/40 text-purple-300 border-purple-900/50 hover:bg-purple-900/60' 
+                : 'bg-purple-50 text-purple-700 border-purple-200 hover:bg-purple-100'
+            }`}
+            title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
+          >
+            <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span>📋 មើល & កែឈ្មោះទាំងអស់</span>
           </button>
         </div>
 
@@ -576,9 +594,17 @@ export default function StudentManager({
             );
           })
         ) : (
-          <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl">
+          <div className="col-span-full py-16 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6">
             <Users className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-2 opacity-50" />
             <p className="text-slate-400 dark:text-slate-500 text-sm font-bold">គ្មានលទ្ធផលសិស្សស្របតាមការស្វែងរករបស់អ្នកឡើយ!</p>
+            <button
+              type="button"
+              onClick={() => setShowQuickEditModal(true)}
+              className="mt-3 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer mx-auto active:scale-95"
+            >
+              <ClipboardList className="w-4 h-4" />
+              <span>📋 មើល / បិទភ្ជាប់ឈ្មោះសិស្សទាំងអស់</span>
+            </button>
           </div>
         )}
       </div>
@@ -761,6 +787,23 @@ export default function StudentManager({
           </form>
         </div>
       )}
+
+      {/* Quick View, Edit, Copy & Paste Modal */}
+      <StudentQuickEditModal
+        isOpen={showQuickEditModal}
+        onClose={() => setShowQuickEditModal(false)}
+        students={students}
+        className={classes.find(c => c.id === (filterClassId === 'all' ? activeClassId : filterClassId))?.name || 'ថ្នាក់រៀន'}
+        isDarkMode={isDarkMode}
+        onSave={async (names, mode) => {
+          const targetId = filterClassId === 'all' ? activeClassId : filterClassId;
+          if (onBatchSyncStudents) {
+            await onBatchSyncStudents(names, mode, targetId);
+          } else {
+            onBulkAddStudents(names.map(n => ({ name: n, gender: 'ប្រុស', status: 'សកម្ម' })), targetId);
+          }
+        }}
+      />
     </div>
   );
 }

@@ -840,7 +840,7 @@ export default function App() {
   }, [students, activeClassId, classes]);
 
   useEffect(() => {
-    if (activeClassId) {
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
       localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
     }
   }, [cards, activeClassId]);
@@ -852,25 +852,25 @@ export default function App() {
   }, [pickedIds, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && subjects.length > 0) {
+    if (activeClassId && lastLoadedClassId.current === activeClassId && subjects.length > 0) {
       localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(subjects));
     }
   }, [subjects, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && chapters.length > 0) {
+    if (activeClassId && lastLoadedClassId.current === activeClassId && chapters.length > 0) {
       localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(chapters));
     }
   }, [chapters, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId && activeSubjectId) {
+    if (activeClassId && lastLoadedClassId.current === activeClassId && activeSubjectId) {
       localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
     }
   }, [activeSubjectId, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId) {
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
       if (activeRoomId) {
         localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
       } else if (activeRoomId === null) {
@@ -1548,11 +1548,26 @@ export default function App() {
       const validCurrentStudents = students.filter(s => isStudentInClass(s, activeClassId, currentCls?.name));
       localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(validCurrentStudents));
       localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
+      localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
+      if (subjects.length > 0) {
+        localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(subjects));
+      }
+      if (chapters.length > 0) {
+        localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(chapters));
+      }
+      if (activeSubjectId) {
+        localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
+      }
+      if (activeRoomId) {
+        localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
+      }
     }
 
+    lastLoadedClassId.current = classId;
     setActiveClassId(classId);
     setSelectedStudentId(null);
     setActiveCardId(null);
+    setActiveCardState('answering');
 
     // Immediately load target class's cached data from localStorage
     const targetCls = classes.find(c => c.id === classId);
@@ -1583,6 +1598,64 @@ export default function App() {
     } else {
       setPickedIds([]);
     }
+
+    // Immediately load target class's cached subjects, chapters, and questions
+    const cachedSubjectsStr = localStorage.getItem(`subjects_class_${classId}`);
+    let targetSubjects: QuizSubject[] = [];
+    let targetActiveSubjectId: string | null = null;
+    let targetActiveRoomId: string | null = null;
+    let targetChapters: QuizChapter[] = [];
+    let targetCards: QuizCard[] = [];
+
+    if (cachedSubjectsStr) {
+      try {
+        const parsed = JSON.parse(cachedSubjectsStr);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          targetSubjects = parsed;
+          targetActiveSubjectId = localStorage.getItem(`active_subject_id_${classId}`) || parsed[0].id;
+          targetActiveRoomId = localStorage.getItem(`active_room_id_${classId}`) || null;
+        }
+      } catch {}
+    }
+
+    if (targetSubjects.length === 0) {
+      const migration = getMigratedSubjects([]);
+      targetSubjects = migration.subjects;
+      targetActiveSubjectId = migration.activeSubjectId;
+      targetActiveRoomId = targetSubjects[0]?.chapters[0]?.rooms[0]?.id || null;
+    }
+
+    const activeSub = targetSubjects.find(s => s.id === targetActiveSubjectId) || targetSubjects[0];
+    targetChapters = activeSub?.chapters || [];
+
+    let targetRoom: QuizRoom | undefined;
+    if (targetActiveRoomId) {
+      for (const ch of targetChapters) {
+        targetRoom = ch.rooms.find(r => r.id === targetActiveRoomId);
+        if (targetRoom) break;
+      }
+    }
+    if (!targetRoom && targetChapters.length > 0 && targetChapters[0].rooms.length > 0) {
+      targetRoom = targetChapters[0].rooms[0];
+      targetActiveRoomId = targetRoom.id;
+    }
+
+    const cachedCardsStr = localStorage.getItem(`quiz_cards_class_${classId}`);
+    if (cachedCardsStr) {
+      try {
+        targetCards = JSON.parse(cachedCardsStr);
+      } catch {
+        targetCards = targetRoom?.cards || [];
+      }
+    } else {
+      targetCards = targetRoom?.cards || [];
+    }
+
+    setSubjects(targetSubjects);
+    setActiveSubjectId(targetActiveSubjectId);
+    setChapters(targetChapters);
+    setActiveRoomId(targetActiveRoomId);
+    setCards(targetCards);
 
     if (teacher) {
       localStorage.setItem(`khmer_teacher_active_class_id_${teacher.id}`, classId);
@@ -1857,6 +1930,99 @@ export default function App() {
       localStorage.setItem(savedKey, JSON.stringify(savedList));
     }
   }, [activeClassId, teacher]);
+
+  const handleBatchSyncStudents = useCallback(async (
+    names: string[],
+    mode: 'replace' | 'append' = 'replace',
+    targetClassIdParam?: string
+  ) => {
+    const targetClassId = targetClassIdParam || activeClassId;
+    const currentTeacherId = teacher?.id || 'local';
+    const cleanNames = names.map(n => n.trim()).filter(Boolean);
+    const randomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
+
+    const targetCls = classes.find(c => c.id === targetClassId);
+    const existingCurrent = students.filter(s => isStudentInClass(s, targetClassId, targetCls?.name));
+
+    if (mode === 'append') {
+      const newStudents: Student[] = cleanNames.map(name => ({
+        id: `s-${Date.now()}-${Math.random()}`,
+        name,
+        score: 0,
+        emoji: randomEmoji(),
+        gender: 'ប្រុស',
+        status: 'សកម្ម',
+        classId: targetClassId
+      }));
+
+      try {
+        await Promise.all(
+          newStudents.map(student => 
+            safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetClassId, 'students', student.id), student)
+          )
+        );
+      } catch (err) {
+        console.error('Failed to append students to cloud:', err);
+      }
+
+      setStudents(prev => [...prev, ...newStudents]);
+      const updatedList = [...existingCurrent, ...newStudents];
+      localStorage.setItem(`students_class_${targetClassId}`, JSON.stringify(updatedList));
+      return;
+    }
+
+    // Mode: 'replace'
+    const unusedExisting = [...existingCurrent];
+    const finalStudents: Student[] = [];
+
+    cleanNames.forEach(name => {
+      const matchIndex = unusedExisting.findIndex(s => s.name.trim().toLowerCase() === name.toLowerCase());
+      if (matchIndex >= 0) {
+        const matched = unusedExisting.splice(matchIndex, 1)[0];
+        finalStudents.push({
+          ...matched,
+          name,
+          classId: targetClassId
+        });
+      } else {
+        finalStudents.push({
+          id: `s-${Date.now()}-${Math.random()}`,
+          name,
+          score: 0,
+          emoji: randomEmoji(),
+          gender: 'ប្រុស',
+          status: 'សកម្ម',
+          classId: targetClassId
+        });
+      }
+    });
+
+    try {
+      await Promise.all([
+        ...unusedExisting.map(s => 
+          safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetClassId, 'students', s.id))
+        ),
+        ...finalStudents.map(s => 
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetClassId, 'students', s.id), s)
+        )
+      ]);
+    } catch (err) {
+      console.error('Failed to sync batch students to cloud:', err);
+    }
+
+    setStudents(prev => {
+      const otherClasses = prev.filter(s => !isStudentInClass(s, targetClassId, targetCls?.name));
+      return [...otherClasses, ...finalStudents];
+    });
+
+    localStorage.setItem(`students_class_${targetClassId}`, JSON.stringify(finalStudents));
+
+    const finalIds = new Set(finalStudents.map(s => s.id));
+    setPickedIds(prev => prev.filter(id => finalIds.has(id)));
+    if (selectedStudentId && !finalIds.has(selectedStudentId)) {
+      setSelectedStudentId(null);
+    }
+  }, [activeClassId, teacher, classes, students, selectedStudentId]);
 
   const updateStudentDetail = useCallback(async (id: string, fields: Partial<Student>) => {
     let updatedStudent: Student | null = null;
@@ -2542,6 +2708,8 @@ export default function App() {
                 onSelectStudent={(s) => setSelectedStudentId(s.id)}
                 selectedStudent={selectedStudent}
                 isDarkMode={isDarkMode}
+                activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+                onBatchSyncStudents={handleBatchSyncStudents}
               />
             </aside>
           </>
@@ -2553,13 +2721,15 @@ export default function App() {
               <StudentPanel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
-                onSetPickedIds={setPickedIds}
+                onSetPickedIds={handleSetPickedIds}
                 onAddStudent={addStudent}
                 onRemoveStudent={removeStudent}
                 onClearStudents={clearStudents}
                 onSelectStudent={(s) => setSelectedStudentId(s.id)}
                 selectedStudent={selectedStudent}
                 isDarkMode={isDarkMode}
+                activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+                onBatchSyncStudents={handleBatchSyncStudents}
               />
             </aside>
 
@@ -2606,6 +2776,7 @@ export default function App() {
               activeClassId={activeClassId || ''}
               teacher={teacher}
               isDarkMode={isDarkMode}
+              onBatchSyncStudents={handleBatchSyncStudents}
             />
           </div>
         )}
@@ -2613,7 +2784,7 @@ export default function App() {
         {activeTab === 'students' && (
           <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
             <StudentManager
-              students={students}
+              students={currentClassStudents}
               classes={classes}
               activeClassId={activeClassId}
               isDarkMode={isDarkMode}
@@ -2622,6 +2793,7 @@ export default function App() {
               onClearStudents={clearStudents}
               onUpdateStudentDetail={updateStudentDetail}
               onBulkAddStudents={handleBulkAddStudents}
+              onBatchSyncStudents={handleBatchSyncStudents}
               onSwitchClass={handleSwitchClass}
             />
           </div>

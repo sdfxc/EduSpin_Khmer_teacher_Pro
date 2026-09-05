@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud } from 'lucide-react';
+import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList } from 'lucide-react';
 import { Student, TeacherAccount } from '../types';
 import * as XLSX from 'xlsx';
 import { db, handleFirestoreError, OperationType } from '../lib/firebase';
 import { doc, getDoc } from 'firebase/firestore';
 import { safeSetDoc } from '../lib/firebase';
+import { StudentQuickEditModal } from './StudentQuickEditModal';
 
 interface GroupDividerProps {
   students: Student[];
@@ -12,6 +13,7 @@ interface GroupDividerProps {
   activeClassId: string;
   teacher: TeacherAccount | null;
   isDarkMode?: boolean;
+  onBatchSyncStudents?: (names: string[], mode: 'replace' | 'append') => void | Promise<void>;
 }
 
 interface GroupMember extends Student {
@@ -30,13 +32,15 @@ export default function GroupDivider({
   activeClassName,
   activeClassId,
   teacher,
-  isDarkMode = false
+  isDarkMode = false,
+  onBatchSyncStudents
 }: GroupDividerProps) {
   const [numGroups, setNumGroups] = useState(4);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupScoreInputs, setGroupScoreInputs] = useState<Record<number, string>>({});
   const [isCloudLoading, setIsCloudLoading] = useState(false);
   const [cloudSynced, setCloudSynced] = useState(false);
+  const [showQuickEditModal, setShowQuickEditModal] = useState(false);
   const [shuffleStats, setShuffleStats] = useState<{
     combinationsTested: number;
     fairPermutationsCount: number;
@@ -509,6 +513,21 @@ export default function GroupDivider({
 
         {/* Adjusters & Buttons */}
         <div className="flex flex-wrap items-center gap-4 self-end lg:self-auto">
+          {/* Quick View, Copy, Paste, & Edit All Students */}
+          <button
+            type="button"
+            onClick={() => setShowQuickEditModal(true)}
+            className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
+              isDarkMode 
+                ? 'bg-purple-950/40 border-purple-900/50 text-purple-300 hover:bg-purple-900/60' 
+                : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+            }`}
+            title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
+          >
+            <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+            <span>📋 បញ្ជី & កែឈ្មោះសិស្ស</span>
+          </button>
+
           {groups.length > 0 && (
             <button
               onClick={exportGroupsToExcel}
@@ -775,17 +794,63 @@ export default function GroupDivider({
           ))}
         </div>
       ) : (
-        <div className={`text-center py-20 border border-dashed rounded-3xl transition-all duration-300 ${
+        <div className={`text-center py-20 border border-dashed rounded-3xl transition-all duration-300 p-6 ${
           isDarkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-white border-slate-200'
         }`}>
           <Users className={`w-12 h-12 mx-auto mb-2 opacity-50 transition-all duration-300 ${
             isDarkMode ? 'text-slate-700' : 'text-slate-300'
           }`} />
-          <p className={`text-sm font-bold transition-all duration-300 ${
-            isDarkMode ? 'text-slate-500' : 'text-slate-400'
-          }`}>សូមចុចប៊ូតុង «បែងចែកក្រុមឥឡូវនេះ» ដើម្បីកំណត់ក្រុមស្មើគ្នាដែលមានសិស្សចម្រុះគ្រប់ប្រភេទ!</p>
+          {students.length === 0 ? (
+            <div>
+              <p className={`text-sm font-bold mb-3 transition-all duration-300 ${
+                isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              }`}>
+                មិនទាន់មានឈ្មោះសិស្សនៅក្នុងថ្នាក់នេះនៅឡើយទេ សូមបញ្ចូលឈ្មោះសិស្សដើម្បីចាប់ផ្ដើមបែងចែកក្រុម!
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowQuickEditModal(true)}
+                className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer mx-auto active:scale-95"
+              >
+                <ClipboardList className="w-4 h-4" />
+                <span>📋 បញ្ចូល ឬ បិទភ្ជាប់ឈ្មោះសិស្សទាំងអស់</span>
+              </button>
+            </div>
+          ) : (
+            <div>
+              <p className={`text-sm font-bold mb-3 transition-all duration-300 ${
+                isDarkMode ? 'text-slate-500' : 'text-slate-400'
+              }`}>
+                សូមចុចប៊ូតុង «បែងចែកក្រុមឥឡូវនេះ» ដើម្បីកំណត់ក្រុមស្មើគ្នាដែលមានសិស្សចម្រុះគ្រប់ប្រភេទ!
+              </p>
+              <button
+                type="button"
+                onClick={() => setShowQuickEditModal(true)}
+                className={`px-4 py-2 rounded-xl text-xs font-bold border transition-all cursor-pointer inline-flex items-center gap-1.5 ${
+                  isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100'
+                }`}
+              >
+                <ClipboardList className="w-3.5 h-3.5" />
+                <span>មើល/កែឈ្មោះសិស្ស ({students.length} នាក់)</span>
+              </button>
+            </div>
+          )}
         </div>
       )}
+
+      {/* Quick View, Edit, Copy & Paste Modal */}
+      <StudentQuickEditModal
+        isOpen={showQuickEditModal}
+        onClose={() => setShowQuickEditModal(false)}
+        students={students}
+        className={activeClassName}
+        isDarkMode={isDarkMode}
+        onSave={async (names, mode) => {
+          if (onBatchSyncStudents) {
+            await onBatchSyncStudents(names, mode);
+          }
+        }}
+      />
     </div>
   );
 }

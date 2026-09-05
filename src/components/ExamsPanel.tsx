@@ -32,6 +32,8 @@ import { useConfirm } from '../context/ConfirmContext.tsx';
 import { PREBUILT_LESSONS } from '../lib/templates';
 import { Question } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
+import { db, safeSetDoc } from '../lib/firebase';
+import { doc, getDoc } from 'firebase/firestore';
 import { 
   Document, 
   Packer, 
@@ -368,9 +370,10 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
     }
   }, [activeExam?.id, activeSubject?.id, activeClassName, activeExam?.schoolName, defaultSchool]);
 
-  // Reload exams from localStorage whenever activeClassId changes to keep each classroom separate
+  // Reload exams from localStorage and Firestore whenever activeClassId changes to keep each classroom separate
   useEffect(() => {
-    const saved = localStorage.getItem(`khmer_exams_${activeClassId || 'general'}`);
+    const key = `khmer_exams_${activeClassId || 'general'}`;
+    const saved = localStorage.getItem(key);
     let loadedExams: ExamPaper[] = [];
     if (saved) {
       try {
@@ -397,7 +400,32 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
     } else {
       setSelectedExamId('');
     }
-  }, [activeClassId]);
+
+    // Also fetch from cloud if teacher is logged in and class is active
+    if (teacher?.id && activeClassId) {
+      getDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers'))
+        .then(snap => {
+          if (snap.exists()) {
+            const data = snap.data();
+            if (Array.isArray(data.exams) && data.exams.length > 0) {
+              const cloudExams = data.exams.map((e: any) => ({
+                ...e,
+                schoolName: e.schoolName || defaultSchool
+              }));
+              setExams(cloudExams);
+              localStorage.setItem(key, JSON.stringify(cloudExams));
+              const cloudMatched = cloudExams.filter((e: any) => e.type === activeType);
+              if (cloudMatched.length > 0) {
+                setSelectedExamId(cloudMatched[0].id);
+              } else if (cloudExams.length > 0) {
+                setSelectedExamId(cloudExams[0].id);
+              }
+            }
+          }
+        })
+        .catch(err => console.error("Cloud exams load error:", err));
+    }
+  }, [activeClassId, teacher?.id]);
 
   // expert AI states
   const [isExpertAiModalOpen, setIsExpertAiModalOpen] = useState(false);
@@ -537,7 +565,15 @@ Output the response in JSON format.`;
   // Save state helper
   const saveState = (updatedExams: ExamPaper[]) => {
     setExams(updatedExams);
-    localStorage.setItem(`khmer_exams_${activeClassId || 'general'}`, JSON.stringify(updatedExams));
+    const key = `khmer_exams_${activeClassId || 'general'}`;
+    localStorage.setItem(key, JSON.stringify(updatedExams));
+
+    if (teacher?.id && activeClassId) {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers'), {
+        exams: updatedExams,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => console.error("Cloud exams save error:", err));
+    }
   };
 
   // Create new exam paper
