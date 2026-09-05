@@ -14,7 +14,7 @@ import { TeacherProfileModal } from './components/TeacherProfileModal';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
 import StudentManager from './components/StudentManager';
-import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject } from './types';
+import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass } from './types';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
@@ -167,7 +167,7 @@ export default function App() {
       if (raw) {
         const parsed = JSON.parse(raw);
         if (Array.isArray(parsed)) {
-          return parsed.filter((s: any) => s && s.id && !s.id.startsWith('sim-'));
+          return parsed.filter((s: any) => s && s.id && !s.id.startsWith('sim-') && isStudentInClass(s, currentActiveId));
         }
       }
     } catch (e) {}
@@ -678,13 +678,29 @@ export default function App() {
         const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
         const studentsSnap = await getDocs(studentsCollRef);
         
+        const activeCls = classes.find(c => c.id === activeClassId);
+        const activeClassName = activeCls?.name;
+
         let loadedStudents: Student[] = [];
+        const foreignStudentsToDelete: string[] = [];
+
         studentsSnap.forEach(docSnap => {
           const data = docSnap.data() as Student;
           if (data && data.id && !data.id.startsWith('sim-')) {
-            loadedStudents.push(data);
+            if (isStudentInClass(data, activeClassId, activeClassName)) {
+              loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
+            } else {
+              foreignStudentsToDelete.push(data.id);
+              if (data.classId) {
+                safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', data.classId, 'students', data.id), data).catch(() => {});
+              }
+            }
           }
         });
+
+        for (const fId of foreignStudentsToDelete) {
+          safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', fId)).catch(() => {});
+        }
 
         // Merge locally saved students in case any were added before sync or offline
         const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
@@ -694,9 +710,12 @@ export default function App() {
             if (Array.isArray(parsedLocals)) {
               for (const std of parsedLocals) {
                 if (std && std.id && !std.id.startsWith('sim-')) {
-                  if (!loadedStudents.some(s => s.id === std.id)) {
-                    loadedStudents.push(std);
-                    safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
+                  if (isStudentInClass(std, activeClassId, activeClassName)) {
+                    if (!loadedStudents.some(s => s.id === std.id)) {
+                      const stdWithClass = std.classId ? std : { ...std, classId: activeClassId };
+                      loadedStudents.push(stdWithClass);
+                      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), stdWithClass).catch(() => {});
+                    }
                   }
                 }
               }
@@ -733,6 +752,9 @@ export default function App() {
 
     const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
     const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
+      const activeCls = classes.find(c => c.id === activeClassId);
+      const activeClassName = activeCls?.name;
+
       if (snapshot.empty) {
         // Protect local students from being wiped if snapshot reports empty during network latency
         const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
@@ -740,12 +762,14 @@ export default function App() {
           try {
             const parsed = JSON.parse(localStudentsStr);
             if (Array.isArray(parsed) && parsed.length > 0) {
-              for (const std of parsed) {
-                if (std && std.id && !std.id.startsWith('sim-')) {
+              const validLocals = parsed.filter((std: any) => std && std.id && !std.id.startsWith('sim-') && isStudentInClass(std, activeClassId, activeClassName));
+              if (validLocals.length > 0) {
+                for (const std of validLocals) {
                   safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
                 }
+                setStudents(validLocals);
+                return;
               }
-              return;
             }
           } catch {}
         }
@@ -757,7 +781,11 @@ export default function App() {
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as Student;
         if (data && data.id && !data.id.startsWith('sim-')) {
-          loadedStudents.push(data);
+          if (isStudentInClass(data, activeClassId, activeClassName)) {
+            loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
+          } else {
+            safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', data.id)).catch(() => {});
+          }
         }
       });
       setStudents(loadedStudents);
@@ -767,7 +795,7 @@ export default function App() {
     });
 
     return () => unsubscribe();
-  }, [activeClassId, teacher?.id]);
+  }, [activeClassId, teacher?.id, classes]);
 
   // Sync active quiz state to Class document in Firestore for student phones
   useEffect(() => {
@@ -804,10 +832,12 @@ export default function App() {
   }, [classes, teacher]);
 
   useEffect(() => {
-    if (activeClassId) {
-      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(students));
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
+      const activeCls = classes.find(c => c.id === activeClassId);
+      const classOnlyStudents = students.filter(s => isStudentInClass(s, activeClassId, activeCls?.name));
+      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(classOnlyStudents));
     }
-  }, [students, activeClassId]);
+  }, [students, activeClassId, classes]);
 
   useEffect(() => {
     if (activeClassId) {
@@ -816,7 +846,7 @@ export default function App() {
   }, [cards, activeClassId]);
 
   useEffect(() => {
-    if (activeClassId) {
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
       localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
     }
   }, [pickedIds, activeClassId]);
@@ -1510,9 +1540,50 @@ export default function App() {
 
   // Handler for switching class
   const handleSwitchClass = (classId: string) => {
+    if (classId === activeClassId) return;
+
+    // Save CURRENT class data to its own key BEFORE switching!
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
+      const currentCls = classes.find(c => c.id === activeClassId);
+      const validCurrentStudents = students.filter(s => isStudentInClass(s, activeClassId, currentCls?.name));
+      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(validCurrentStudents));
+      localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
+    }
+
     setActiveClassId(classId);
     setSelectedStudentId(null);
     setActiveCardId(null);
+
+    // Immediately load target class's cached data from localStorage
+    const targetCls = classes.find(c => c.id === classId);
+    const cachedStudentsStr = localStorage.getItem(`students_class_${classId}`);
+    if (cachedStudentsStr) {
+      try {
+        const parsed = JSON.parse(cachedStudentsStr);
+        if (Array.isArray(parsed)) {
+          const filtered = parsed.filter((s: any) => s && s.id && !s.id.startsWith('sim-') && isStudentInClass(s, classId, targetCls?.name));
+          setStudents(filtered);
+        } else {
+          setStudents([]);
+        }
+      } catch {
+        setStudents([]);
+      }
+    } else {
+      setStudents([]);
+    }
+
+    const cachedPickedStr = localStorage.getItem(`picked_students_class_${classId}`);
+    if (cachedPickedStr) {
+      try {
+        setPickedIds(JSON.parse(cachedPickedStr));
+      } catch {
+        setPickedIds([]);
+      }
+    } else {
+      setPickedIds([]);
+    }
+
     if (teacher) {
       localStorage.setItem(`khmer_teacher_active_class_id_${teacher.id}`, classId);
     }
@@ -1744,7 +1815,11 @@ export default function App() {
     }
   }, [activeClassId, teacher]);
 
-  const handleBulkAddStudents = useCallback(async (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[]) => {
+  const handleBulkAddStudents = useCallback(async (
+    list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[],
+    targetClassIdParam?: string
+  ) => {
+    const targetClassId = targetClassIdParam || activeClassId;
     const randomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
     const newStudents: Student[] = list.map(item => ({
       id: `s-${Date.now()}-${Math.random()}`,
@@ -1753,26 +1828,34 @@ export default function App() {
       emoji: randomEmoji(),
       gender: item.gender,
       status: item.status,
-      classId: activeClassId
+      classId: targetClassId
     }));
 
     const currentTeacherId = teacher?.id || 'local';
     try {
       await Promise.all(
         newStudents.map(student => 
-          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', student.id), student)
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetClassId, 'students', student.id), student)
         )
       );
     } catch (err) {
       console.error(err);
     }
 
-    setStudents(prev => {
-      const existingIds = new Set(prev.map(s => s.id));
-      const uniqueNew = newStudents.filter(s => !existingIds.has(s.id));
-      if (uniqueNew.length === 0) return prev;
-      return [...prev, ...uniqueNew];
-    });
+    if (targetClassId === activeClassId) {
+      setStudents(prev => {
+        const existingIds = new Set(prev.map(s => s.id));
+        const uniqueNew = newStudents.filter(s => !existingIds.has(s.id));
+        if (uniqueNew.length === 0) return prev;
+        return [...prev, ...uniqueNew];
+      });
+    } else {
+      const savedKey = `students_class_${targetClassId}`;
+      const savedRaw = localStorage.getItem(savedKey);
+      const savedList = savedRaw ? JSON.parse(savedRaw) : [];
+      savedList.push(...newStudents);
+      localStorage.setItem(savedKey, JSON.stringify(savedList));
+    }
   }, [activeClassId, teacher]);
 
   const updateStudentDetail = useCallback(async (id: string, fields: Partial<Student>) => {
@@ -2021,9 +2104,20 @@ export default function App() {
     setActiveCardId(null);
   };
 
-  const selectedStudent = students.find(s => s.id === selectedStudentId) || null;
-  const activeCard = cards.find(c => c.id === activeCardId) || null;
   const activeClass = classes.find(c => c.id === activeClassId) || null;
+
+  const currentClassStudents = React.useMemo(() => {
+    if (!activeClassId) return students;
+    return students.filter(s => isStudentInClass(s, activeClassId, activeClass?.name));
+  }, [students, activeClassId, activeClass?.name]);
+
+  const currentClassPickedIds = React.useMemo(() => {
+    const studentIds = new Set(currentClassStudents.map(s => s.id));
+    return pickedIds.filter(id => studentIds.has(id));
+  }, [pickedIds, currentClassStudents]);
+
+  const selectedStudent = currentClassStudents.find(s => s.id === selectedStudentId) || null;
+  const activeCard = cards.find(c => c.id === activeCardId) || null;
 
   return (
     <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
@@ -2396,17 +2490,17 @@ export default function App() {
             isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
           }`}>
             <UsersIcon className="w-3.5 h-3.5 text-indigo-500" />
-            <span>សិស្សសរុប៖ <strong className="text-indigo-600 dark:text-indigo-400">{students.length}</strong> នាក់</span>
+            <span>សិស្សសរុប៖ <strong className="text-indigo-600 dark:text-indigo-400">{currentClassStudents.length}</strong> នាក់</span>
           </div>
 
           <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
             isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
           }`}>
             <Compass className="w-3.5 h-3.5 text-amber-500" />
-            <span>បានហៅ៖ <strong className="text-amber-600 dark:text-amber-400">{pickedIds.length}</strong>/{students.length}</span>
+            <span>បានហៅ៖ <strong className="text-amber-600 dark:text-amber-400">{currentClassPickedIds.length}</strong>/{currentClassStudents.length}</span>
           </div>
 
-          {pickedIds.length > 0 && (
+          {currentClassPickedIds.length > 0 && (
             <button
               onClick={() => handleSetPickedIds([])}
               className="px-2.5 py-1 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
@@ -2424,8 +2518,8 @@ export default function App() {
           <>
             <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
               <SpinningWheel
-                students={students}
-                pickedIds={pickedIds}
+                students={currentClassStudents}
+                pickedIds={currentClassPickedIds}
                 onSetPickedIds={handleSetPickedIds}
                 onSelectStudent={(s) => setSelectedStudentId(s.id)}
                 selectedStudent={selectedStudent}
@@ -2439,8 +2533,8 @@ export default function App() {
             
             <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-slate-800">
               <StudentPanel
-                students={students}
-                pickedIds={pickedIds}
+                students={currentClassStudents}
+                pickedIds={currentClassPickedIds}
                 onSetPickedIds={handleSetPickedIds}
                 onAddStudent={addStudent}
                 onRemoveStudent={removeStudent}
@@ -2457,8 +2551,8 @@ export default function App() {
           <>
             <aside className="basis-2/5 h-full shrink-0 hidden md:block">
               <StudentPanel
-                students={students}
-                pickedIds={pickedIds}
+                students={currentClassStudents}
+                pickedIds={currentClassPickedIds}
                 onSetPickedIds={setPickedIds}
                 onAddStudent={addStudent}
                 onRemoveStudent={removeStudent}
@@ -2507,7 +2601,7 @@ export default function App() {
         {activeTab === 'groups' && (
           <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
             <GroupDivider
-              students={students}
+              students={currentClassStudents}
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
               activeClassId={activeClassId || ''}
               teacher={teacher}
@@ -2528,6 +2622,7 @@ export default function App() {
               onClearStudents={clearStudents}
               onUpdateStudentDetail={updateStudentDetail}
               onBulkAddStudents={handleBulkAddStudents}
+              onSwitchClass={handleSwitchClass}
             />
           </div>
         )}
@@ -2538,7 +2633,7 @@ export default function App() {
             className={activeClass?.name || 'ថ្នាក់រៀន'}
             teacher={teacher}
             activeRoomId={activeRoomId}
-            students={students}
+            students={currentClassStudents}
             cards={cards}
             activeCardId={activeCardId}
             isDarkMode={isDarkMode}

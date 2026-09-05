@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
@@ -11,8 +11,9 @@ interface StudentManagerProps {
   onAddStudentDetail: (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
   onRemoveStudent: (id: string) => void;
   onClearStudents?: () => void;
-  onBulkAddStudents: (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[]) => void;
+  onBulkAddStudents: (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[], targetClassId?: string) => void;
   onUpdateStudentDetail?: (id: string, fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
+  onSwitchClass?: (classId: string) => void;
 }
 
 export default function StudentManager({
@@ -24,10 +25,11 @@ export default function StudentManager({
   onRemoveStudent,
   onClearStudents,
   onBulkAddStudents,
-  onUpdateStudentDetail
+  onUpdateStudentDetail,
+  onSwitchClass
 }: StudentManagerProps) {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterClassId, setFilterClassId] = useState<string>('all');
+  const [filterClassId, setFilterClassId] = useState<string>(activeClassId || 'all');
   
   // Single student form toggle & states
   const [showAddForm, setShowAddForm] = useState(false);
@@ -46,7 +48,17 @@ export default function StudentManager({
   // Bulk add toggle
   const [showBulkForm, setShowBulkForm] = useState(false);
   const [bulkTextInput, setBulkTextInput] = useState('');
+  const [bulkClassId, setBulkClassId] = useState<string>(activeClassId);
   const [parsedStudents, setParsedStudents] = useState<{ name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[]>([]);
+
+  // Automatically keep class selections in sync when activeClassId changes
+  useEffect(() => {
+    if (activeClassId) {
+      setFilterClassId(activeClassId);
+      setNewClassId(activeClassId);
+      setBulkClassId(activeClassId);
+    }
+  }, [activeClassId]);
 
   const handleBulkTextChange = (text: string) => {
     setBulkTextInput(text);
@@ -141,7 +153,7 @@ export default function StudentManager({
   const handleBulkSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     if (parsedStudents.length > 0) {
-      onBulkAddStudents(parsedStudents);
+      onBulkAddStudents(parsedStudents, bulkClassId);
       setBulkTextInput('');
       setParsedStudents([]);
       setShowBulkForm(false);
@@ -166,8 +178,13 @@ export default function StudentManager({
   const femaleCount = filteredStudents.filter(s => s.gender === 'ស្រី').length;
   const outstandingCount = filteredStudents.filter(s => s.status === 'ឆ្នើម').length;
   
-  const activeClassName = classes.find(c => c.id === activeClassId)?.name || 'ថ្នាក់';
-  const activeClassCount = filteredStudents.filter(s => (s.classId || activeClassId) === activeClassId).length;
+  const selectedClassName = filterClassId === 'all' 
+    ? (classes.find(c => c.id === activeClassId)?.name || 'ថ្នាក់រៀន')
+    : (classes.find(c => c.id === filterClassId)?.name || 'ថ្នាក់រៀន');
+  const selectedClassCount = filteredStudents.filter(s => {
+    const cid = s.classId || activeClassId;
+    return filterClassId === 'all' ? cid === activeClassId : cid === filterClassId;
+  }).length;
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -189,7 +206,13 @@ export default function StudentManager({
         <div className="w-full sm:w-auto">
           <select
             value={filterClassId}
-            onChange={(e) => setFilterClassId(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              setFilterClassId(val);
+              if (val !== 'all' && onSwitchClass) {
+                onSwitchClass(val);
+              }
+            }}
             className="w-full sm:w-48 px-4 py-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl text-sm font-bold shadow-sm focus:outline-none focus:ring-4 focus:ring-indigo-500/10 focus:border-indigo-500 cursor-pointer"
           >
             <option value="all">ថ្នាក់ទាំងអស់</option>
@@ -348,6 +371,23 @@ export default function StudentManager({
         <form onSubmit={handleBulkSubmit} className={`${
           isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200'
         } border p-6 rounded-3xl shadow-sm space-y-5 animate-in slide-in-from-top-3 duration-300`}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div className="flex flex-col gap-1.5">
+              <label className={`text-xs font-extrabold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ជ្រើសរើសថ្នាក់រៀនសម្រាប់បញ្ចូល</label>
+              <select
+                value={bulkClassId}
+                onChange={(e) => setBulkClassId(e.target.value)}
+                className={`w-full text-sm px-4 py-2.5 border rounded-2xl font-bold cursor-pointer focus:outline-none focus:ring-4 focus:ring-indigo-500/15 ${
+                  isDarkMode ? 'border-slate-800 bg-[#0f172a] text-slate-100' : 'border-slate-200 bg-slate-50 text-slate-800'
+                }`}
+              >
+                {classes.map(c => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
           <div className="flex flex-col gap-1.5">
             <label className={`text-xs font-extrabold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>បញ្ចូលឈ្មោះច្រើន (មួយជួរ ឈ្មោះមួយ)</label>
             <textarea
@@ -577,13 +617,13 @@ export default function StudentManager({
           </div>
         </div>
 
-        {/* Card 3: Active Class count */}
+        {/* Card 3: Class count */}
         <div className={`border p-4 rounded-3xl shadow-sm text-left flex items-center justify-between ${
           isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
         }`}>
           <div>
-            <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{activeClassName}</p>
-            <h4 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{activeClassCount}</h4>
+            <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedClassName}</p>
+            <h4 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{selectedClassCount}</h4>
           </div>
           <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
             isDarkMode ? 'bg-emerald-950/35 text-emerald-450' : 'bg-emerald-50 text-emerald-500'

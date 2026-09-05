@@ -68,3 +68,15 @@ export interface TeacherAccount {
   password?: string;
   avatarUrl?: string;
 }
+
+export function isStudentInClass(
+  student: Student | null | undefined,
+  targetClassId: string,
+  targetClassName?: string
+): boolean {
+  if (!student) return false;
+  if (!student.classId) return true;
+  if (student.classId === targetClassId) return true;
+  if (targetClassName && student.classId === targetClassName) return true;
+  return false;
+}

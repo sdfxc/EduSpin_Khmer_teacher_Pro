@@ -1,6 +1,6 @@
 import { initializeApp } from 'firebase/app';
 import { 
-  getFirestore,
+  initializeFirestore,
   doc, 
   getDoc, 
   setDoc, 
@@ -9,7 +9,6 @@ import {
   deleteDoc, 
   query, 
   where,
-  getDocFromServer,
   onSnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -23,7 +22,10 @@ if (typeof window !== 'undefined') {
 
 const app = initializeApp(firebaseConfig);
 
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with forced long polling to avoid 10s WebChannel timeout in container/browser environments
+export const db = initializeFirestore(app, {
+  experimentalForceLongPolling: true,
+}, firebaseConfig.firestoreDatabaseId);
 
 export const isQuotaExceeded = () => false;
 
@@ -79,8 +81,16 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   const errCode = (error as any)?.code || '';
   const errMessage = error instanceof Error ? error.message : String(error);
   
-  if (errCode === 'resource-exhausted' || errMessage.includes('resource-exhausted') || errMessage.includes('Quota exceeded')) {
-    console.warn('[Firestore] Notice: Request limit reached or offline. Data will continue to save locally.');
+  if (
+    errCode === 'resource-exhausted' ||
+    errCode === 'unavailable' ||
+    errCode === 'deadline-exceeded' ||
+    errMessage.includes('resource-exhausted') ||
+    errMessage.includes('Quota exceeded') ||
+    errMessage.includes('Could not reach Cloud Firestore backend') ||
+    errMessage.includes("Backend didn't respond within 10 seconds")
+  ) {
+    console.warn('[Firestore] Notice: Operating in offline mode or network reconnecting. Data is saved locally and will synchronize automatically.', errMessage);
     return;
   }
 
@@ -97,17 +107,3 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
   };
   console.error('Firestore Error: ', JSON.stringify(errInfo));
 }
-
-// Validate Connection to Firestore on startup
-export async function testConnection() {
-  setTimeout(async () => {
-    try {
-      await getDocFromServer(doc(db, 'test', 'connection'));
-      console.log('Firebase connection test completed successfully.');
-    } catch (error: any) {
-      // Non-blocking connection check
-    }
-  }, 1000);
-}
-
-testConnection();
