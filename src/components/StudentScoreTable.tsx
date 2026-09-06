@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import { Student, ClassInfo, MonthlyDetailedScore, WeeklyScoreBreakdown } from '../types';
 import * as XLSX from 'xlsx';
+import SovannaphumiLogo from './SovannaphumiLogo';
 
 interface StudentScoreTableProps {
   students: Student[];
@@ -398,6 +399,15 @@ export function StudentScoreTable({
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `ពិន្ទុ_${selectedMonth}`);
     XLSX.writeFile(wb, `តារាងពិន្ទុសិស្ស_ខែ${selectedMonth}_${currentClassName}.xlsx`);
+
+    // Also download the official school logo image file to go together with the Excel file
+    const link = document.createElement('a');
+    link.href = 'https://lh3.googleusercontent.com/d/1AHlIse7sV5KwQ9EOzhLl6ZPuJhvUz1km';
+    link.download = 'logo_sovannaphumi_school.jpeg';
+    link.target = '_blank';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   };
 
   // Reset scores for active month
@@ -696,9 +706,7 @@ export function StudentScoreTable({
           <div className="p-5 border-b border-slate-200/80 dark:border-slate-800 text-center space-y-1 bg-gradient-to-b from-indigo-50/60 to-transparent dark:from-indigo-950/30 dark:to-transparent shrink-0">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-md shadow-indigo-600/20 select-none">
-                  SPS
-                </div>
+                <SovannaphumiLogo className="w-12 h-12 shrink-0 select-none" />
                 <div className="text-left">
                   <h4 className="text-xs font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">សាលារៀន សុវណ្ណភូមិ</h4>
                   <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sovannaphumi School</p>
