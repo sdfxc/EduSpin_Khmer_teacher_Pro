@@ -525,7 +525,7 @@ export default function GroupDivider({
             title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
           >
             <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <span>📋 បញ្ជី & កែឈ្មោះសិស្ស</span>
+            <span>បញ្ជី & កែឈ្មោះសិស្ស</span>
           </button>
 
           {groups.length > 0 && (
@@ -813,7 +813,7 @@ export default function GroupDivider({
                 className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer mx-auto active:scale-95"
               >
                 <ClipboardList className="w-4 h-4" />
-                <span>📋 បញ្ចូល ឬ បិទភ្ជាប់ឈ្មោះសិស្សទាំងអស់</span>
+                <span>បញ្ចូល ឬ បិទភ្ជាប់ឈ្មោះសិស្សទាំងអស់</span>
               </button>
             </div>
           ) : (

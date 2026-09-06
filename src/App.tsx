@@ -2310,18 +2310,16 @@ export default function App() {
               <span className="truncate max-w-[160px] sm:max-w-[220px]" title={teacher?.schoolName || 'សាលារៀន'}>
                 {teacher ? (teacher.schoolName || 'មិនទាន់បញ្ចូលឈ្មោះសាលា') : 'សាលារៀនសុវណ្ណភូមិ'}
               </span>
-              {teacher && (
-                <span className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold text-[10px] bg-emerald-50 dark:bg-emerald-950/40 px-1.5 py-0.5 rounded-md shrink-0">
-                  <Cloud className={`w-2.5 h-2.5 ${loadingCloudData ? 'animate-pulse text-indigo-500' : ''}`} />
-                  <span>{loadingCloudData ? 'Syncing...' : 'Cloud'}</span>
-                </span>
-              )}
             </div>
           </div>
         </div>
 
         {/* Dynamic Telegram iOS Liquid Glass Water Droplet Navigation Tabs */}
-        <nav className="flex items-center gap-1 bg-slate-200/50 dark:bg-slate-900/60 p-1.5 rounded-2xl border border-white/80 dark:border-white/10 shadow-[0_8px_25px_rgba(0,0,0,0.05)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0">
+        <nav className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
+          isDarkMode 
+            ? 'bg-slate-900/80 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4),0_8px_30px_rgba(0,0,0,0.4)]' 
+            : 'bg-slate-200/60 border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(0,0,0,0.04)]'
+        }`}>
           {[
             { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass },
             { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon },
@@ -2337,13 +2335,13 @@ export default function App() {
               <motion.button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                whileHover={{ scale: 1.02 }}
-                whileTap={{ scale: 0.93 }}
-                transition={{ type: "spring", stiffness: 600, damping: 22 }}
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
+                transition={{ type: "spring", stiffness: 500, damping: 20 }}
                 className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
                   isActive
-                    ? 'text-blue-600 dark:text-blue-400 font-extrabold'
-                    : 'text-slate-600 dark:text-slate-300 hover:text-slate-900 dark:hover:text-white hover:bg-white/30 dark:hover:bg-white/10'
+                    ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-extrabold'
+                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
                 }`}
               >
                 {isActive && (
@@ -2351,32 +2349,57 @@ export default function App() {
                     layoutId="telegramWaterDroplet"
                     transition={{
                       type: "spring",
-                      stiffness: 380,
-                      damping: 26,
-                      mass: 0.55
+                      stiffness: 350,
+                      damping: 22,
+                      mass: 0.65
                     }}
-                    className="absolute inset-0 rounded-xl bg-white/40 dark:bg-white/10 border border-white/90 dark:border-white/30 shadow-[0_4px_16px_rgba(0,0,0,0.08),0_1px_3px_rgba(0,0,0,0.04),inset_0_2px_3px_rgba(255,255,255,0.95),inset_0_-1.5px_3px_rgba(0,0,0,0.06)] backdrop-blur-xl overflow-hidden pointer-events-none"
+                    className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                      isDarkMode
+                        ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                        : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                    }`}
                   >
-                    {/* Pure Clear Glass Top Specular Glare Reflection */}
-                    <div className="absolute top-0 inset-x-1.5 h-[48%] bg-gradient-to-b from-white/90 via-white/30 to-transparent rounded-t-xl pointer-events-none" />
-                    {/* Water Droplet Lens Curved Ambient Highlight */}
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-white/50 via-transparent to-transparent pointer-events-none" />
-                    {/* Pure Glass Bottom Edge Light Rim */}
-                    <div className="absolute bottom-0 inset-x-2 h-[1px] bg-white/80 pointer-events-none" />
+                    {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                    <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                      isDarkMode 
+                        ? 'from-white/50 via-white/12 to-transparent' 
+                        : 'from-white/95 via-white/40 to-transparent'
+                    }`} />
+
+                    {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                    <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
+                      isDarkMode
+                        ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                        : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                    }`} />
+
+                    {/* Bottom Droplet Meniscus Light Rim (គែមពន្លឺបាតតំណក់ទឹកថ្លា) */}
+                    <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                      isDarkMode ? 'via-white/50' : 'via-white/90'
+                    }`} />
                   </motion.div>
                 )}
 
                 <motion.span
-                  animate={{ scale: isActive ? 1.05 : 1 }}
-                  transition={{ type: "spring", stiffness: 400, damping: 22 }}
+                  animate={{ 
+                    scale: isActive ? 1.05 : 1,
+                    y: isActive ? -0.5 : 0
+                  }}
+                  transition={{ type: "spring", stiffness: 450, damping: 22 }}
                   className="relative z-10 flex items-center gap-2"
                 >
                   <Icon className={`w-4 h-4 transition-all duration-300 ${
                     isActive
-                      ? 'text-blue-600 dark:text-blue-400 scale-110'
-                      : 'text-slate-500 dark:text-slate-400'
+                      ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-blue-600 scale-110 drop-shadow-xs'
+                      : isDarkMode ? 'text-slate-400' : 'text-slate-500'
                   } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
-                  <span className={isActive ? 'text-blue-600 dark:text-blue-400 font-extrabold tracking-wide' : 'font-bold'}>{tab.label}</span>
+                  <span className={
+                    isActive 
+                      ? isDarkMode 
+                        ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                        : 'text-blue-600 font-extrabold tracking-wide' 
+                      : 'font-bold'
+                  }>{tab.label}</span>
                   {tab.badge && (
                     <span className="flex h-2 w-2 relative ml-0.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
@@ -2394,7 +2417,7 @@ export default function App() {
           {/* Active Teacher Profile Area */}
           {teacher ? (
             <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
-              isDarkMode ? 'bg-slate-800/80 border-slate-700 hover:border-slate-600' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+              isDarkMode ? 'bg-slate-800/90 border-slate-700 hover:border-slate-600 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
             }`}>
               {/* Avatar with Camera badge for instant change from phone/PC */}
               <button
@@ -2425,17 +2448,27 @@ export default function App() {
                 className="text-left pr-1 hidden sm:block cursor-pointer select-none hover:opacity-85 transition-opacity"
                 title="ចុចដើម្បីមើល ឬកែប្រែព័ត៌មាន Profile"
               >
-                <p className="text-xs font-bold text-slate-800 dark:text-slate-100 truncate max-w-[110px]">
+                <p className={`text-xs font-black truncate max-w-[110px] ${
+                  isDarkMode ? 'text-white drop-shadow-xs' : 'text-slate-900'
+                }`}>
                   {teacher.name}
                 </p>
                 {teacher.subjects && (
-                  <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-none truncate max-w-[110px]">{teacher.subjects}</p>
+                  <p className={`text-[10px] font-bold leading-none truncate max-w-[110px] mt-0.5 ${
+                    isDarkMode ? 'text-slate-300' : 'text-slate-500'
+                  }`}>
+                    {teacher.subjects}
+                  </p>
                 )}
               </div>
 
               <button
                 onClick={handleLogout}
-                className="p-1.5 text-slate-400 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isDarkMode 
+                    ? 'text-slate-300 hover:text-red-400 hover:bg-red-500/20' 
+                    : 'text-slate-400 hover:text-red-500 hover:bg-red-500/10'
+                }`}
                 title="ចាកចេញពីគណនី"
               >
                 <LogOut className="w-3.5 h-3.5" />
@@ -2490,14 +2523,25 @@ export default function App() {
             <RotateCcw className="w-4.5 h-4.5" />
           </button>
 
-          {/* Create Questions Button */}
-          <button
-            onClick={() => setIsLessonModalOpen(true)}
-            className="px-4 py-2 btn-orange-gemini text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow-md shadow-orange-500/20 group cursor-pointer select-none shrink-0"
-          >
-            <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform" />
-            <span className="hidden sm:inline">បង្កើតសំណួរ AI</span>
-          </button>
+          {/* Create Questions Button with Cloud Status at bottom right */}
+          <div className="flex flex-col items-end gap-0.5 shrink-0">
+            <button
+              onClick={() => setIsLessonModalOpen(true)}
+              className="px-4 py-2 btn-orange-gemini text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow-md shadow-orange-500/20 group cursor-pointer select-none"
+            >
+              <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform" />
+              <span className="hidden sm:inline">បង្កើតសំណួរ AI</span>
+            </button>
+
+            {/* Cloud Sync Status - very small at bottom right */}
+            <div 
+              title={teacher ? `បានភ្ជាប់គណនី ${teacher.username} ទៅកាន់ Cloud Firestore` : 'ទិន្នន័យរក្សាទុកក្នុង Local និងត្រៀម Sync ទៅកាន់ Cloud'}
+              className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[9px] bg-emerald-50/90 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40 select-none shadow-2xs leading-none mr-0.5"
+            >
+              <Cloud className={`w-2.5 h-2.5 ${loadingCloudData ? 'animate-pulse text-indigo-500' : 'text-emerald-500'}`} />
+              <span>{loadingCloudData ? 'Syncing...' : 'Cloud'}</span>
+            </div>
+          </div>
         </div>
       </header>
 
@@ -2511,10 +2555,10 @@ export default function App() {
             <span>ថ្នាក់រៀន៖</span>
           </div>
 
-          {/* Class Pills */}
-          <div className="flex items-center gap-1.5 flex-wrap">
+          {/* Class Pills Track */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/50 dark:bg-slate-900/60 border border-white/80 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
             {!teacher ? (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 px-2 py-1">
                 <span className="text-xs text-slate-500 dark:text-slate-400 italic">
                   មិនទាន់មានគណនីចូលប្រើ — ទិន្នន័យទទេរ
                 </span>
@@ -2538,109 +2582,164 @@ export default function App() {
                 </button>
               </div>
             ) : classes.length === 0 ? (
-              <span className="text-xs text-slate-400 dark:text-slate-500 italic">
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic px-3 py-1">
                 មិនទាន់មានថ្នាក់នៅឡើយទេ ចុច «បន្ថែមថ្នាក់» ដើម្បីបង្កើត
               </span>
             ) : (
               classes.map((cls, idx) => {
               const isActive = activeClassId === cls.id;
               return (
-                <div 
-                  key={cls.id ? `class-${cls.id}-${idx}` : `class-idx-${idx}`}
+                <motion.div 
+                  key={cls.id ? `class-${cls.id}` : `class-idx-${idx}`}
                   onClick={() => handleSwitchClass(cls.id)}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
                   draggable={canDrag}
-                  onDragStart={(e) => handleClassDragStart(e, idx)}
-                  onDragOver={(e) => handleClassDragOver(e, idx)}
+                  onDragStart={(e) => handleClassDragStart(e as any, idx)}
+                  onDragOver={(e) => handleClassDragOver(e as any, idx)}
                   onDragEnd={handleClassDragEnd}
                   onMouseLeave={() => setCanDrag(false)}
-                  className={`group/item relative px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer transition-all select-none border ${
+                  className={`group/item relative px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
                     draggedClassIndex === idx
                       ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50 dark:bg-slate-800 scale-95'
                       : isActive 
-                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs font-extrabold' 
-                        : isDarkMode 
-                          ? 'bg-slate-800/90 text-slate-300 border-slate-700/80 hover:bg-slate-700/80 hover:text-white hover:border-slate-600' 
-                          : 'bg-white text-slate-700 border-slate-200 hover:bg-slate-100 hover:text-slate-950 hover:border-slate-300 shadow-xs'
+                        ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-extrabold' 
+                        : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
                   }`}
                 >
-                  <div
-                    onMouseDown={() => setCanDrag(true)}
-                    onTouchStart={() => setCanDrag(true)}
-                    onMouseUp={() => setCanDrag(false)}
-                    onTouchEnd={() => setCanDrag(false)}
-                    className="cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded hover:bg-black/10 dark:hover:bg-white/10 transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90"
-                    title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
-                  >
-                    <GripVertical className="w-3 h-3" />
-                  </div>
-                  
-                  <span>{cls.name}</span>
-
-                  {/* Discrete action buttons (reveal on hover) */}
-                  <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity">
-                    {idx > 0 && (
-                      <button
-                        onClick={(e) => handleMoveClass(e, idx, 'left')}
-                        className={`p-0.5 rounded transition-colors ${
-                          isActive 
-                            ? 'hover:bg-white/20 text-white' 
-                            : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
-                        }`}
-                        title="រំកិលទៅឆ្វេង"
-                      >
-                        <ChevronLeft className="w-3 h-3" />
-                      </button>
-                    )}
-                    {idx < classes.length - 1 && (
-                      <button
-                        onClick={(e) => handleMoveClass(e, idx, 'right')}
-                        className={`p-0.5 rounded transition-colors ${
-                          isActive 
-                            ? 'hover:bg-white/20 text-white' 
-                            : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
-                        }`}
-                        title="រំកិលទៅស្ដាំ"
-                      >
-                        <ChevronRight className="w-3 h-3" />
-                      </button>
-                    )}
-                    <button
-                      onClick={(e) => handleOpenRenameClass(e, cls.id, cls.name)}
-                      className={`p-0.5 rounded transition-colors ${
-                        isActive 
-                          ? 'hover:bg-white/20 text-white' 
-                          : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                  {/* Water Droplet Liquid Glass Pill */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="classWaterDroplet"
+                      transition={{
+                        type: "spring",
+                        stiffness: 350,
+                        damping: 22,
+                        mass: 0.65
+                      }}
+                      className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                        isDarkMode
+                          ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                          : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
                       }`}
-                      title="កែឈ្មោះថ្នាក់"
                     >
-                      <Pencil className="w-2.5 h-2.5" />
-                    </button>
-                    {classes.length > 1 && (
+                      {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                      <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                        isDarkMode 
+                          ? 'from-white/50 via-white/12 to-transparent' 
+                          : 'from-white/95 via-white/40 to-transparent'
+                      }`} />
+                      
+                      {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                      <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2 pointer-events-none ${
+                        isDarkMode
+                          ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                          : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                      }`} />
+
+                      {/* Bottom Droplet Meniscus Light Rim */}
+                      <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                        isDarkMode ? 'via-white/50' : 'via-white/90'
+                      }`} />
+                    </motion.div>
+                  )}
+
+                  <motion.span
+                    animate={{ 
+                      scale: isActive ? 1.04 : 1,
+                      y: isActive ? -0.5 : 0
+                    }}
+                    transition={{ type: "spring", stiffness: 450, damping: 22 }}
+                    className="relative z-10 flex items-center gap-1.5"
+                  >
+                    <div
+                      onMouseDown={() => setCanDrag(true)}
+                      onTouchStart={() => setCanDrag(true)}
+                      onMouseUp={() => setCanDrag(false)}
+                      onTouchEnd={() => setCanDrag(false)}
+                      className={`cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90 ${
+                        isActive 
+                          ? isDarkMode ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-500/10 text-blue-600' 
+                          : isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/10 text-slate-500'
+                      }`}
+                      title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
+                    >
+                      <GripVertical className="w-3 h-3" />
+                    </div>
+                    
+                    <span className={
+                      isActive 
+                        ? isDarkMode 
+                          ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                          : 'text-blue-600 font-extrabold tracking-wide' 
+                        : 'font-bold'
+                    }>
+                      {cls.name}
+                    </span>
+
+                    {/* Discrete action buttons (reveal on hover) */}
+                    <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity ml-0.5">
+                      {idx > 0 && (
+                        <button
+                          onClick={(e) => handleMoveClass(e, idx, 'left')}
+                          className={`p-0.5 rounded transition-colors ${
+                            isActive 
+                              ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
+                              : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                          }`}
+                          title="រំកិលទៅឆ្វេង"
+                        >
+                          <ChevronLeft className="w-3 h-3" />
+                        </button>
+                      )}
+                      {idx < classes.length - 1 && (
+                        <button
+                          onClick={(e) => handleMoveClass(e, idx, 'right')}
+                          className={`p-0.5 rounded transition-colors ${
+                            isActive 
+                              ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
+                              : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                          }`}
+                          title="រំកិលទៅស្ដាំ"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      )}
                       <button
-                        onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                        onClick={(e) => handleOpenRenameClass(e, cls.id, cls.name)}
                         className={`p-0.5 rounded transition-colors ${
-                          isActive
-                            ? 'hover:bg-red-500 text-red-200 hover:text-white'
-                            : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
+                          isActive 
+                            ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
+                            : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
                         }`}
-                        title="លុបថ្នាក់"
+                        title="កែឈ្មោះថ្នាក់"
                       >
-                        <Trash2 className="w-2.5 h-2.5" />
+                        <Pencil className="w-2.5 h-2.5" />
                       </button>
-                    )}
-                  </div>
-                </div>
+                      {classes.length > 1 && (
+                        <button
+                          onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                          className={`p-0.5 rounded transition-colors ${
+                            isActive
+                              ? 'hover:bg-red-500 text-red-500 hover:text-white'
+                              : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
+                          }`}
+                          title="លុបថ្នាក់"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
+                  </motion.span>
+                </motion.div>
               );
             }))}
 
             {teacher && (
               <button
                 onClick={handleOpenAddClass}
-                className={`px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer ${
-                  isDarkMode 
-                    ? 'border-slate-700 hover:border-indigo-500 hover:text-indigo-400 text-slate-400 hover:bg-slate-800/50' 
-                    : 'border-slate-300 hover:border-indigo-500 hover:text-indigo-600 text-slate-500 hover:bg-indigo-50/50'
-                }`}
+                className="px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
                 title="បន្ថែមថ្នាក់ថ្មី"
               >
                 <Plus className="w-3.5 h-3.5" />

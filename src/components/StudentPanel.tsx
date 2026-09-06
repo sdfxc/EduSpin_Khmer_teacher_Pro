@@ -261,7 +261,7 @@ export default function StudentPanel({
             title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
           >
             <ClipboardList className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
-            <span>📋 មើល & កែទាំងអស់</span>
+            <span>មើល & កែទាំងអស់</span>
           </button>
 
           {students.length > 0 && (
@@ -412,7 +412,7 @@ export default function StudentPanel({
               className="mt-3 px-3.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 shadow-sm cursor-pointer mx-auto active:scale-95"
             >
               <ClipboardList className="w-3.5 h-3.5" />
-              <span>📋 បញ្ចូល ឬ បិទភ្ជាប់ឈ្មោះទាំងអស់</span>
+              <span>បញ្ចូល ឬ បិទភ្ជាប់ឈ្មោះទាំងអស់</span>
             </button>
           </div>
         ) : (

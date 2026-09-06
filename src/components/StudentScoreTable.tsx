@@ -1,0 +1,1171 @@
+import React, { useState, useMemo } from 'react';
+import { 
+  Download, Printer, RotateCcw, Plus, Search, Star, 
+  Award, Trophy, Table, LayoutGrid, Sparkles, ArrowUpDown, 
+  ArrowUpAZ, Hash, ArrowDownUp, RefreshCw
+} from 'lucide-react';
+import { Student, ClassInfo, MonthlyDetailedScore, WeeklyScoreBreakdown } from '../types';
+import * as XLSX from 'xlsx';
+
+interface StudentScoreTableProps {
+  students: Student[];
+  classes: ClassInfo[];
+  activeClassId: string;
+  isDarkMode?: boolean;
+  onUpdateStudentDetail?: (id: string, fields: Partial<Student>) => void;
+}
+
+const KHMER_MONTHS = [
+  'មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា',
+  'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'
+];
+
+type SortMode = 'default' | 'id' | 'name' | 'score-desc' | 'score-asc';
+
+export function StudentScoreTable({
+  students,
+  classes,
+  activeClassId,
+  isDarkMode = false,
+  onUpdateStudentDetail
+}: StudentScoreTableProps) {
+  // Current active month
+  const currentMonthIndex = new Date().getMonth();
+  const defaultMonth = KHMER_MONTHS[currentMonthIndex] || 'កញ្ញា';
+  const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
+  const [activeViewMode, setActiveViewMode] = useState<'table' | 'cards'>('table');
+  const [scoreSearchQuery, setScoreSearchQuery] = useState('');
+  const [sortMode, setSortMode] = useState<SortMode>('default');
+
+  // Helper to calculate subtotal WITHOUT monthly exam
+  const calculateSubTotalNoExam = (student: Student, month: string): number => {
+    const monthData = student.monthlyScores?.[month];
+    if (monthData?.manualSubTotalNoExam !== undefined && monthData?.manualSubTotalNoExam !== null) {
+      return Number(monthData.manualSubTotalNoExam) || 0;
+    }
+    if (!monthData) return 0;
+
+    const w1 = (Number(monthData.week1?.activity) || 0) + (Number(monthData.week1?.homework) || 0) + (Number(monthData.week1?.quiz) || 0);
+    const w2 = (Number(monthData.week2?.activity) || 0) + (Number(monthData.week2?.homework) || 0) + (Number(monthData.week2?.quiz) || 0);
+    const w3 = (Number(monthData.week3?.activity) || 0) + (Number(monthData.week3?.homework) || 0) + (Number(monthData.week3?.quiz) || 0);
+    const w4 = (Number(monthData.week4?.activity) || 0) + (Number(monthData.week4?.homework) || 0) + (Number(monthData.week4?.quiz) || 0);
+    const quiz = Number(monthData.quiz) || 0;
+    const notebook = Number(monthData.notebook) || 0;
+
+    return w1 + w2 + w3 + w4 + quiz + notebook;
+  };
+
+  // Helper to calculate grand total for the month (monthly exam + subtotal)
+  const calculateStudentMonthTotal = (student: Student, month: string): number => {
+    const monthData = student.monthlyScores?.[month];
+    if (monthData?.manualTotal !== undefined && monthData?.manualTotal !== null) {
+      return Number(monthData.manualTotal) || 0;
+    }
+    const mExam = Number(monthData?.monthlyExam) || 0;
+    const subTotal = calculateSubTotalNoExam(student, month);
+    const sum = mExam + subTotal;
+    return sum > 0 ? sum : (student.score || 0);
+  };
+
+  // Helper to update specific score sub-field (resets manual total overrides so formula stays sync)
+  const handleScoreFieldChange = (
+    student: Student,
+    fieldPath: string,
+    rawVal: string
+  ) => {
+    if (!onUpdateStudentDetail) return;
+    const val = rawVal === '' ? undefined : Math.max(0, parseFloat(rawVal) || 0);
+
+    const currentMonthScores = student.monthlyScores || {};
+    const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
+
+    const updatedMonthData: MonthlyDetailedScore = JSON.parse(JSON.stringify(existingMonthData));
+
+    // Clear any manual overrides when modifying underlying sub-fields
+    delete updatedMonthData.manualTotal;
+    delete updatedMonthData.manualSubTotalNoExam;
+
+    if (fieldPath === 'monthlyExam') {
+      updatedMonthData.monthlyExam = val;
+    } else if (fieldPath === 'quiz') {
+      updatedMonthData.quiz = val;
+    } else if (fieldPath === 'notebook') {
+      updatedMonthData.notebook = val;
+    } else if (fieldPath.startsWith('week1.')) {
+      const sub = fieldPath.split('.')[1] as keyof WeeklyScoreBreakdown;
+      updatedMonthData.week1 = { ...updatedMonthData.week1, [sub]: val };
+    } else if (fieldPath.startsWith('week2.')) {
+      const sub = fieldPath.split('.')[1] as keyof WeeklyScoreBreakdown;
+      updatedMonthData.week2 = { ...updatedMonthData.week2, [sub]: val };
+    } else if (fieldPath.startsWith('week3.')) {
+      const sub = fieldPath.split('.')[1] as keyof WeeklyScoreBreakdown;
+      updatedMonthData.week3 = { ...updatedMonthData.week3, [sub]: val };
+    } else if (fieldPath.startsWith('week4.')) {
+      const sub = fieldPath.split('.')[1] as keyof WeeklyScoreBreakdown;
+      updatedMonthData.week4 = { ...updatedMonthData.week4, [sub]: val };
+    }
+
+    // Recalculate auto total
+    const mExam = Number(updatedMonthData.monthlyExam) || 0;
+    const w1 = (Number(updatedMonthData.week1?.activity) || 0) + (Number(updatedMonthData.week1?.homework) || 0) + (Number(updatedMonthData.week1?.quiz) || 0);
+    const w2 = (Number(updatedMonthData.week2?.activity) || 0) + (Number(updatedMonthData.week2?.homework) || 0) + (Number(updatedMonthData.week2?.quiz) || 0);
+    const w3 = (Number(updatedMonthData.week3?.activity) || 0) + (Number(updatedMonthData.week3?.homework) || 0) + (Number(updatedMonthData.week3?.quiz) || 0);
+    const w4 = (Number(updatedMonthData.week4?.activity) || 0) + (Number(updatedMonthData.week4?.homework) || 0) + (Number(updatedMonthData.week4?.quiz) || 0);
+    const quiz = Number(updatedMonthData.quiz) || 0;
+    const notebook = Number(updatedMonthData.notebook) || 0;
+
+    const newTotal = mExam + w1 + w2 + w3 + w4 + quiz + notebook;
+
+    onUpdateStudentDetail(student.id, {
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      },
+      score: newTotal
+    });
+  };
+
+  // Manual direct override for SubTotal without Exam
+  const handleManualSubTotalChange = (student: Student, rawVal: string) => {
+    if (!onUpdateStudentDetail) return;
+    const currentMonthScores = student.monthlyScores || {};
+    const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
+    const updatedMonthData: MonthlyDetailedScore = { ...existingMonthData };
+
+    if (rawVal === '') {
+      delete updatedMonthData.manualSubTotalNoExam;
+      delete updatedMonthData.manualTotal;
+    } else {
+      const parsed = Math.max(0, parseFloat(rawVal) || 0);
+      updatedMonthData.manualSubTotalNoExam = parsed;
+      const mExam = Number(updatedMonthData.monthlyExam) || 0;
+      updatedMonthData.manualTotal = mExam + parsed;
+    }
+
+    const calculatedTotal = calculateStudentMonthTotal({ ...student, monthlyScores: { ...currentMonthScores, [selectedMonth]: updatedMonthData } }, selectedMonth);
+
+    onUpdateStudentDetail(student.id, {
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      },
+      score: calculatedTotal
+    });
+  };
+
+  // Manual direct override for Grand Total
+  const handleManualGrandTotalChange = (student: Student, rawVal: string) => {
+    if (!onUpdateStudentDetail) return;
+    const currentMonthScores = student.monthlyScores || {};
+    const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
+    const updatedMonthData: MonthlyDetailedScore = { ...existingMonthData };
+
+    if (rawVal === '') {
+      delete updatedMonthData.manualTotal;
+    } else {
+      const parsed = Math.max(0, parseFloat(rawVal) || 0);
+      updatedMonthData.manualTotal = parsed;
+    }
+
+    const calculatedTotal = calculateStudentMonthTotal({ ...student, monthlyScores: { ...currentMonthScores, [selectedMonth]: updatedMonthData } }, selectedMonth);
+
+    onUpdateStudentDetail(student.id, {
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      },
+      score: calculatedTotal
+    });
+  };
+
+  // Update Student ID
+  const handleStudentIdChange = (student: Student, newStudentId: string) => {
+    if (!onUpdateStudentDetail) return;
+    onUpdateStudentDetail(student.id, {
+      studentId: newStudentId
+    });
+  };
+
+  // Filter & Sort Students
+  const processedStudents = useMemo(() => {
+    let list = students.filter(s => {
+      const q = scoreSearchQuery.toLowerCase().trim();
+      if (!q) return true;
+      const nameMatch = s.name.toLowerCase().includes(q);
+      const idMatch = (s.studentId || '').toLowerCase().includes(q);
+      return nameMatch || idMatch;
+    });
+
+    if (sortMode === 'id') {
+      list = [...list].sort((a, b) => {
+        const idA = a.studentId || a.id;
+        const idB = b.studentId || b.id;
+        return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    } else if (sortMode === 'name') {
+      list = [...list].sort((a, b) => a.name.localeCompare(b.name, 'km'));
+    } else if (sortMode === 'score-desc') {
+      list = [...list].sort((a, b) => calculateStudentMonthTotal(b, selectedMonth) - calculateStudentMonthTotal(a, selectedMonth));
+    } else if (sortMode === 'score-asc') {
+      list = [...list].sort((a, b) => calculateStudentMonthTotal(a, selectedMonth) - calculateStudentMonthTotal(b, selectedMonth));
+    }
+
+    return list;
+  }, [students, scoreSearchQuery, sortMode, selectedMonth]);
+
+  // Statistics
+  const currentClassName = classes.find(c => c.id === activeClassId)?.name || 'ថ្នាក់រៀន';
+  const totalScoresSum = processedStudents.reduce((acc, s) => acc + calculateStudentMonthTotal(s, selectedMonth), 0);
+  const averageScore = processedStudents.length > 0 ? (totalScoresSum / processedStudents.length).toFixed(1) : '0';
+  const highestScore = processedStudents.reduce((max, s) => Math.max(max, calculateStudentMonthTotal(s, selectedMonth)), 0);
+  const topStudent = processedStudents.find(s => calculateStudentMonthTotal(s, selectedMonth) === highestScore && highestScore > 0);
+
+  // Export Official Excel matching the revised format with ID and 2 Total columns
+  const handleExportOfficialExcel = () => {
+    if (students.length === 0) return;
+
+    // Header rows matching the official Khmer layout
+    const wsData: any[][] = [
+      ['', '', '', '', '', '', '', '', '', '', '', '', 'ព្រះរាជាណាចក្រកម្ពុជា', '', '', '', '', '', ''],
+      ['', 'Sovannaphumi School', '', '', '', '', '', '', '', '', '', '', 'ជាតិ សាសនា ព្រះមហាក្សត្រ', '', '', '', '', '', ''],
+      ['', '', '', '', `តារាងពិន្ទុសិស្សក្នុងខែ ${selectedMonth} (${currentClassName})`, '', '', '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['ល.រ', 'ID', 'ឈ្មោះសិស្ស', 'ភេទ', 'សរុប (ដក Exam)', 'សរុប ១ខែ', `ពិន្ទុប្រចាំខែ ${selectedMonth}`, '', '', '', '', '', '', '', '', '', '', '', '', ''],
+      ['', '', '', '', '', '', 'Monthly Exam', 'Week1', '', '', 'Week2', '', '', 'Week3', '', '', 'Week4', '', '', 'Quiz', 'ពិនិត្យសៀវភៅ'],
+      ['', '', '', '', '', '', '', 'សកម្មភាព', 'កិច្ចការផ្ទះ', 'Quiz', 'សកម្មភាព', 'កិច្ចការផ្ទះ', 'Quiz', 'សកម្មភាព', 'កិច្ចការផ្ទះ', 'Quiz', 'សកម្មភាព', 'កិច្ចការផ្ទះ', 'Quiz', '', '']
+    ];
+
+    // Data rows
+    processedStudents.forEach((s, idx) => {
+      const monthData = s.monthlyScores?.[selectedMonth] || {};
+      const subTotalNoExam = calculateSubTotalNoExam(s, selectedMonth);
+      const grandTotal = calculateStudentMonthTotal(s, selectedMonth);
+      const genderShort = s.gender === 'ស្រី' ? 'ស' : 'ប';
+
+      wsData.push([
+        idx + 1,
+        s.studentId || `STU-${(idx + 1).toString().padStart(3, '0')}`,
+        s.name,
+        genderShort,
+        subTotalNoExam,
+        grandTotal,
+        monthData.monthlyExam ?? '',
+        monthData.week1?.activity ?? '',
+        monthData.week1?.homework ?? '',
+        monthData.week1?.quiz ?? '',
+        monthData.week2?.activity ?? '',
+        monthData.week2?.homework ?? '',
+        monthData.week2?.quiz ?? '',
+        monthData.week3?.activity ?? '',
+        monthData.week3?.homework ?? '',
+        monthData.week3?.quiz ?? '',
+        monthData.week4?.activity ?? '',
+        monthData.week4?.homework ?? '',
+        monthData.week4?.quiz ?? '',
+        monthData.quiz ?? '',
+        monthData.notebook ?? ''
+      ]);
+    });
+
+    const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+    // Set merged ranges
+    ws['!merges'] = [
+      { s: { r: 0, c: 12 }, e: { r: 0, c: 18 } }, // ព្រះរាជាណាចក្រកម្ពុជា
+      { s: { r: 1, c: 12 }, e: { r: 1, c: 18 } }, // ជាតិ សាសនា ព្រះមហាក្សត្រ
+      { s: { r: 2, c: 4 }, e: { r: 2, c: 16 } },  // Title
+      { s: { r: 3, c: 0 }, e: { r: 5, c: 0 } },   // ល.រ
+      { s: { r: 3, c: 1 }, e: { r: 5, c: 1 } },   // ID
+      { s: { r: 3, c: 2 }, e: { r: 5, c: 2 } },   // ឈ្មោះសិស្ស
+      { s: { r: 3, c: 3 }, e: { r: 5, c: 3 } },   // ភេទ
+      { s: { r: 3, c: 4 }, e: { r: 5, c: 4 } },   // សរុប (ដក Exam)
+      { s: { r: 3, c: 5 }, e: { r: 5, c: 5 } },   // សរុប ១ខែ
+      { s: { r: 3, c: 6 }, e: { r: 3, c: 20 } },  // ពិន្ទុប្រចាំខែ
+      { s: { r: 4, c: 6 }, e: { r: 5, c: 6 } },   // Monthly Exam
+      { s: { r: 4, c: 7 }, e: { r: 4, c: 9 } },   // Week 1
+      { s: { r: 4, c: 10 }, e: { r: 4, c: 12 } }, // Week 2
+      { s: { r: 4, c: 13 }, e: { r: 4, c: 15 } }, // Week 3
+      { s: { r: 4, c: 16 }, e: { r: 4, c: 18 } }, // Week 4
+      { s: { r: 4, c: 19 }, e: { r: 5, c: 19 } }, // Quiz
+      { s: { r: 4, c: 20 }, e: { r: 5, c: 20 } }  // ពិនិត្យសៀវភៅ
+    ];
+
+    ws['!cols'] = [
+      { wch: 6 },  // ល.រ
+      { wch: 10 }, // ID
+      { wch: 22 }, // ឈ្មោះ
+      { wch: 8 },  // ភេទ
+      { wch: 14 }, // សរុប (ដក Exam)
+      { wch: 12 }, // សរុប ១ខែ
+      { wch: 14 }, // Monthly Exam
+      { wch: 10 }, // W1 Act
+      { wch: 12 }, // W1 HW
+      { wch: 10 }, // W1 Quiz
+      { wch: 10 }, // W2 Act
+      { wch: 12 }, // W2 HW
+      { wch: 10 }, // W2 Quiz
+      { wch: 10 }, // W3 Act
+      { wch: 12 }, // W3 HW
+      { wch: 10 }, // W3 Quiz
+      { wch: 10 }, // W4 Act
+      { wch: 12 }, // W4 HW
+      { wch: 10 }, // W4 Quiz
+      { wch: 10 }, // Quiz
+      { wch: 14 }  // ពិនិត្យសៀវភៅ
+    ];
+
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, `ពិន្ទុ_${selectedMonth}`);
+    XLSX.writeFile(wb, `តារាងពិន្ទុសិស្ស_ខែ${selectedMonth}_${currentClassName}.xlsx`);
+  };
+
+  // Reset scores for active month
+  const handleResetMonthScores = () => {
+    if (!onUpdateStudentDetail || students.length === 0) return;
+    if (window.confirm(`តើអ្នកពិតជាចង់កំណត់ពិន្ទុខែ «${selectedMonth}» ទាំងអស់ឡើងវិញទៅ 0 មែនទេ?`)) {
+      students.forEach(s => {
+        const currentMonthScores = s.monthlyScores || {};
+        const updated = { ...currentMonthScores };
+        delete updated[selectedMonth];
+        onUpdateStudentDetail(s.id, {
+          monthlyScores: updated,
+          score: 0
+        });
+      });
+    }
+  };
+
+  const handlePrint = () => {
+    window.print();
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Top Toolbar: Month Switcher, Sort, Search, View Switcher & Action Tools */}
+      <div className={`p-4 rounded-3xl border shadow-xs flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4 ${
+        isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200/80'
+      }`}>
+        
+        {/* Left: Month Selector & Sort Dropdown */}
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Month Selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">
+              ខែពិន្ទុ៖
+            </span>
+            <select
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="px-3.5 py-2 rounded-2xl bg-indigo-50 dark:bg-indigo-950/50 border border-indigo-200 dark:border-indigo-800/80 text-indigo-700 dark:text-indigo-300 text-xs font-black cursor-pointer shadow-xs focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            >
+              {KHMER_MONTHS.map(m => (
+                <option key={m} value={m}>ខែ {m}</option>
+              ))}
+            </select>
+          </div>
+
+          {/* Sort Switcher (តាម ID / តាម A-Z / ពិន្ទុ) */}
+          <div className="flex items-center gap-2">
+            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border ${
+              isDarkMode ? 'bg-slate-950/80 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-200 text-slate-700'
+            }`}>
+              <ArrowDownUp className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+              <span className="text-xs font-bold text-slate-400">តម្រៀប៖</span>
+              <select
+                value={sortMode}
+                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                className="bg-transparent border-none text-xs font-black text-indigo-600 dark:text-indigo-400 cursor-pointer focus:outline-none pr-1"
+              >
+                <option value="default" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                  លំនាំដើម (ល.រ)
+                </option>
+                <option value="id" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                  រៀបតាម ID (0-9 / A-Z)
+                </option>
+                <option value="name" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                  រៀបតាមឈ្មោះ (A-Z)
+                </option>
+                <option value="score-desc" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                  ពិន្ទុច្រើន → តិច
+                </option>
+                <option value="score-asc" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                  ពិន្ទុតិច → ច្រើន
+                </option>
+              </select>
+            </div>
+          </div>
+
+          {/* View Mode Toggle: Table Sheet vs Quick Cards */}
+          <div className={`inline-flex items-center p-1 rounded-2xl border ${
+            isDarkMode ? 'bg-slate-950/80 border-slate-800' : 'bg-slate-100 border-slate-200'
+          }`}>
+            <button
+              type="button"
+              onClick={() => setActiveViewMode('table')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeViewMode === 'table'
+                  ? isDarkMode ? 'bg-indigo-600 text-white shadow-xs font-black' : 'bg-white text-indigo-600 shadow-xs font-black'
+                  : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <Table className="w-3.5 h-3.5" />
+              <span>តារាង Sheet ពេញលេញ</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveViewMode('cards')}
+              className={`px-3 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ${
+                activeViewMode === 'cards'
+                  ? isDarkMode ? 'bg-indigo-600 text-white shadow-xs font-black' : 'bg-white text-indigo-600 shadow-xs font-black'
+                  : isDarkMode ? 'text-slate-400 hover:text-slate-200' : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <LayoutGrid className="w-3.5 h-3.5" />
+              <span>កាត & ចំណាត់ថ្នាក់</span>
+            </button>
+          </div>
+        </div>
+
+        {/* Right: Search & Action Buttons */}
+        <div className="flex flex-wrap items-center gap-2.5 justify-end">
+          <div className="relative w-full sm:w-44">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-slate-400" />
+            <input
+              type="text"
+              placeholder="ស្វែងរក ID ឬឈ្មោះ..."
+              value={scoreSearchQuery}
+              onChange={(e) => setScoreSearchQuery(e.target.value)}
+              className="w-full pl-9 pr-3 py-2 text-xs font-bold rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20"
+            />
+          </div>
+
+          <button
+            type="button"
+            onClick={handleExportOfficialExcel}
+            className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-sm transition-all active:scale-95 cursor-pointer"
+            title="ទាញយកជា Excel តាមគំរូផ្លូវការ"
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>Excel ផ្លូវការ</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handlePrint}
+            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+              isDarkMode ? 'bg-slate-800 border-slate-700 text-slate-200 hover:bg-slate-700' : 'bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100'
+            }`}
+            title="បោះពុម្ពតារាងពិន្ទុ"
+          >
+            <Printer className="w-3.5 h-3.5" />
+            <span>បោះពុម្ព</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={handleResetMonthScores}
+            className={`px-3 py-2 rounded-xl border text-xs font-bold flex items-center gap-1.5 transition-all active:scale-95 cursor-pointer ${
+              isDarkMode ? 'bg-amber-950/30 border-amber-900/40 text-amber-300 hover:bg-amber-900/40' : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+            }`}
+            title="កំណត់ពិន្ទុខែនេះឡើងវិញ"
+          >
+            <RotateCcw className="w-3.5 h-3.5" />
+            <span>Reset</span>
+          </button>
+        </div>
+      </div>
+
+      {/* ===================== VIEW 1: OFFICIAL TABLE SHEET VIEW WITH SCROLL ===================== */}
+      {activeViewMode === 'table' && (
+        <div className={`border rounded-3xl overflow-hidden shadow-lg flex flex-col ${
+          isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200/90'
+        }`}>
+          
+          {/* Official MoEYS / Sovannaphumi School Header Banner */}
+          <div className="p-5 border-b border-slate-200/80 dark:border-slate-800 text-center space-y-1 bg-gradient-to-b from-indigo-50/60 to-transparent dark:from-indigo-950/30 dark:to-transparent shrink-0">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="flex items-center gap-3">
+                <div className="w-11 h-11 rounded-2xl bg-indigo-600 text-white font-black flex items-center justify-center text-sm shadow-md shadow-indigo-600/20 select-none">
+                  SPS
+                </div>
+                <div className="text-left">
+                  <h4 className="text-xs font-black text-indigo-700 dark:text-indigo-400 uppercase tracking-wider">សាលារៀន សុវណ្ណភូមិ</h4>
+                  <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400">Sovannaphumi School</p>
+                </div>
+              </div>
+
+              <div className="text-center">
+                <h2 className="text-sm font-black text-slate-800 dark:text-slate-100 tracking-wide">ព្រះរាជាណាចក្រកម្ពុជា</h2>
+                <h3 className="text-xs font-extrabold text-slate-600 dark:text-slate-300">ជាតិ សាសនា ព្រះមហាក្សត្រ</h3>
+              </div>
+
+              <div className="text-right hidden sm:block">
+                <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 text-xs font-black">
+                  <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                  <span>{currentClassName}</span>
+                </span>
+              </div>
+            </div>
+
+            <div className="pt-1 flex items-center justify-center gap-3">
+              <h1 className="text-base sm:text-lg font-black text-slate-900 dark:text-white underline decoration-indigo-500 underline-offset-8">
+                តារាងពិន្ទុសិស្សក្នុងខែ {selectedMonth}
+              </h1>
+            </div>
+            <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 pt-1">
+              * ពិន្ទុសរុបត្រូវបានគណនាស្វ័យប្រវត្តិ ហើយលោកគ្រូអ្នកគ្រូអាចចុចកែប្រែដោយផ្ទាល់បានតាមតម្រូវការ
+            </p>
+          </div>
+
+          {/* Vertically & Horizontally Scrollable Sheet View Container */}
+          <div className="overflow-x-auto overflow-y-auto max-h-[620px] scrollbar-thin relative">
+            <table className="w-full text-xs text-center border-collapse">
+              {/* Sticky Headers for comfortable scrolling */}
+              <thead className="sticky top-0 z-20 shadow-xs">
+                {/* Header Row 1 */}
+                <tr className={`${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} font-black border-b border-slate-200 dark:border-slate-800`}>
+                  {/* ល.រ */}
+                  <th rowSpan={3} className="p-2.5 border-r border-slate-200 dark:border-slate-800 min-w-[45px] sticky left-0 z-30 bg-inherit shadow-xs">
+                    ល.រ
+                  </th>
+                  
+                  {/* ID Column */}
+                  <th 
+                    rowSpan={3} 
+                    onClick={() => setSortMode(prev => prev === 'id' ? 'default' : 'id')}
+                    className="p-2.5 border-r border-slate-200 dark:border-slate-800 min-w-[75px] cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
+                    title="ចុចដើម្បីតម្រៀបតាម ID"
+                  >
+                    <div className="flex items-center justify-center gap-1">
+                      <span>ID</span>
+                      <ArrowUpDown className={`w-3 h-3 ${sortMode === 'id' ? 'text-indigo-500' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+                    </div>
+                  </th>
+
+                  {/* ឈ្មោះសិស្ស */}
+                  <th 
+                    rowSpan={3} 
+                    onClick={() => setSortMode(prev => prev === 'name' ? 'default' : 'name')}
+                    className="p-2.5 border-r border-slate-200 dark:border-slate-800 min-w-[155px] text-left pl-4 cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
+                    title="ចុចដើម្បីតម្រៀបតាមឈ្មោះ A-Z"
+                  >
+                    <div className="flex items-center gap-1.5">
+                      <span>ឈ្មោះសិស្ស</span>
+                      <ArrowUpAZ className={`w-3.5 h-3.5 ${sortMode === 'name' ? 'text-indigo-500' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+                    </div>
+                  </th>
+
+                  {/* ភេទ */}
+                  <th rowSpan={3} className="p-2.5 border-r border-slate-200 dark:border-slate-800 min-w-[50px]">
+                    ភេទ
+                  </th>
+
+                  {/* Column 1: សរុប (ដក Exam) */}
+                  <th 
+                    rowSpan={3} 
+                    className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[85px] bg-emerald-500/10 dark:bg-emerald-950/40 text-emerald-700 dark:text-emerald-300 font-black text-center"
+                    title="ពិន្ទុសរុបនៃសកម្មភាព Weeks, Quiz, និងសៀវភៅ (មិនរាប់បញ្ចូល Monthly Exam)"
+                  >
+                    <div className="flex flex-col items-center justify-center leading-tight">
+                      <span>សរុប</span>
+                      <span className="text-[10px] font-bold text-emerald-600 dark:text-emerald-400">(ដក Exam)</span>
+                    </div>
+                  </th>
+
+                  {/* Column 2: សរុប ១ខែ */}
+                  <th 
+                    rowSpan={3} 
+                    onClick={() => setSortMode(prev => prev === 'score-desc' ? 'score-asc' : 'score-desc')}
+                    className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[85px] bg-amber-500/15 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-black text-center cursor-pointer hover:bg-amber-500/25 transition-colors select-none group"
+                    title="ពិន្ទុសរុបប្រចាំខែពេញលេញ (ចុចដើម្បីតម្រៀបពិន្ទុ)"
+                  >
+                    <div className="flex flex-col items-center justify-center leading-tight">
+                      <div className="flex items-center gap-1">
+                        <span>សរុប ១ខែ</span>
+                        <ArrowUpDown className={`w-3 h-3 ${sortMode.startsWith('score') ? 'text-amber-600' : 'text-slate-400'}`} />
+                      </div>
+                      <span className="text-[9px] font-bold text-amber-600 dark:text-amber-400">(Grand Total)</span>
+                    </div>
+                  </th>
+
+                  {/* Header Span for Monthly Details */}
+                  <th colSpan={15} className="p-2.5 bg-indigo-600/10 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300 border-b border-slate-200 dark:border-slate-800 font-black tracking-wide">
+                    ពិន្ទុប្រចាំខែ {selectedMonth}
+                  </th>
+                </tr>
+
+                {/* Header Row 2 */}
+                <tr className={`${isDarkMode ? 'bg-slate-900 text-slate-200' : 'bg-slate-50 text-slate-700'} font-extrabold border-b border-slate-200 dark:border-slate-800 text-[11px]`}>
+                  <th rowSpan={2} className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[75px] bg-sky-50 dark:bg-sky-950/40 text-sky-700 dark:text-sky-300">
+                    Monthly Exam
+                  </th>
+                  <th colSpan={3} className="p-1.5 border-r border-slate-200 dark:border-slate-800 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-300 font-bold">
+                    Week 1
+                  </th>
+                  <th colSpan={3} className="p-1.5 border-r border-slate-200 dark:border-slate-800 bg-purple-50/70 dark:bg-purple-950/30 text-purple-700 dark:text-purple-300 font-bold">
+                    Week 2
+                  </th>
+                  <th colSpan={3} className="p-1.5 border-r border-slate-200 dark:border-slate-800 bg-amber-50/70 dark:bg-amber-950/30 text-amber-700 dark:text-amber-300 font-bold">
+                    Week 3
+                  </th>
+                  <th colSpan={3} className="p-1.5 border-r border-slate-200 dark:border-slate-800 bg-rose-50/70 dark:bg-rose-950/30 text-rose-700 dark:text-rose-300 font-bold">
+                    Week 4
+                  </th>
+                  <th rowSpan={2} className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[60px] bg-cyan-50 dark:bg-cyan-950/40 text-cyan-700 dark:text-cyan-300">
+                    Quiz
+                  </th>
+                  <th rowSpan={2} className="p-2 min-w-[85px] bg-indigo-50 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300">
+                    ពិនិត្យសៀវភៅ
+                  </th>
+                </tr>
+
+                {/* Header Row 3: Sub-columns for Weeks 1 to 4 */}
+                <tr className={`${isDarkMode ? 'bg-slate-900 text-slate-400' : 'bg-slate-100/80 text-slate-600'} text-[10px] font-bold border-b border-slate-200 dark:border-slate-800`}>
+                  {/* Week 1 */}
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">សកម្មភាព</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">កិច្ចការផ្ទះ</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[50px]">Quiz</th>
+
+                  {/* Week 2 */}
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">សកម្មភាព</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">កិច្ចការផ្ទះ</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[50px]">Quiz</th>
+
+                  {/* Week 3 */}
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">សកម្មភាព</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">កិច្ចការផ្ទះ</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[50px]">Quiz</th>
+
+                  {/* Week 4 */}
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">សកម្មភាព</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[55px]">កិច្ចការផ្ទះ</th>
+                  <th className="p-1.5 border-r border-slate-200 dark:border-slate-800 min-w-[50px]">Quiz</th>
+                </tr>
+              </thead>
+
+              <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
+                {processedStudents.length > 0 ? (
+                  processedStudents.map((student, idx) => {
+                    const monthData = student.monthlyScores?.[selectedMonth] || {};
+                    const subTotalNoExam = calculateSubTotalNoExam(student, selectedMonth);
+                    const grandTotal = calculateStudentMonthTotal(student, selectedMonth);
+                    const genderShort = student.gender === 'ស្រី' ? 'ស' : 'ប';
+                    const hasManualSub = monthData.manualSubTotalNoExam !== undefined;
+                    const hasManualGrand = monthData.manualTotal !== undefined;
+
+                    return (
+                      <tr 
+                        key={student.id}
+                        className={`hover:bg-indigo-50/40 dark:hover:bg-indigo-950/30 transition-colors ${
+                          idx % 2 === 1 
+                            ? isDarkMode ? 'bg-slate-900/40' : 'bg-slate-50/50' 
+                            : 'bg-transparent'
+                        }`}
+                      >
+                        {/* Index (No.) */}
+                        <td className="p-2 border-r border-slate-200 dark:border-slate-800 font-extrabold text-slate-500 sticky left-0 bg-inherit shadow-xs">
+                          {idx + 1}
+                        </td>
+
+                        {/* ID Column (Editable inline or display) */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="text"
+                            value={student.studentId || ''}
+                            placeholder={`${(idx + 1).toString().padStart(3, '0')}`}
+                            onChange={(e) => handleStudentIdChange(student, e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-700 dark:text-slate-200 text-xs focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                            title="ចុចដើម្បីកែប្រែ ID សិស្ស"
+                          />
+                        </td>
+
+                        {/* Name */}
+                        <td className="p-2 border-r border-slate-200 dark:border-slate-800 text-left pl-3.5 font-black text-slate-800 dark:text-slate-100 whitespace-nowrap">
+                          {student.name}
+                        </td>
+
+                        {/* Gender */}
+                        <td className="p-2 border-r border-slate-200 dark:border-slate-800 font-bold">
+                          <span className={student.gender === 'ស្រី' ? 'text-pink-500' : 'text-blue-500'}>
+                            {genderShort}
+                          </span>
+                        </td>
+
+                        {/* Column 1: សរុប (ដក Exam) - Auto-calculated & Teacher Editable */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800 bg-emerald-500/10 dark:bg-emerald-950/30">
+                          <div className="relative group">
+                            <input
+                              type="number"
+                              min="0"
+                              value={subTotalNoExam}
+                              onChange={(e) => handleManualSubTotalChange(student, e.target.value)}
+                              className={`w-full text-center py-1 rounded font-black text-xs focus:outline-none focus:ring-1 focus:ring-emerald-500 ${
+                                hasManualSub 
+                                  ? 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-200 font-black' 
+                                  : 'bg-transparent hover:bg-white/80 dark:hover:bg-slate-800 text-emerald-700 dark:text-emerald-300'
+                              }`}
+                              title="ពិន្ទុសរុបដក Monthly Exam (អាចកែប្រែដោយផ្ទាល់)"
+                            />
+                            {hasManualSub && (
+                              <span className="absolute top-0 right-0.5 w-1.5 h-1.5 rounded-full bg-emerald-500" title="កែប្រែដោយផ្ទាល់ (Manual)" />
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Column 2: សរុប ១ខែ - Auto-calculated & Teacher Editable */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800 bg-amber-500/15 dark:bg-amber-950/40">
+                          <div className="relative group">
+                            <input
+                              type="number"
+                              min="0"
+                              value={grandTotal}
+                              onChange={(e) => handleManualGrandTotalChange(student, e.target.value)}
+                              className={`w-full text-center py-1 rounded font-black text-sm focus:outline-none focus:ring-1 focus:ring-amber-500 ${
+                                hasManualGrand 
+                                  ? 'bg-amber-100 dark:bg-amber-900/60 text-amber-900 dark:text-amber-100' 
+                                  : 'bg-transparent hover:bg-white/80 dark:hover:bg-slate-800 text-amber-700 dark:text-amber-300'
+                              }`}
+                              title="ពិន្ទុសរុប ១ខែពេញលេញ (អាចកែប្រែដោយផ្ទាល់)"
+                            />
+                            {hasManualGrand && (
+                              <span className="absolute top-0 right-0.5 w-1.5 h-1.5 rounded-full bg-amber-500" title="កែប្រែដោយផ្ទាល់ (Manual)" />
+                            )}
+                          </div>
+                        </td>
+
+                        {/* Monthly Exam */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.monthlyExam ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'monthlyExam', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-extrabold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 1: Activity */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week1?.activity ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week1.activity', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 1: Homework */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week1?.homework ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week1.homework', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 1: Quiz */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week1?.quiz ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week1.quiz', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 2: Activity */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week2?.activity ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week2.activity', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 2: Homework */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week2?.homework ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week2.homework', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 2: Quiz */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week2?.quiz ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week2.quiz', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 3: Activity */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week3?.activity ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week3.activity', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 3: Homework */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week3?.homework ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week3.homework', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 3: Quiz */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week3?.quiz ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week3.quiz', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 4: Activity */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week4?.activity ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week4.activity', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 4: Homework */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week4?.homework ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week4.homework', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Week 4: Quiz */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.week4?.quiz ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'week4.quiz', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Quiz Overall */}
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.quiz ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'quiz', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+
+                        {/* Notebook Check */}
+                        <td className="p-1">
+                          <input
+                            type="number"
+                            min="0"
+                            placeholder="0"
+                            value={monthData.notebook ?? ''}
+                            onChange={(e) => handleScoreFieldChange(student, 'notebook', e.target.value)}
+                            className="w-full text-center py-1 bg-transparent hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-800 rounded font-bold text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                          />
+                        </td>
+                      </tr>
+                    );
+                  })
+                ) : (
+                  <tr>
+                    <td colSpan={21} className="p-8 text-center text-slate-400">
+                      មិនមានសិស្សក្នុងថ្នាក់ ឬលក្ខខណ្ឌស្វែងរកនេះឡើយ។
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
+      {/* ===================== VIEW 2: CARDS & RANKING VIEW ===================== */}
+      {activeViewMode === 'cards' && (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[...processedStudents]
+            .sort((a, b) => calculateStudentMonthTotal(b, selectedMonth) - calculateStudentMonthTotal(a, selectedMonth))
+            .map((student, idx) => {
+              const currentScore = calculateStudentMonthTotal(student, selectedMonth);
+              const subTotalNoExam = calculateSubTotalNoExam(student, selectedMonth);
+              const monthData = student.monthlyScores?.[selectedMonth] || {};
+
+              let rankBadge = (
+                <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
+                  isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                }`}>
+                  #{idx + 1}
+                </span>
+              );
+
+              if (idx === 0 && currentScore > 0) {
+                rankBadge = (
+                  <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-yellow-500 text-slate-950 font-black flex items-center justify-center text-xs shadow-sm shadow-amber-500/20 shrink-0">
+                    🥇
+                  </span>
+                );
+              } else if (idx === 1 && currentScore > 0) {
+                rankBadge = (
+                  <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-slate-300 to-slate-400 text-slate-900 font-black flex items-center justify-center text-xs shadow-xs shrink-0">
+                    🥈
+                  </span>
+                );
+              } else if (idx === 2 && currentScore > 0) {
+                rankBadge = (
+                  <span className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-600 to-amber-700 text-white font-black flex items-center justify-center text-xs shadow-xs shrink-0">
+                    🥉
+                  </span>
+                );
+              }
+
+              const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-blue-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
+              const badgeBg = colors[student.name.charCodeAt(0) % colors.length];
+
+              return (
+                <div
+                  key={student.id}
+                  className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3 ${
+                    isDarkMode 
+                      ? 'bg-[#1e293b] border-slate-800' 
+                      : 'bg-white border-slate-200/80'
+                  }`}
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-2.5">
+                      {rankBadge}
+                      <div className={`w-9 h-9 rounded-xl ${badgeBg} flex items-center justify-center text-white text-xs font-black select-none shrink-0 shadow-xs`}>
+                        {student.name.trim().charAt(0)}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-1.5">
+                          <h3 className={`font-black text-sm leading-tight ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+                            {student.name}
+                          </h3>
+                          {student.studentId && (
+                            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500">
+                              ID: {student.studentId}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <span className={`text-[10px] font-bold ${
+                            student.gender === 'ស្រី' ? 'text-pink-500' : 'text-blue-500'
+                          }`}>
+                            {student.gender || 'ប្រុស'}
+                          </span>
+                          <span className="text-[10px] text-slate-400 font-semibold">• ខែ {selectedMonth}</span>
+                        </div>
+                      </div>
+                    </div>
+
+                    <div className={`px-3 py-1 rounded-xl text-center border ${
+                      currentScore > 0 
+                        ? isDarkMode ? 'bg-amber-950/30 border-amber-800/40 text-amber-300' : 'bg-amber-50 border-amber-200 text-amber-700'
+                        : isDarkMode ? 'bg-slate-900 border-slate-800 text-slate-500' : 'bg-slate-50 border-slate-200 text-slate-400'
+                    }`}>
+                      <div className="flex items-center gap-1 justify-center">
+                        <Star className={`w-3.5 h-3.5 ${currentScore > 0 ? 'text-amber-500 fill-amber-500' : 'text-slate-400'}`} />
+                        <span className="text-base font-black tracking-tight">{currentScore}</span>
+                      </div>
+                      <span className="text-[9px] font-bold uppercase tracking-wider block -mt-0.5">សរុប ១ខែ</span>
+                    </div>
+                  </div>
+
+                  {/* Summary Breakdown Mini Pills */}
+                  <div className="grid grid-cols-3 gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80 text-[10px] font-bold text-center">
+                    <div className="p-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                      <span className="text-slate-400 block text-[9px]">Monthly Exam</span>
+                      <span className="text-sky-600 dark:text-sky-400 font-black">{monthData.monthlyExam || 0}</span>
+                    </div>
+                    <div className="p-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                      <span className="text-slate-400 block text-[9px]">សរុបដក Exam</span>
+                      <span className="text-emerald-600 dark:text-emerald-400 font-black">
+                        {subTotalNoExam}
+                      </span>
+                    </div>
+                    <div className="p-1 rounded bg-slate-50 dark:bg-slate-900 border border-slate-100 dark:border-slate-800">
+                      <span className="text-slate-400 block text-[9px]">Quiz & សៀវភៅ</span>
+                      <span className="text-purple-600 dark:text-purple-400 font-black">
+                        {(Number(monthData.quiz) || 0) + (Number(monthData.notebook) || 0)}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Stepper Buttons for Quick Point Adjustments */}
+                  <div className="flex items-center justify-between gap-1.5 pt-2 border-t border-slate-100 dark:border-slate-800/80">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!onUpdateStudentDetail) return;
+                        const newTotal = Math.max(0, currentScore - 1);
+                        handleManualGrandTotalChange(student, newTotal.toString());
+                      }}
+                      disabled={currentScore <= 0}
+                      className="px-2.5 py-1.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-30 disabled:pointer-events-none text-xs font-bold transition-all active:scale-90 cursor-pointer"
+                      title="ដក 1 ពិន្ទុ (-1)"
+                    >
+                      -1
+                    </button>
+
+                    <div className="flex items-center gap-1">
+                      <input
+                        type="number"
+                        min="0"
+                        value={currentScore}
+                        onChange={(e) => handleManualGrandTotalChange(student, e.target.value)}
+                        className="w-14 py-1 text-center font-black text-xs rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-1 focus:ring-indigo-500"
+                        title="វាយបញ្ចូលពិន្ទុផ្ទាល់"
+                      />
+                    </div>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!onUpdateStudentDetail) return;
+                        const newTotal = currentScore + 1;
+                        handleManualGrandTotalChange(student, newTotal.toString());
+                      }}
+                      className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs shadow-xs transition-all active:scale-90 cursor-pointer flex items-center gap-0.5"
+                      title="បន្ថែម 1 ពិន្ទុ (+1)"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>1</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        if (!onUpdateStudentDetail) return;
+                        const newTotal = currentScore + 5;
+                        handleManualGrandTotalChange(student, newTotal.toString());
+                      }}
+                      className={`px-3 py-1.5 rounded-lg border font-bold text-xs shadow-xs transition-all active:scale-90 cursor-pointer flex items-center gap-0.5 ${
+                        isDarkMode 
+                          ? 'bg-amber-950/40 border-amber-800/40 text-amber-300 hover:bg-amber-900/50' 
+                          : 'bg-amber-50 border-amber-200 text-amber-700 hover:bg-amber-100'
+                      }`}
+                      title="បន្ថែម 5 ពិន្ទុ (+5)"
+                    >
+                      <Plus className="w-3 h-3" />
+                      <span>5</span>
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+        </div>
+      )}
+
+      {/* Bottom Score Statistics Summary Bar */}
+      <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t ${
+        isDarkMode ? 'border-slate-800' : 'border-slate-200'
+      }`}>
+        <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+          isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+        }`}>
+          <div>
+            <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ពិន្ទុសរុប (ខែ {selectedMonth})</p>
+            <h4 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-amber-400' : 'text-amber-600'}`}>{totalScoresSum}</h4>
+          </div>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            isDarkMode ? 'bg-amber-950/35 text-amber-400' : 'bg-amber-50 text-amber-500'
+          }`}>
+            <Star className="w-5 h-5 fill-amber-400 text-amber-400" />
+          </div>
+        </div>
+
+        <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+          isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+        }`}>
+          <div>
+            <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ពិន្ទុមធ្យម</p>
+            <h4 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-sky-400' : 'text-sky-600'}`}>{averageScore}</h4>
+          </div>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            isDarkMode ? 'bg-sky-950/35 text-sky-400' : 'bg-sky-50 text-sky-500'
+          }`}>
+            <Sparkles className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+          isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+        }`}>
+          <div>
+            <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ពិន្ទុខ្ពស់បំផុត</p>
+            <h4 className={`text-2xl font-black mt-1 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`}>{highestScore}</h4>
+          </div>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center ${
+            isDarkMode ? 'bg-emerald-950/35 text-emerald-400' : 'bg-emerald-50 text-emerald-500'
+          }`}>
+            <Trophy className="w-5 h-5" />
+          </div>
+        </div>
+
+        <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+          isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+        }`}>
+          <div className="truncate pr-2">
+            <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សពិន្ទុឆ្នើម</p>
+            <h4 className={`text-sm font-black mt-1 truncate ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
+              {topStudent ? topStudent.name : 'មិនទាន់មាន'}
+            </h4>
+          </div>
+          <div className={`w-10 h-10 rounded-xl flex items-center justify-center shrink-0 ${
+            isDarkMode ? 'bg-yellow-950/35 text-yellow-400' : 'bg-yellow-50 text-yellow-500'
+          }`}>
+            <Award className="w-5 h-5 text-amber-500" />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}

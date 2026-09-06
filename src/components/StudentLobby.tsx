@@ -939,56 +939,48 @@ export default function StudentLobby({
             isDarkMode 
               ? 'bg-gradient-to-br from-[#121829] to-[#0d1222] border-2 border-indigo-950/85 shadow-[0_8px_30px_rgb(0,0,0,0.3)]' 
               : 'bg-white border-2 border-slate-100 shadow-xl'
-          } rounded-[2.5rem] p-8 relative overflow-hidden flex flex-col items-center justify-center text-center flex-1 min-h-[500px]`}>
+          } rounded-[2.5rem] py-5 px-6 relative overflow-hidden flex flex-col items-center justify-start text-center flex-1`}>
             <div className={`absolute top-0 right-0 w-32 h-32 ${
               isDarkMode ? 'bg-indigo-500/5' : 'bg-indigo-50/50'
             } rounded-full -mr-16 -mt-16 pointer-events-none`} />
             
-            <div className="w-full flex items-center justify-center gap-2 mb-2">
-              <Smartphone className={`w-5 h-5 animate-bounce ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
-              <span className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>ស្កែន QR ឬបញ្ចូលលេខកូដដើម្បីចូលលេង</span>
+            <div className="w-full flex items-center justify-center gap-2 mb-1">
+              <Smartphone className={`w-4 h-4 ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`} />
+              <span className={`text-xs font-bold uppercase tracking-wider ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>ស្កែន QR ឬបញ្ចូលលេខកូដ</span>
             </div>
 
-            <h2 className={`text-2xl font-black tracking-tight mb-1 flex items-center gap-2 justify-center ${
+            <h2 className={`text-xl font-black tracking-tight mb-2 flex items-center gap-2 justify-center ${
               isDarkMode ? 'text-white' : 'text-slate-900'
             }`}>
               <span>ចូលរួមលេងជាមួយ PIN</span>
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black uppercase tracking-wider animate-pulse ${
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${
                 isDarkMode 
                   ? 'bg-amber-500/15 text-amber-400 border border-amber-500/20' 
                   : 'bg-amber-100 text-amber-800 border border-amber-200'
               }`}>Classic</span>
             </h2>
 
-            <p className={`text-[11.5px] max-w-sm mb-5 font-bold leading-relaxed ${
-              isDarkMode ? 'text-slate-400' : 'text-slate-600'
+            {/* Compact Game PIN Block */}
+            <div className={`w-full max-w-[270px] py-2 px-4 rounded-2xl mb-2.5 text-center relative overflow-hidden group border ${
+              isDarkMode ? 'bg-slate-950/60 border-indigo-950/80 shadow-inner' : 'bg-slate-50/90 border-slate-200/80 shadow-xs'
             }`}>
-              សិស្សប្រើប្រាស់ទូរស័ព្ទដៃស្កេន QR Code ខាងក្រោម ដើម្បីចុះឈ្មោះ និងចូលរួមលេងហ្គេមឆ្លើយសំណួរផ្ដាច់មុខរបស់ StudyPlay ភ្លាមៗ!
-            </p>
-
-            {/* Unique Game PIN Block - Elegant Dynamic design */}
-            <div className={`w-full p-5 rounded-3xl mb-5 text-center relative overflow-hidden group ${
-              isDarkMode ? 'bg-slate-950/60 border border-indigo-950/80' : 'bg-slate-50 border border-slate-200/80'
-            }`}>
-              <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-40 h-40 bg-indigo-500/5 rounded-full blur-xl pointer-events-none" />
-              
-              <span className={`text-[10.5px] font-black uppercase tracking-widest flex items-center justify-center gap-1.5 mb-1.5 z-10 relative ${
+              <span className={`text-[10px] font-bold uppercase tracking-wider flex items-center justify-center gap-1.5 mb-0.5 z-10 relative ${
                 isDarkMode ? 'text-indigo-400/90' : 'text-indigo-600/90'
               }`}>
-                <Crown className="w-3.5 h-3.5 text-amber-500 animate-pulse" />
-                លេខកូដសម្គាល់បន្ទប់ (GAME PIN)
+                <Crown className="w-3 h-3 text-amber-500 animate-pulse" />
+                លេខកូដបន្ទប់ (GAME PIN)
               </span>
-              <div className={`text-5xl font-black font-sans tracking-[0.2em] select-all z-10 relative pl-[0.2em] ${
+              <div className={`text-2xl font-black font-mono tracking-widest select-all z-10 relative ${
                 isDarkMode 
-                  ? 'text-amber-400 drop-shadow-[0_4px_12px_rgba(245,158,11,0.25)]' 
-                  : 'text-slate-900 drop-shadow-[0_2px_4px_rgba(0,0,0,0.04)]'
+                  ? 'text-amber-400 drop-shadow-[0_2px_8px_rgba(245,158,11,0.25)]' 
+                  : 'text-slate-900 drop-shadow-[0_1px_2px_rgba(0,0,0,0.04)]'
               }`}>
                 {(activeRoomId || 'default').substring(0, 8).toUpperCase()}
               </div>
             </div>
 
             {/* Beautiful White Educational Frame with Scholarly Ornamentation */}
-            <div className="w-full max-w-[270px] bg-white text-slate-800 rounded-[2rem] p-4 shadow-[0_12px_40px_rgba(0,0,0,0.35)] border-2 border-amber-300/90 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 select-none">
+            <div className="w-full max-w-[270px] bg-white text-slate-800 rounded-[2rem] p-3.5 shadow-[0_12px_40px_rgba(0,0,0,0.35)] border-2 border-amber-300/90 relative overflow-hidden group hover:scale-[1.02] transition-all duration-300 select-none">
               
               {/* Ornate Corner Elements (ក្បាច់ស៊ុមបែបអប់រំ / Classical Educational Diploma Corner Motifs) */}
               <svg className="w-5 h-5 text-amber-500/90 absolute top-2 left-2 pointer-events-none" viewBox="0 0 24 24" fill="none">

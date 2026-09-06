@@ -1,11 +1,31 @@
+export interface WeeklyScoreBreakdown {
+  activity?: number; // សកម្មភាព
+  homework?: number; // កិច្ចការផ្ទះ
+  quiz?: number;     // Quiz
+}
+
+export interface MonthlyDetailedScore {
+  monthlyExam?: number; // Monthly Exam
+  week1?: WeeklyScoreBreakdown;
+  week2?: WeeklyScoreBreakdown;
+  week3?: WeeklyScoreBreakdown;
+  week4?: WeeklyScoreBreakdown;
+  quiz?: number; // Quiz
+  notebook?: number; // ពិនិត្យសៀវភៅ
+  manualTotal?: number; // Teacher override total for the month
+  manualSubTotalNoExam?: number; // Teacher override total excluding monthly exam
+}
+
 export interface Student {
   id: string;
+  studentId?: string; // អត្តលេខ / ID សិស្ស
   name: string;
   score: number;
   emoji?: string;
   gender?: 'ប្រុស' | 'ស្រី';
   status?: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ';
   classId?: string; // To keep track if queried overall
+  monthlyScores?: Record<string, MonthlyDetailedScore>; // Key is month e.g. "កញ្ញា"
   currentAnswerCardId?: string;
   currentAnswerIndex?: number;
   currentAnswerIsCorrect?: boolean;

@@ -1,6 +1,8 @@
 @import url('https://fonts.googleapis.com/css2?family=Angkor&family=Battambang:wght@400;700;900&family=Bokor&family=Content:wght@400;700&family=Fasthand&family=Hanuman:wght@400;700;900&family=Kantumruy+Pro:ital,wght@0,300..700;1,300..700&family=Koulen&family=Moul&family=Nokora:wght@400;700&family=Odor+Mean+Chey&family=Preahvihear&family=Siemreap&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap');
 @import "tailwindcss";
 
+@custom-variant dark (&:where(.dark, .dark *));
+
 @theme {
   --font-sans: "Battambang", "Khmer OS Battambang", "Inter", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;

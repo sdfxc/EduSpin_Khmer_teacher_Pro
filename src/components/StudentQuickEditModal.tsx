@@ -246,7 +246,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 title="ចម្លងឈ្មោះទាំងអស់ទៅកាន់ Clipboard (Copy)"
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? '✓ បានចម្លងរួចរាល់!' : '📋 ចម្លងទាំងអស់ (Copy)'}</span>
+                <span>{copied ? 'បានចម្លងរួចរាល់!' : 'ចម្លងទាំងអស់ (Copy)'}</span>
               </button>
 
               {/* Paste from Clipboard */}
@@ -261,7 +261,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 title="បិទភ្ជាប់អត្ថបទពី Clipboard (Paste)"
               >
                 <ClipboardPaste className="w-3.5 h-3.5" />
-                <span>📥 បិទភ្ជាប់ (Paste)</span>
+                <span>បិទភ្ជាប់ (Paste)</span>
               </button>
 
               {/* Clean Numbers & Bullets */}
@@ -279,7 +279,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 title="លុបលេខរៀងនាំមុខ (1. , 2. , • ) ពីមុខឈ្មោះ"
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{cleanedNotice ? '✓ បានសម្អាតលេខរៀង!' : '🧹 សម្អាតលេខរៀង (1. , 2.)'}</span>
+                <span>{cleanedNotice ? 'បានសម្អាតលេខរៀង!' : 'សម្អាតលេខរៀង (1. , 2.)'}</span>
               </button>
             </div>
 
@@ -326,7 +326,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
             
             {/* Quick helper tip */}
             <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 pt-2 px-1">
-              <span>💡 ជំនួយ៖ វាយឈ្មោះសិស្ស <b>មួយជួរ ឈ្មោះមួយ</b>។ អ្នកអាច Copy ពី Excel, Word ឬ Telegram មក Paste បានភ្លាមៗ!</span>
+              <span>ជំនួយ៖ វាយឈ្មោះសិស្ស <b>មួយជួរ ឈ្មោះមួយ</b>។ អ្នកអាច Copy ពី Excel, Word ឬ Telegram មក Paste បានភ្លាមៗ!</span>
               <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0 ml-2">
                 {parsedNames.length} នាក់
               </span>

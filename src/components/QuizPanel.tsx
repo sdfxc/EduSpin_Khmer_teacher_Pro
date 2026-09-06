@@ -2631,7 +2631,7 @@ export default function QuizPanel({
           {/* Quick Info Box */}
           <div className="mb-6 p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/10 border border-indigo-200 dark:border-indigo-900/30 text-indigo-800 dark:text-indigo-400 text-xs font-bold flex items-center gap-2">
             <Info className="w-4.5 h-4.5 text-indigo-500 shrink-0" />
-            <span>សូមជ្រើសរើសមេរៀន (បន្ទប់សំណួរ) ណាមួយខាងក្រោម រួចចុច "ត្រឡប់ទៅក្ដារសំណួរ" ដើម្បីសួរដេញដោលសិស្ស។</span>
+            <span>សូមជ្រើសរើសមេរៀនណាមួយខាងក្រោម រួចចុច "ត្រឡប់ទៅក្ដារសំណួរ" ដើម្បីសួរដេញដោលសិស្ស។</span>
           </div>
 
           {/* Active indicator */}
@@ -2735,7 +2735,7 @@ export default function QuizPanel({
                   {/* Lessons list inside Chapter as a DROPDOWN */}
                   <div className="p-4 flex flex-col gap-3 relative overflow-visible">
                     <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
-                      បន្ទប់សំណួរមេរៀន៖
+                      មេរៀន៖
                     </span>
 
                     {hasRooms ? (
@@ -2754,7 +2754,7 @@ export default function QuizPanel({
                             <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
                             <span className="truncate">
                               {activeRoomInThisChapter 
-                                ? `មេរៀនសកម្ម៖ ${activeRoomInThisChapter.name}` 
+                                ? activeRoomInThisChapter.name 
                                 : `ជ្រើសរើសមេរៀនក្នុងជំពូកនេះ (${chapter.rooms.length})`}
                             </span>
                           </div>
@@ -2933,7 +2933,7 @@ export default function QuizPanel({
                           className="inline-flex items-center gap-1 px-3 py-1 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-400 rounded-lg transition-all font-black text-[11px] cursor-pointer active:scale-95 border border-dashed border-amber-300 dark:border-amber-800"
                         >
                           <Plus className="w-3 h-3" />
-                          <span>បង្កើតបន្ទប់មេរៀនថ្មី</span>
+                          <span>បង្កើតមេរៀនថ្មី</span>
                         </button>
                       )}
                     </div>
