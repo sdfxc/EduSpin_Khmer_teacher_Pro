@@ -404,22 +404,36 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
     // Also fetch from cloud if teacher is logged in and class is active
     if (teacher?.id && activeClassId) {
       getDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers'))
-        .then(snap => {
+        .then(async snap => {
+          let cloudExams: any[] | null = null;
           if (snap.exists()) {
             const data = snap.data();
             if (Array.isArray(data.exams) && data.exams.length > 0) {
-              const cloudExams = data.exams.map((e: any) => ({
-                ...e,
-                schoolName: e.schoolName || defaultSchool
-              }));
-              setExams(cloudExams);
-              localStorage.setItem(key, JSON.stringify(cloudExams));
-              const cloudMatched = cloudExams.filter((e: any) => e.type === activeType);
-              if (cloudMatched.length > 0) {
-                setSelectedExamId(cloudMatched[0].id);
-              } else if (cloudExams.length > 0) {
-                setSelectedExamId(cloudExams[0].id);
+              cloudExams = data.exams;
+            }
+          }
+          if (!cloudExams) {
+            const classSnap = await getDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId));
+            if (classSnap.exists()) {
+              const cData = classSnap.data();
+              if (Array.isArray(cData.exams) && cData.exams.length > 0) {
+                cloudExams = cData.exams;
               }
+            }
+          }
+
+          if (cloudExams && cloudExams.length > 0) {
+            const formatted = cloudExams.map((e: any) => ({
+              ...e,
+              schoolName: e.schoolName || defaultSchool
+            }));
+            setExams(formatted);
+            localStorage.setItem(key, JSON.stringify(formatted));
+            const cloudMatched = formatted.filter((e: any) => e.type === activeType);
+            if (cloudMatched.length > 0) {
+              setSelectedExamId(cloudMatched[0].id);
+            } else if (formatted.length > 0) {
+              setSelectedExamId(formatted[0].id);
             }
           }
         })
@@ -573,6 +587,11 @@ Output the response in JSON format.`;
         exams: updatedExams,
         updatedAt: new Date().toISOString()
       }, { merge: true }).catch(err => console.error("Cloud exams save error:", err));
+
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        exams: updatedExams,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => console.error("Cloud class exams save error:", err));
     }
   };
 

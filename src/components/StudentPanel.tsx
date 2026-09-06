@@ -387,8 +387,16 @@ export default function StudentPanel({
               <h3 className={`text-3xl font-black truncate px-2 mb-1 flex items-center justify-center gap-2 ${
                 isDarkMode ? 'text-yellow-400' : 'text-red-600'
               }`}>
-                <span className="text-4xl">{selectedStudent.emoji}</span>
-                {selectedStudent.name}
+                {selectedStudent.avatarUrl ? (
+                  <img
+                    src={selectedStudent.avatarUrl}
+                    alt={selectedStudent.name}
+                    className="w-12 h-12 rounded-full object-cover border-2 border-yellow-400 shadow-md inline-block select-none"
+                  />
+                ) : (
+                  <span className="text-4xl">{selectedStudent.emoji}</span>
+                )}
+                <span>{selectedStudent.name}</span>
               </h3>
               <div className={`flex items-center justify-center gap-1.5 font-bold text-xs ${
                 isDarkMode ? 'text-slate-300' : 'text-red-700/60'
@@ -429,10 +437,18 @@ export default function StudentPanel({
               }`}
             >
               <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-3xl font-bold transition-transform group-hover:scale-110 ${
+                <div className={`w-12 h-12 rounded-xl flex items-center justify-center text-3xl font-bold transition-transform group-hover:scale-110 overflow-hidden shrink-0 ${
                    selectedStudent?.id === student.id ? 'bg-indigo-600 text-white' : 'bg-slate-100 dark:bg-slate-800'
                 }`}>
-                  {student.emoji || student.name.charAt(0).toUpperCase()}
+                  {student.avatarUrl ? (
+                    <img
+                      src={student.avatarUrl}
+                      alt={student.name}
+                      className="w-full h-full object-cover select-none"
+                    />
+                  ) : (
+                    student.emoji || student.name.charAt(0).toUpperCase()
+                  )}
                 </div>
                 <div>
                   <div className="flex items-center gap-2">

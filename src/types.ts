@@ -14,6 +14,7 @@ export interface MonthlyDetailedScore {
   notebook?: number; // ពិនិត្យសៀវភៅ
   manualTotal?: number; // Teacher override total for the month
   manualSubTotalNoExam?: number; // Teacher override total excluding monthly exam
+  manualAverage?: number; // Teacher override average
 }
 
 export interface Student {
@@ -22,7 +23,12 @@ export interface Student {
   name: string;
   score: number;
   emoji?: string;
+  avatarUrl?: string; // Profile photo URL / base64
   gender?: 'ប្រុស' | 'ស្រី';
+  grade?: string; // ថ្នាក់ទី e.g. ថ្នាក់ទី៧ក
+  dateOfBirth?: string; // ថ្ងៃខែឆ្នាំកំណើត
+  phoneNumber?: string; // លេខទូរស័ព្ទ / អាណាព្យាបាល
+  notes?: string; // កំណត់សម្គាល់ / ព័ត៌មានបន្ថែម
   status?: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ';
   classId?: string; // To keep track if queried overall
   monthlyScores?: Record<string, MonthlyDetailedScore>; // Key is month e.g. "កញ្ញា"

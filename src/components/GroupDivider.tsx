@@ -726,9 +726,17 @@ export default function GroupDivider({
                       }`}
                     >
                       <div className="flex items-center gap-2 truncate">
-                        <span className="text-base shrink-0 select-none">
-                          {liveStudent?.emoji || member.emoji || (member.gender === 'ស្រី' ? '👧' : '👦')}
-                        </span>
+                        {liveStudent?.avatarUrl || member.avatarUrl ? (
+                          <img
+                            src={liveStudent?.avatarUrl || member.avatarUrl}
+                            alt={member.name}
+                            className="w-6 h-6 rounded-lg object-cover shrink-0 select-none border border-slate-200 dark:border-slate-700"
+                          />
+                        ) : (
+                          <span className="text-base shrink-0 select-none">
+                            {liveStudent?.emoji || member.emoji || (member.gender === 'ស្រី' ? '👧' : '👦')}
+                          </span>
+                        )}
                         <div className="truncate text-left">
                           <div className="truncate text-sm font-bold flex items-center gap-1.5">
                             <span className={`truncate transition-all duration-300 ${

@@ -674,6 +674,25 @@ export default function App() {
         setCards(activeRoom?.cards || []);
         setPickedIds(activeRoom?.pickedIds || []);
 
+        // Immediately cache to localStorage so refresh and tab switches retain the exact cloud data
+        localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(loadedSubjects));
+        localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(loadedChapters));
+        if (loadedActiveSubjectId) {
+          localStorage.setItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
+        }
+        if (loadedActiveRoomId) {
+          localStorage.setItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
+        }
+        localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(activeRoom?.cards || []));
+        localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(activeRoom?.pickedIds || []));
+
+        if (classSnap.exists()) {
+          const cData = classSnap.data();
+          if (Array.isArray(cData.exams) && cData.exams.length > 0) {
+            localStorage.setItem(`khmer_exams_${activeClassId}`, JSON.stringify(cData.exams));
+          }
+        }
+
         // 2. Fetch students
         const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
         const studentsSnap = await getDocs(studentsCollRef);

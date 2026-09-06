@@ -29,9 +29,27 @@ export const db = initializeFirestore(app, {
 
 export const isQuotaExceeded = () => false;
 
+export const cleanFirestoreData = (obj: any): any => {
+  if (obj === null || typeof obj !== 'object') {
+    return obj;
+  }
+  if (Array.isArray(obj)) {
+    return obj.map(cleanFirestoreData);
+  }
+  const cleaned: Record<string, any> = {};
+  for (const key of Object.keys(obj)) {
+    const val = obj[key];
+    if (val !== undefined) {
+      cleaned[key] = cleanFirestoreData(val);
+    }
+  }
+  return cleaned;
+};
+
 export const safeSetDoc = async (docRef: any, data: any, options?: any) => {
   try {
-    await setDoc(docRef, data, options);
+    const sanitized = cleanFirestoreData(data);
+    await setDoc(docRef, sanitized, options);
   } catch (e: any) {
     handleFirestoreError(e, OperationType.WRITE, docRef?.path || null);
   }

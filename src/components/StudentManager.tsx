@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
+import { motion } from 'motion/react';
 import { 
   Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, 
   Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil, ClipboardList,
-  UserCheck, Trophy, Medal, Star, Flame, ArrowUpDown, RotateCcw, CheckCircle2, ChevronUp, ChevronDown
+  UserCheck, Trophy, Medal, Star, Flame, ArrowUpDown, RotateCcw, CheckCircle2, ChevronUp, ChevronDown,
+  Camera
 } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 import { StudentScoreTable } from './StudentScoreTable';
+import { StudentProfileModal } from './StudentProfileModal';
 
 interface StudentManagerProps {
   students: Student[];
@@ -64,6 +67,9 @@ export default function StudentManager({
   const [bulkTextInput, setBulkTextInput] = useState('');
   const [bulkClassId, setBulkClassId] = useState<string>(activeClassId);
   const [parsedStudents, setParsedStudents] = useState<{ name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[]>([]);
+
+  // Student Profile & Avatar Modal state
+  const [profileStudent, setProfileStudent] = useState<Student | null>(null);
 
   // Score Tab sorting & filter states
   const [scoreSortOrder, setScoreSortOrder] = useState<'desc' | 'asc' | 'alpha'>('desc');
@@ -265,60 +271,160 @@ export default function StudentManager({
       
       {/* 2 Major Tabs: ស្ថានភាពសិស្ស (Status) and ពិន្ទុសិស្ស (Scores) */}
       <div className="flex flex-col sm:flex-row items-center justify-between gap-4 border-b border-slate-200/80 dark:border-slate-800 pb-4">
-        {/* Modern Segmented Sub-Tab Switcher */}
-        <div className={`inline-flex items-center p-1.5 rounded-2xl border ${
-          isDarkMode 
-            ? 'bg-slate-900/90 border-slate-800 shadow-inner' 
-            : 'bg-slate-100 border-slate-200/80 shadow-xs'
-        }`}>
+        {/* Modern Water Droplet / Glass Sub-Tab Switcher */}
+        <div className="p-1 rounded-2xl bg-slate-200/50 dark:bg-slate-900/60 border border-white/80 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl inline-flex items-center select-none relative gap-1">
+          {/* Sub-Tab 1: ស្ថានភាពសិស្ស */}
           <button
             type="button"
             onClick={() => setActiveSubTab('status')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeSubTab === 'status'
-                ? isDarkMode 
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-black' 
-                  : 'bg-white text-indigo-600 shadow-sm font-black'
-                : isDarkMode 
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50' 
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
+            className="relative px-5 py-2 rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
           >
-            <UserCheck className="w-4 h-4" />
-            <span>ស្ថានភាពសិស្ស</span>
-            <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-              activeSubTab === 'status'
-                ? isDarkMode ? 'bg-indigo-700 text-indigo-100' : 'bg-indigo-50 text-indigo-700'
-                : isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
-            }`}>
-              {students.length}
-            </span>
+            {activeSubTab === 'status' && (
+              <motion.div
+                layoutId="activeStudentSubTabIndicator"
+                transition={{
+                  type: "spring",
+                  stiffness: 350,
+                  damping: 22,
+                  mass: 0.65
+                }}
+                className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                  isDarkMode
+                    ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                    : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                }`}
+              >
+                {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                  isDarkMode 
+                    ? 'from-white/50 via-white/12 to-transparent' 
+                    : 'from-white/95 via-white/40 to-transparent'
+                }`} />
+
+                {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
+                  isDarkMode
+                    ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                    : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                }`} />
+
+                {/* Bottom Droplet Meniscus Light Rim (គែមពន្លឺបាតតំណក់ទឹកថ្លា) */}
+                <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                  isDarkMode ? 'via-white/50' : 'via-white/90'
+                }`} />
+              </motion.div>
+            )}
+
+            <motion.span
+              animate={{ 
+                scale: activeSubTab === 'status' ? 1.05 : 1,
+                y: activeSubTab === 'status' ? -0.5 : 0
+              }}
+              transition={{ type: "spring", stiffness: 450, damping: 22 }}
+              className="relative z-10 flex items-center gap-2"
+            >
+              <UserCheck className={`w-4 h-4 transition-all duration-300 ${
+                activeSubTab === 'status'
+                  ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-blue-600 scale-110 drop-shadow-xs'
+                  : isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              }`} />
+              <span className={
+                activeSubTab === 'status' 
+                  ? isDarkMode 
+                    ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                    : 'text-blue-600 font-extrabold tracking-wide' 
+                  : 'font-bold text-slate-600 dark:text-slate-400'
+              }>
+                ស្ថានភាពសិស្ស
+              </span>
+              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black transition-colors ${
+                activeSubTab === 'status'
+                  ? isDarkMode 
+                    ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-xs' 
+                    : 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
+                  : isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
+              }`}>
+                {students.length}
+              </span>
+            </motion.span>
           </button>
 
+          {/* Sub-Tab 2: ពិន្ទុសិស្ស */}
           <button
             type="button"
             onClick={() => setActiveSubTab('score')}
-            className={`px-5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2 transition-all cursor-pointer select-none ${
-              activeSubTab === 'score'
-                ? isDarkMode 
-                  ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 font-black' 
-                  : 'bg-white text-indigo-600 shadow-sm font-black'
-                : isDarkMode 
-                  ? 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/50' 
-                  : 'text-slate-600 hover:text-slate-900 hover:bg-white/60'
-            }`}
+            className="relative px-5 py-2 rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
           >
-            <Award className="w-4 h-4 text-amber-500" />
-            <span>ពិន្ទុសិស្ស</span>
-            {totalScoresSum > 0 && (
-              <span className={`text-[10px] px-2 py-0.5 rounded-full font-black ${
-                activeSubTab === 'score'
-                  ? isDarkMode ? 'bg-amber-600 text-amber-100' : 'bg-amber-100 text-amber-800'
-                  : isDarkMode ? 'bg-slate-800 text-amber-400' : 'bg-amber-50 text-amber-600'
-              }`}>
-                {totalScoresSum} pts
-              </span>
+            {activeSubTab === 'score' && (
+              <motion.div
+                layoutId="activeStudentSubTabIndicator"
+                transition={{
+                  type: "spring",
+                  stiffness: 350,
+                  damping: 22,
+                  mass: 0.65
+                }}
+                className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                  isDarkMode
+                    ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                    : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                }`}
+              >
+                {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                  isDarkMode 
+                    ? 'from-white/50 via-white/12 to-transparent' 
+                    : 'from-white/95 via-white/40 to-transparent'
+                }`} />
+
+                {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
+                  isDarkMode
+                    ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                    : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                }`} />
+
+                {/* Bottom Droplet Meniscus Light Rim (គែមពន្លឺបាតតំណក់ទឹកថ្លា) */}
+                <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                  isDarkMode ? 'via-white/50' : 'via-white/90'
+                }`} />
+              </motion.div>
             )}
+
+            <motion.span
+              animate={{ 
+                scale: activeSubTab === 'score' ? 1.05 : 1,
+                y: activeSubTab === 'score' ? -0.5 : 0
+              }}
+              transition={{ type: "spring", stiffness: 450, damping: 22 }}
+              className="relative z-10 flex items-center gap-2"
+            >
+              <Award className={`w-4 h-4 transition-all duration-300 ${
+                activeSubTab === 'score'
+                  ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-blue-600 scale-110 drop-shadow-xs'
+                  : isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              }`} />
+              <span className={
+                activeSubTab === 'score' 
+                  ? isDarkMode 
+                    ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                    : 'text-blue-600 font-extrabold tracking-wide' 
+                  : 'font-bold text-slate-600 dark:text-slate-400'
+              }>
+                ពិន្ទុសិស្ស
+              </span>
+              {totalScoresSum > 0 && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black transition-colors ${
+                  activeSubTab === 'score'
+                    ? isDarkMode 
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-xs' 
+                      : 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
+                    : isDarkMode ? 'bg-slate-800 text-amber-400' : 'bg-amber-50 text-amber-600'
+                }`}>
+                  {totalScoresSum} pts
+                </span>
+              )}
+            </motion.span>
           </button>
         </div>
 
@@ -620,14 +726,49 @@ export default function StudentManager({
                         : 'bg-white border-slate-200/80 hover:border-slate-300'
                     }`}
                   >
-                    <div className="flex items-center gap-3.5">
-                      <div className={`w-11 h-11 rounded-xl ${badgeBg} flex items-center justify-center text-white text-base font-black select-none shadow-xs shrink-0`}>
-                        {getKhmerInitial(student.name)}
+                    <div className="flex items-center gap-3.5 min-w-0">
+                      {/* Avatar with image display and camera hover to edit profile */}
+                      <div 
+                        onClick={() => setProfileStudent(student)}
+                        className="relative group/avatar cursor-pointer shrink-0"
+                        title="ចុចដើម្បីដាក់រូបភាព & កែប្រែព័ត៌មាន Profile"
+                      >
+                        {student.avatarUrl ? (
+                          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-900/60 shadow-xs">
+                            <img
+                              src={student.avatarUrl}
+                              alt={student.name}
+                              className="w-full h-full object-cover select-none"
+                            />
+                          </div>
+                        ) : (
+                          <div className={`w-12 h-12 rounded-2xl ${badgeBg} flex items-center justify-center text-white text-base font-black select-none shadow-xs`}>
+                            {getKhmerInitial(student.name)}
+                          </div>
+                        )}
+                        <div className="absolute inset-0 rounded-2xl bg-black/45 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white shadow-xs">
+                          <Camera className="w-4 h-4" />
+                        </div>
                       </div>
-                      <div>
-                        <h3 className={`font-extrabold text-sm leading-snug ${isDarkMode ? 'text-white' : 'text-slate-800'}`}>
-                          {student.name}
-                        </h3>
+
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 
+                            onClick={() => setProfileStudent(student)}
+                            className={`font-extrabold text-sm leading-snug cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate ${
+                              isDarkMode ? 'text-white' : 'text-slate-800'
+                            }`}
+                            title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
+                          >
+                            {student.name}
+                          </h3>
+                          {student.studentId && (
+                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">
+                              #{student.studentId}
+                            </span>
+                          )}
+                        </div>
+
                         <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
                           <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md ${
                             isDarkMode ? 'text-slate-400 bg-slate-900 border-slate-800' : 'text-slate-500 bg-slate-50 border-slate-100'
@@ -644,25 +785,22 @@ export default function StudentManager({
                           <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${statusPillColor}`}>
                             {statusKey}
                           </span>
+                          {student.phoneNumber && (
+                            <span className="text-[10px] font-medium text-slate-400 hidden sm:inline-block">
+                              📞 {student.phoneNumber}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0 ml-2">
                       <button
-                        onClick={() => {
-                          setEditingStudent(student);
-                          setEditStudentId(student.studentId || '');
-                          setEditName(student.name);
-                          setEditGender(student.gender || 'ប្រុស');
-                          setEditStatus(student.status || 'សកម្ម');
-                          setEditClassId(student.classId || activeClassId);
-                          setEditScore(student.score || 0);
-                        }}
+                        onClick={() => setProfileStudent(student)}
                         className={`p-2 rounded-xl cursor-pointer transition-all ${
                           isDarkMode ? 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
                         }`}
-                        title="កែប្រែព័ត៌មាន"
+                        title="កែប្រែព័ត៌មាន & រូបភាព Profile"
                       >
                         <Pencil className="w-4 h-4" />
                       </button>
@@ -923,6 +1061,26 @@ export default function StudentManager({
           } else {
             onBulkAddStudents(names.map(n => ({ name: n, gender: 'ប្រុស', status: 'សកម្ម' })), targetId);
           }
+        }}
+      />
+
+      {/* Full Student Profile & Avatar Image Modal */}
+      <StudentProfileModal
+        isOpen={!!profileStudent}
+        onClose={() => setProfileStudent(null)}
+        student={profileStudent}
+        classes={classes}
+        activeClassId={filterClassId === 'all' ? activeClassId : filterClassId}
+        isDarkMode={isDarkMode}
+        onSaveStudent={async (id, updatedFields) => {
+          if (onUpdateStudentDetail) {
+            await onUpdateStudentDetail(id, updatedFields);
+          }
+          setProfileStudent(prev => (prev && prev.id === id ? { ...prev, ...updatedFields } : null));
+        }}
+        onDeleteStudent={(id) => {
+          onRemoveStudent(id);
+          setProfileStudent(null);
         }}
       />
     </div>
