@@ -9,12 +9,16 @@ import { Student, ClassInfo, MonthlyDetailedScore, WeeklyScoreBreakdown } from '
 import * as XLSX from 'xlsx';
 import SovannaphumiLogo from './SovannaphumiLogo';
 
+export type SortMode = 'default' | 'id' | 'name' | 'score-desc' | 'score-asc' | 'rank-asc' | 'avg-desc' | 'avg-asc';
+
 interface StudentScoreTableProps {
   students: Student[];
   classes: ClassInfo[];
   activeClassId: string;
   isDarkMode?: boolean;
   onUpdateStudentDetail?: (id: string, fields: Partial<Student>) => void;
+  currentSortMode?: SortMode;
+  onSortModeChange?: (mode: SortMode) => void;
 }
 
 const KHMER_MONTHS = [
@@ -22,14 +26,14 @@ const KHMER_MONTHS = [
   'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'
 ];
 
-type SortMode = 'default' | 'id' | 'name' | 'score-desc' | 'score-asc' | 'rank-asc' | 'avg-desc' | 'avg-asc';
-
 export function StudentScoreTable({
   students,
   classes,
   activeClassId,
   isDarkMode = false,
-  onUpdateStudentDetail
+  onUpdateStudentDetail,
+  currentSortMode,
+  onSortModeChange
 }: StudentScoreTableProps) {
   // Current active month
   const currentMonthIndex = new Date().getMonth();
@@ -37,7 +41,22 @@ export function StudentScoreTable({
   const [selectedMonth, setSelectedMonth] = useState<string>(defaultMonth);
   const [activeViewMode, setActiveViewMode] = useState<'table' | 'cards'>('table');
   const [scoreSearchQuery, setScoreSearchQuery] = useState('');
-  const [sortMode, setSortMode] = useState<SortMode>('default');
+  
+  // Persistent sort mode (shared with Attendance and saved to localStorage)
+  const [internalSortMode, setInternalSortMode] = useState<SortMode>(() => {
+    const saved = localStorage.getItem('edu_spin_student_sort_mode');
+    return (saved as SortMode) || 'id';
+  });
+
+  const sortMode = currentSortMode !== undefined ? currentSortMode : internalSortMode;
+
+  const handleSortChange = (newMode: SortMode) => {
+    localStorage.setItem('edu_spin_student_sort_mode', newMode);
+    setInternalSortMode(newMode);
+    if (onSortModeChange) {
+      onSortModeChange(newMode);
+    }
+  };
 
   // Average divisor state (e.g. ÷2, ÷10, ÷1)
   const [averageDivisor, setAverageDivisor] = useState<number>(() => {
@@ -464,17 +483,17 @@ export function StudentScoreTable({
               <span className="text-xs font-bold text-slate-400">តម្រៀប៖</span>
               <select
                 value={sortMode}
-                onChange={(e) => setSortMode(e.target.value as SortMode)}
+                onChange={(e) => handleSortChange(e.target.value as SortMode)}
                 className="bg-transparent border-none text-xs font-black text-indigo-600 dark:text-indigo-400 cursor-pointer focus:outline-none pr-1"
               >
-                <option value="default" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
-                  លំនាំដើម (ល.រ)
-                </option>
                 <option value="id" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
                   រៀបតាម ID (0-9 / A-Z)
                 </option>
                 <option value="name" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
-                  រៀបតាមឈ្មោះ (A-Z)
+                  រៀបតាមឈ្មោះ (ក-អ / A-Z)
+                </option>
+                <option value="default" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
+                  លំនាំដើម (ល.រ)
                 </option>
                 <option value="rank-asc" className="text-slate-800 dark:text-slate-200 bg-white dark:bg-slate-900">
                   ចំណាត់ថ្នាក់ (លេខ ១ → N)
@@ -751,26 +770,26 @@ export function StudentScoreTable({
                   {/* ID Column */}
                   <th 
                     rowSpan={3} 
-                    onClick={() => setSortMode(prev => prev === 'id' ? 'default' : 'id')}
+                    onClick={() => handleSortChange(sortMode === 'id' ? 'name' : 'id')}
                     className="p-2.5 border-r border-slate-200 dark:border-slate-800 min-w-[75px] cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
-                    title="ចុចដើម្បីតម្រៀបតាម ID"
+                    title="ចុចដើម្បីតម្រៀបតាម ID (0-9 / A-Z)"
                   >
                     <div className="flex items-center justify-center gap-1">
                       <span>ID</span>
-                      <ArrowUpDown className={`w-3 h-3 ${sortMode === 'id' ? 'text-indigo-500' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+                      <ArrowUpDown className={`w-3 h-3 ${sortMode === 'id' ? 'text-indigo-500 font-bold' : 'text-slate-400 group-hover:text-indigo-400'}`} />
                     </div>
                   </th>
 
                   {/* ឈ្មោះសិស្ស */}
                   <th 
                     rowSpan={3} 
-                    onClick={() => setSortMode(prev => prev === 'name' ? 'default' : 'name')}
+                    onClick={() => handleSortChange(sortMode === 'name' ? 'id' : 'name')}
                     className="p-2.5 border-r border-slate-200 dark:border-slate-800 min-w-[155px] text-left pl-4 cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
-                    title="ចុចដើម្បីតម្រៀបតាមឈ្មោះ A-Z"
+                    title="ចុចដើម្បីតម្រៀបតាមឈ្មោះ (ក-អ / A-Z)"
                   >
                     <div className="flex items-center gap-1.5">
                       <span>ឈ្មោះសិស្ស</span>
-                      <ArrowUpAZ className={`w-3.5 h-3.5 ${sortMode === 'name' ? 'text-indigo-500' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+                      <ArrowUpAZ className={`w-3.5 h-3.5 ${sortMode === 'name' ? 'text-indigo-500 font-bold' : 'text-slate-400 group-hover:text-indigo-400'}`} />
                     </div>
                   </th>
 
@@ -794,7 +813,7 @@ export function StudentScoreTable({
                   {/* Column 2: សរុប ១ខែ */}
                   <th 
                     rowSpan={3} 
-                    onClick={() => setSortMode(prev => prev === 'score-desc' ? 'score-asc' : 'score-desc')}
+                    onClick={() => handleSortChange(sortMode === 'score-desc' ? 'score-asc' : 'score-desc')}
                     className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[85px] bg-amber-500/15 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 font-black text-center cursor-pointer hover:bg-amber-500/25 transition-colors select-none group"
                     title="ពិន្ទុសរុបប្រចាំខែពេញលេញ (ចុចដើម្បីតម្រៀបពិន្ទុ)"
                   >
@@ -810,7 +829,7 @@ export function StudentScoreTable({
                   {/* Column 3: មធ្យមភាគ (Average) */}
                   <th 
                     rowSpan={3} 
-                    onClick={() => setSortMode(prev => prev === 'avg-desc' ? 'avg-asc' : 'avg-desc')}
+                    onClick={() => handleSortChange(sortMode === 'avg-desc' ? 'avg-asc' : 'avg-desc')}
                     className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[85px] bg-blue-500/15 dark:bg-blue-950/40 text-blue-700 dark:text-blue-300 font-black text-center cursor-pointer hover:bg-blue-500/25 transition-colors select-none group"
                     title="មធ្យមភាគប្រចាំខែ (ចុចដើម្បីតម្រៀប)"
                   >
@@ -826,7 +845,7 @@ export function StudentScoreTable({
                   {/* Column 4: ចំណាត់ថ្នាក់ (Rank) */}
                   <th 
                     rowSpan={3} 
-                    onClick={() => setSortMode(prev => prev === 'rank-asc' ? 'default' : 'rank-asc')}
+                    onClick={() => handleSortChange(sortMode === 'rank-asc' ? 'default' : 'rank-asc')}
                     className="p-2 border-r border-slate-200 dark:border-slate-800 min-w-[80px] bg-purple-500/15 dark:bg-purple-950/40 text-purple-700 dark:text-purple-300 font-black text-center cursor-pointer hover:bg-purple-500/25 transition-colors select-none group"
                     title="ចំណាត់ថ្នាក់ស្វ័យប្រវត្តិតាមពិន្ទុសរុប (ចុចដើម្បីតម្រៀប)"
                   >

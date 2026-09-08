@@ -1,15 +1,15 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { motion } from 'motion/react';
 import { 
   Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, 
   Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil, ClipboardList,
   UserCheck, Trophy, Medal, Star, Flame, ArrowUpDown, RotateCcw, CheckCircle2, ChevronUp, ChevronDown,
-  Camera
+  Camera, ArrowUpAZ, Hash
 } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
-import { StudentScoreTable } from './StudentScoreTable';
+import { StudentScoreTable, SortMode } from './StudentScoreTable';
 import { StudentProfileModal } from './StudentProfileModal';
 
 interface StudentManagerProps {
@@ -39,13 +39,103 @@ export default function StudentManager({
   onUpdateStudentDetail,
   onSwitchClass
 }: StudentManagerProps) {
-  // Main Sub-Tab: 'status' (ស្ថានភាពសិស្ស) vs 'score' (ពិន្ទុសិស្ស)
-  const [activeSubTab, setActiveSubTab] = useState<'status' | 'score'>('status');
+  // Main Sub-Tab: 'status' (ស្ថានភាពសិស្ស) | 'score' (ពិន្ទុសិស្ស) | 'attendance' (វត្តមានសិស្ស)
+  const [activeSubTab, setActiveSubTab] = useState<'status' | 'score' | 'attendance'>('status');
+
+  const handleExportAttendanceExcel = () => {
+    const classObj = classes.find(c => c.id === currentClassIdForAttendance);
+    const className = classObj ? classObj.name : 'គ្រប់ថ្នាក់';
+
+    const worksheetData: (string | number)[][] = [
+      [`បញ្ជីវត្តមានសិស្ស - ថ្នាក់៖ ${className}`],
+      [`កាលបរិច្ឆេទ៖ ${attendanceDate}`],
+      [],
+      ['ល.រ', 'អត្តលេខ', 'ឈ្មោះសិស្ស', 'ភេទ', 'ស្ថានភាពវត្តមាន']
+    ];
+
+    filteredStudents.forEach((student, index) => {
+      const status = currentClassAttendance[student.id] || 'present';
+      const statusKh = status === 'present' ? 'វត្តមាន' : status === 'permission' ? 'មានច្បាប់' : status === 'late' ? 'យឺតយ៉ាវ' : 'អវត្តមាន';
+      worksheetData.push([
+        index + 1,
+        student.studentId || student.id,
+        student.name,
+        student.gender || 'ប្រុស',
+        statusKh
+      ]);
+    });
+
+    const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
+    XLSX.writeFile(workbook, `attendance_${currentClassIdForAttendance}_${attendanceDate}.xlsx`);
+  };
 
   const [searchQuery, setSearchQuery] = useState('');
   const [filterClassId, setFilterClassId] = useState<string>(activeClassId || 'all');
   const [showQuickEditModal, setShowQuickEditModal] = useState(false);
-  
+
+  // Persistent student sort mode shared across Attendance and Score tabs ('id' | 'name')
+  const [studentSortMode, setStudentSortMode] = useState<SortMode>(() => {
+    const saved = localStorage.getItem('edu_spin_student_sort_mode');
+    return (saved as SortMode) || 'id';
+  });
+
+  const handleSortModeChange = (mode: SortMode) => {
+    setStudentSortMode(mode);
+    localStorage.setItem('edu_spin_student_sort_mode', mode);
+  };
+
+  // Attendance states
+  const todayStr = new Date().toISOString().split('T')[0];
+  const [attendanceDate, setAttendanceDate] = useState<string>(todayStr);
+  const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, 'present' | 'absent' | 'permission' | 'late'>>>({});
+
+  useEffect(() => {
+    const saved = localStorage.getItem('edu_spin_attendance_records');
+    if (saved) {
+      try {
+        setAttendanceMap(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, []);
+
+  const saveAttendanceMap = (newMap: typeof attendanceMap) => {
+    setAttendanceMap(newMap);
+    localStorage.setItem('edu_spin_attendance_records', JSON.stringify(newMap));
+  };
+
+  const currentClassIdForAttendance = filterClassId !== 'all' ? filterClassId : (classes[0]?.id || 'default');
+  const classAttendanceKey = `${currentClassIdForAttendance}_${attendanceDate}`;
+  const currentClassAttendance = attendanceMap[classAttendanceKey] || {};
+
+  const handleSetStudentAttendance = (studentId: string, status: 'present' | 'absent' | 'permission' | 'late') => {
+    const updatedClassAttendance = {
+      ...currentClassAttendance,
+      [studentId]: status
+    };
+    const newMap = {
+      ...attendanceMap,
+      [classAttendanceKey]: updatedClassAttendance
+    };
+    saveAttendanceMap(newMap);
+  };
+
+  const handleMarkAllAttendance = (status: 'present' | 'absent' | 'permission' | 'late') => {
+    const filteredStudents = students.filter(s => filterClassId === 'all' || s.classId === filterClassId);
+    const updatedClassAttendance: Record<string, 'present' | 'absent' | 'permission' | 'late'> = {};
+    filteredStudents.forEach(s => {
+      updatedClassAttendance[s.id] = status;
+    });
+    const newMap = {
+      ...attendanceMap,
+      [classAttendanceKey]: updatedClassAttendance
+    };
+    saveAttendanceMap(newMap);
+  };
+
   // Single student form toggle & states
   const [showAddForm, setShowAddForm] = useState(false);
   const [newName, setNewName] = useState('');
@@ -185,20 +275,35 @@ export default function StudentManager({
     }
   };
 
-  // Filter logic
-  const filteredStudents = students.filter(student => {
-    const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesClass = filterClassId === 'all' || (student.classId || activeClassId) === filterClassId;
-    if (!matchesSearch || !matchesClass) return false;
+  // Filter & Sort logic (shared across tabs: Score, Attendance, Status)
+  const filteredStudents = useMemo(() => {
+    let list = students.filter(student => {
+      const matchesSearch = student.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (student.studentId || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesClass = filterClassId === 'all' || (student.classId || activeClassId) === filterClassId;
+      if (!matchesSearch || !matchesClass) return false;
 
-    if (activeSubTab === 'score') {
-      const score = student.score || 0;
-      if (scoreFilterTier === 'hasScore' && score <= 0) return false;
-      if (scoreFilterTier === 'noScore' && score > 0) return false;
+      if (activeSubTab === 'score') {
+        const score = student.score || 0;
+        if (scoreFilterTier === 'hasScore' && score <= 0) return false;
+        if (scoreFilterTier === 'noScore' && score > 0) return false;
+      }
+
+      return true;
+    });
+
+    if (studentSortMode === 'id') {
+      list = [...list].sort((a, b) => {
+        const idA = (a.studentId || a.id || '').trim();
+        const idB = (b.studentId || b.id || '').trim();
+        return idA.localeCompare(idB, undefined, { numeric: true, sensitivity: 'base' });
+      });
+    } else if (studentSortMode === 'name') {
+      list = [...list].sort((a, b) => a.name.trim().localeCompare(b.name.trim(), 'km'));
     }
 
-    return true;
-  });
+    return list;
+  }, [students, searchQuery, filterClassId, activeClassId, activeSubTab, scoreFilterTier, studentSortMode]);
 
   // Sort logic for score tab
   const sortedScoreStudents = [...filteredStudents].sort((a, b) => {
@@ -424,6 +529,68 @@ export default function StudentManager({
                   {totalScoresSum} pts
                 </span>
               )}
+            </motion.span>
+          </button>
+
+          {/* Sub-Tab 3: វត្តមានសិស្ស */}
+          <button
+            type="button"
+            onClick={() => setActiveSubTab('attendance')}
+            className="relative px-5 py-2 rounded-xl text-xs transition-all flex items-center gap-2 cursor-pointer focus:outline-none"
+          >
+            {activeSubTab === 'attendance' && (
+              <motion.div
+                layoutId="activeStudentSubTabIndicator"
+                transition={{
+                  type: "spring",
+                  stiffness: 350,
+                  damping: 22,
+                  mass: 0.65
+                }}
+                className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                  isDarkMode
+                    ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                    : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                }`}
+              >
+                <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                  isDarkMode 
+                    ? 'from-white/50 via-white/12 to-transparent' 
+                    : 'from-white/95 via-white/40 to-transparent'
+                }`} />
+                <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
+                  isDarkMode
+                    ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                    : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                }`} />
+                <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                  isDarkMode ? 'via-white/50' : 'via-white/90'
+                }`} />
+              </motion.div>
+            )}
+
+            <motion.span
+              animate={{ 
+                scale: activeSubTab === 'attendance' ? 1.05 : 1,
+                y: activeSubTab === 'attendance' ? -0.5 : 0
+              }}
+              transition={{ type: "spring", stiffness: 450, damping: 22 }}
+              className="relative z-10 flex items-center gap-2"
+            >
+              <ClipboardList className={`w-4 h-4 transition-all duration-300 ${
+                activeSubTab === 'attendance'
+                  ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-blue-600 scale-110 drop-shadow-xs'
+                  : isDarkMode ? 'text-slate-400' : 'text-slate-500'
+              }`} />
+              <span className={
+                activeSubTab === 'attendance' 
+                  ? isDarkMode 
+                    ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                    : 'text-blue-600 font-extrabold tracking-wide' 
+                  : 'font-bold text-slate-600 dark:text-slate-400'
+              }>
+                វត្តមានសិស្ស
+              </span>
             </motion.span>
           </button>
         </div>
@@ -904,7 +1071,272 @@ export default function StudentManager({
           activeClassId={activeClassId}
           isDarkMode={isDarkMode}
           onUpdateStudentDetail={onUpdateStudentDetail}
+          currentSortMode={studentSortMode}
+          onSortModeChange={handleSortModeChange}
         />
+      )}
+
+      {/* ======================= TAB 3: វត្តមានសិស្ស (STUDENT ATTENDANCE) ======================= */}
+      {activeSubTab === 'attendance' && (
+        <div className="space-y-6">
+          {/* Header controls for date & batch mark */}
+          <div className={`p-4 rounded-3xl border flex flex-col md:flex-row items-center justify-between gap-4 ${
+            isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-sm'
+          }`}>
+            <div className="flex items-center gap-3 w-full md:w-auto">
+              <div className="w-10 h-10 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-indigo-600/20">
+                <ClipboardList className="w-5 h-5" />
+              </div>
+              <div>
+                <h3 className="text-sm font-black">កត់ត្រា និងគ្រប់គ្រងវត្តមានសិស្ស</h3>
+                <p className="text-[11px] text-slate-500">ជ្រើសរើសថ្ងៃខែ និងកត់ត្រាវត្តមានប្រចាំថ្ងៃរបស់សិស្សក្នុងថ្នាក់</p>
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-3 w-full md:w-auto justify-end">
+              {/* Quick Sort Switcher (តាម ID / តាម ឈ្មោះ ក-អ) */}
+              <div className={`flex items-center gap-1 p-1 rounded-2xl border ${
+                isDarkMode ? 'bg-slate-950/70 border-slate-800' : 'bg-slate-100 border-slate-200'
+              }`}>
+                <span className="text-xs font-bold text-slate-400 pl-2 pr-1">តម្រៀប៖</span>
+                <button
+                  type="button"
+                  onClick={() => handleSortModeChange('id')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    studentSortMode === 'id'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/30'
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800'
+                  }`}
+                  title="តម្រៀបតាមលេខ ID សិស្ស (0-9 / A-Z) — រួមទាំងបញ្ជីពិន្ទុ និងវត្តមាន"
+                >
+                  <Hash className="w-3.5 h-3.5" />
+                  <span>តាម ID</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleSortModeChange('name')}
+                  className={`px-3 py-1.5 rounded-xl text-xs font-black transition-all flex items-center gap-1.5 cursor-pointer border ${
+                    studentSortMode === 'name'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/30'
+                      : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-slate-200/70 dark:hover:bg-slate-800'
+                  }`}
+                  title="តម្រៀបតាមឈ្មោះអក្ខរក្រមខ្មែរ (ក-អ) — រួមទាំងបញ្ជីពិន្ទុ និងវត្តមាន"
+                >
+                  <ArrowUpAZ className="w-3.5 h-3.5" />
+                  <span>តាម ឈ្មោះ (ក-អ)</span>
+                </button>
+              </div>
+
+              <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-2xl">
+                <span className="text-xs font-bold text-slate-500">កាលបរិច្ឆេទ៖</span>
+                <input
+                  type="date"
+                  value={attendanceDate}
+                  onChange={(e) => setAttendanceDate(e.target.value)}
+                  className="bg-transparent text-xs font-black text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer"
+                />
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => handleMarkAllAttendance('present')}
+                  className="px-3 py-2 rounded-xl bg-emerald-600/10 hover:bg-emerald-600/20 text-emerald-700 dark:text-emerald-400 font-bold text-xs transition-all cursor-pointer border border-emerald-500/30 flex items-center gap-1"
+                >
+                  <CheckCircle2 className="w-3.5 h-3.5" />
+                  <span>វត្តមានទាំងអស់</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => handleMarkAllAttendance('absent')}
+                  className="px-3 py-2 rounded-xl bg-red-600/10 hover:bg-red-600/20 text-red-700 dark:text-red-400 font-bold text-xs transition-all cursor-pointer border border-red-500/30"
+                >
+                  អវត្តមានទាំងអស់
+                </button>
+                <button
+                  type="button"
+                  onClick={handleExportAttendanceExcel}
+                  className="px-3 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs transition-all cursor-pointer shadow-md shadow-indigo-600/20 flex items-center gap-1.5"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>ទាញយក Excel</span>
+                </button>
+              </div>
+            </div>
+          </div>
+
+          {/* Attendance Stats Summary Cards */}
+          {(() => {
+            const classStudents = filteredStudents;
+            const total = classStudents.length;
+            let presentCount = 0;
+            let absentCount = 0;
+            let permCount = 0;
+            let lateCount = 0;
+
+            classStudents.forEach(s => {
+              const status = currentClassAttendance[s.id] || 'present';
+              if (status === 'present') presentCount++;
+              else if (status === 'absent') absentCount++;
+              else if (status === 'permission') permCount++;
+              else if (status === 'late') lateCount++;
+            });
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
+                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}>
+                  <span className="text-[10px] font-bold text-slate-400 uppercase">សិស្សសរុប</span>
+                  <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{total} នាក់</div>
+                </div>
+                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-emerald-950/20 border-emerald-900/40' : 'bg-emerald-50 border-emerald-200'}`}>
+                  <span className="text-[10px] font-bold text-emerald-600 uppercase">វត្តមាន (Present)</span>
+                  <div className="text-2xl font-black mt-1 text-emerald-600">{presentCount} នាក់</div>
+                </div>
+                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-red-950/20 border-red-900/40' : 'bg-red-50 border-red-200'}`}>
+                  <span className="text-[10px] font-bold text-red-600 uppercase">អវត្តមាន (Absent)</span>
+                  <div className="text-2xl font-black mt-1 text-red-600">{absentCount} នាក់</div>
+                </div>
+                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-blue-950/20 border-blue-900/40' : 'bg-blue-50 border-blue-200'}`}>
+                  <span className="text-[10px] font-bold text-blue-600 uppercase">មានច្បាប់ (Permission)</span>
+                  <div className="text-2xl font-black mt-1 text-blue-600">{permCount} នាក់</div>
+                </div>
+                <div className={`p-4 rounded-2xl border col-span-2 sm:col-span-1 ${isDarkMode ? 'bg-amber-950/20 border-amber-900/40' : 'bg-amber-50 border-amber-200'}`}>
+                  <span className="text-[10px] font-bold text-amber-600 uppercase">យឺតយ៉ាវ (Late)</span>
+                  <div className="text-2xl font-black mt-1 text-amber-600">{lateCount} នាក់</div>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Attendance Table */}
+          <div className={`border rounded-3xl overflow-hidden shadow-sm ${
+            isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+          }`}>
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
+                <thead>
+                  <tr className={`border-b text-[11px] font-black uppercase tracking-wider ${
+                    isDarkMode ? 'bg-slate-950/80 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+                  }`}>
+                    <th className="p-4 w-14 text-center">ល.រ</th>
+
+                    {/* ID Column Sortable */}
+                    <th 
+                      onClick={() => handleSortModeChange(studentSortMode === 'id' ? 'name' : 'id')}
+                      className="p-4 w-28 text-center cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
+                      title="ចុចដើម្បីតម្រៀបតាម ID (0-9 / A-Z) — ផ្លាស់ប្ដូរទាំងវត្តមាន និងពិន្ទុសិស្ស"
+                    >
+                      <div className="flex items-center justify-center gap-1.5">
+                        <span>ID សិស្ស</span>
+                        <ArrowUpDown className={`w-3.5 h-3.5 transition-transform ${studentSortMode === 'id' ? 'text-indigo-500 font-black scale-110' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+                      </div>
+                    </th>
+
+                    {/* Name Column Sortable */}
+                    <th 
+                      onClick={() => handleSortModeChange(studentSortMode === 'name' ? 'id' : 'name')}
+                      className="p-4 cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
+                      title="ចុចដើម្បីតម្រៀបតាមអក្ខរក្រម (ក-អ) — ផ្លាស់ប្ដូរទាំងវត្តមាន និងពិន្ទុសិស្ស"
+                    >
+                      <div className="flex items-center gap-2">
+                        <span>ឈ្មោះសិស្ស</span>
+                        <span className="text-[10px] font-bold text-slate-400">(ក-អ)</span>
+                        <ArrowUpAZ className={`w-3.5 h-3.5 transition-transform ${studentSortMode === 'name' ? 'text-indigo-500 font-black scale-110' : 'text-slate-400 group-hover:text-indigo-400'}`} />
+                      </div>
+                    </th>
+
+                    <th className="p-4 w-24 text-center">ភេទ</th>
+                    <th className="p-4 text-center">ស្ថានភាពវត្តមានប្រចាំថ្ងៃ</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y dark:divide-slate-800 text-xs font-bold">
+                  {filteredStudents.length === 0 ? (
+                    <tr>
+                      <td colSpan={5} className="text-center py-12 text-slate-400 font-medium">
+                        ពុំមានទិន្នន័យសិស្សក្នុងថ្នាក់នេះទេ
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredStudents.map((student, index) => {
+                      const currentStatus = currentClassAttendance[student.id] || 'present';
+                      return (
+                        <tr key={student.id} className={`transition-colors ${
+                          isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'
+                        }`}>
+                          <td className="p-4 text-center text-slate-400 font-mono font-bold">{index + 1}</td>
+                          <td className="p-4 text-center">
+                            <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
+                              {student.studentId || student.id.slice(0, 6)}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-sm shadow-xs shrink-0">
+                                {student.avatarUrl ? (
+                                  <img src={student.avatarUrl} alt="" className="w-full h-full object-cover rounded-xl" />
+                                ) : student.emoji ? (
+                                  <span>{student.emoji}</span>
+                                ) : (
+                                  <span>{student.name.charAt(0)}</span>
+                                )}
+                              </div>
+                              <div>
+                                <div className="font-extrabold text-sm">{student.name}</div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="p-4 text-center">
+                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${
+                              student.gender === 'ស្រី' 
+                                ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20' 
+                                : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                            }`}>
+                              {student.gender || 'ប្រុស'}
+                            </span>
+                          </td>
+                          <td className="p-4">
+                            <div className="flex items-center justify-center gap-2">
+                              {[
+                                { id: 'present', label: 'វត្តមាន', color: 'emerald' },
+                                { id: 'permission', label: 'ច្បាប់', color: 'blue' },
+                                { id: 'late', label: 'យឺត', color: 'amber' },
+                                { id: 'absent', label: 'អវត្តមាន', color: 'red' },
+                              ].map(st => {
+                                const isSelected = currentStatus === st.id;
+                                return (
+                                  <button
+                                    key={st.id}
+                                    type="button"
+                                    onClick={() => handleSetStudentAttendance(student.id, st.id as any)}
+                                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1 ${
+                                      isSelected
+                                        ? st.id === 'present'
+                                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+                                          : st.id === 'permission'
+                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                                            : st.id === 'late'
+                                              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/25'
+                                              : 'bg-red-600 text-white shadow-md shadow-red-600/25'
+                                        : isDarkMode
+                                          ? 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                    }`}
+                                  >
+                                    <span>{st.label}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* Edit Student Modal Overlay (Common for both tabs) */}
