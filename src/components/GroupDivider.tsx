@@ -2,9 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList } from 'lucide-react';
 import { Student, TeacherAccount } from '../types';
 import * as XLSX from 'xlsx';
-import { db, handleFirestoreError, OperationType } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
-import { safeSetDoc } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeGetDoc } from '../lib/firebase';
+import { doc } from 'firebase/firestore';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 
 interface GroupDividerProps {
@@ -85,22 +84,22 @@ export default function GroupDivider({
       setIsCloudLoading(true);
       try {
         const docRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'groupsData', 'current');
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
+        const docSnap = await safeGetDoc(docRef);
+        if (docSnap && docSnap.exists()) {
           const data = docSnap.data();
-          if (data.groups) {
+          if (data && data.groups) {
             setGroups(data.groups);
             // Also update localStorage with the latest cloud data
             localStorage.setItem(localGroupsKey, JSON.stringify(data.groups));
           }
-          if (data.numGroups) {
+          if (data && data.numGroups) {
             setNumGroups(data.numGroups);
             localStorage.setItem(localNumGroupsKey, String(data.numGroups));
           }
           setCloudSynced(true);
         }
       } catch (err) {
-        console.error('Failed to load groups from Firestore:', err);
+        console.warn('Notice: Operating with local groups data while offline:', err);
         handleFirestoreError(err, OperationType.GET, `teachers/${teacher.id}/classes/${activeClassId}/groupsData/current`);
       } finally {
         setIsCloudLoading(false);

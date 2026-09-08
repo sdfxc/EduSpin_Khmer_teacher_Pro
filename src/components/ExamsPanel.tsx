@@ -32,8 +32,8 @@ import { useConfirm } from '../context/ConfirmContext.tsx';
 import { PREBUILT_LESSONS } from '../lib/templates';
 import { Question } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
-import { db, safeSetDoc } from '../lib/firebase';
-import { doc, getDoc } from 'firebase/firestore';
+import { db, safeSetDoc, safeGetDoc } from '../lib/firebase';
+import { doc } from 'firebase/firestore';
 import { 
   Document, 
   Packer, 
@@ -403,20 +403,20 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
 
     // Also fetch from cloud if teacher is logged in and class is active
     if (teacher?.id && activeClassId) {
-      getDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers'))
+      safeGetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers'))
         .then(async snap => {
           let cloudExams: any[] | null = null;
-          if (snap.exists()) {
+          if (snap && snap.exists()) {
             const data = snap.data();
-            if (Array.isArray(data.exams) && data.exams.length > 0) {
+            if (data && Array.isArray(data.exams) && data.exams.length > 0) {
               cloudExams = data.exams;
             }
           }
           if (!cloudExams) {
-            const classSnap = await getDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId));
-            if (classSnap.exists()) {
+            const classSnap = await safeGetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId));
+            if (classSnap && classSnap.exists()) {
               const cData = classSnap.data();
-              if (Array.isArray(cData.exams) && cData.exams.length > 0) {
+              if (cData && Array.isArray(cData.exams) && cData.exams.length > 0) {
                 cloudExams = cData.exams;
               }
             }
@@ -437,7 +437,7 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
             }
           }
         })
-        .catch(err => console.error("Cloud exams load error:", err));
+        .catch(err => console.warn("Notice: Cloud exams deferred while offline:", err));
     }
   }, [activeClassId, teacher?.id]);
 

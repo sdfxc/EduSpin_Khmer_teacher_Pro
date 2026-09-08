@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle, Loader2 } from 'lucide-react';
 import { TeacherAccount } from '../types';
-import { doc, getDoc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc } from '../lib/firebase';
+import { doc } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeGetDoc } from '../lib/firebase';
 
 interface TeacherAuthModalProps {
   isOpen: boolean;
@@ -63,7 +63,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
     try {
       // 1. Fetch teacher from cloud Firestore
       const teacherDocRef = doc(db, 'teachers', cleanUsername);
-      const teacherSnap = await getDoc(teacherDocRef);
+      const teacherSnap = await safeGetDoc(teacherDocRef);
 
       if (!teacherSnap.exists()) {
         setErrorMsg('រកមិនឃើញគណនីនេះក្នុងប្រព័ន្ធឡើយ។ សូមពិនិត្យឈ្មោះម្តងទៀត!');
@@ -112,7 +112,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
     try {
       // 1. Check if username exists on Firestore cloud
       const teacherDocRef = doc(db, 'teachers', cleanUsername);
-      const teacherSnap = await getDoc(teacherDocRef);
+      const teacherSnap = await safeGetDoc(teacherDocRef);
 
       if (teacherSnap.exists()) {
         setErrorMsg('ឈ្មោះគណនីនេះមានរួចហើយនៅលើ Cloud។ សូមជ្រើសរើសឈ្មោះគណនីផ្សេង!');

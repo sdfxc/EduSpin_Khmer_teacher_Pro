@@ -20,11 +20,13 @@ import {
   Phone,
   FileText,
   Award,
-  Hash
+  Hash,
+  ClipboardPaste
 } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import { compressAndResizeImage } from '../lib/imageUtils';
 import { formatGoogleDriveImageUrl } from '../lib/driveUtils';
+import { useImageDropAndPaste } from '../lib/useImageDropAndPaste';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 
 interface StudentProfileModalProps {
@@ -68,6 +70,19 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
 
+  // Hook for Drag-and-Drop and Paste (Ctrl+V / Clipboard) from anywhere
+  const {
+    isDraggingOver,
+    dragProps,
+    pasteFromClipboard,
+    processImageFile,
+  } = useImageDropAndPaste({
+    isOpen,
+    onImageReady: (newUrl) => setAvatarUrl(newUrl),
+    setIsProcessing,
+    setStatusMsg,
+  });
+
   // Initialize fields whenever a student is selected
   useEffect(() => {
     if (student) {
@@ -91,28 +106,8 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-
     e.target.value = '';
-    setIsProcessing(true);
-    setStatusMsg(null);
-
-    try {
-      // Compress and resize automatically (smartphone photos 10MB -> ~40KB base64)
-      const compressedDataUrl = await compressAndResizeImage(file, 512, 0.85);
-      setAvatarUrl(compressedDataUrl);
-      setStatusMsg({
-        type: 'success',
-        text: 'បានជ្រើសរើសរូបភាពជោគជ័យ! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
-      });
-    } catch (err) {
-      console.error('Image compression failed:', err);
-      setStatusMsg({
-        type: 'error',
-        text: 'មិនអាចអានរូបភាពបានទេ។ សូមព្យាយាមជាមួយរូបភាពផ្សេងទៀត!'
-      });
-    } finally {
-      setIsProcessing(false);
-    }
+    await processImageFile(file, 'upload');
   };
 
   const handleApplyLink = () => {
@@ -197,8 +192,20 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
           animate={{ opacity: 1, scale: 1, y: 0 }}
           exit={{ opacity: 0, scale: 0.95, y: 15 }}
           transition={{ duration: 0.2 }}
+          {...dragProps}
           className="relative w-full max-w-xl bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 overflow-hidden flex flex-col max-h-[92vh]"
         >
+          {/* Drag & Drop Visual Overlay when dragging file or image from anywhere */}
+          {isDraggingOver && (
+            <div className="absolute inset-0 z-50 rounded-3xl bg-indigo-600/90 backdrop-blur-xs flex flex-col items-center justify-center text-white font-black animate-pulse border-4 border-dashed border-white pointer-events-none p-6 text-center">
+              <Upload className="w-14 h-14 mb-3 animate-bounce" />
+              <span className="text-lg font-black">ទម្លាក់រូបភាពនៅទីនេះ (Drop Image Anywhere Here)</span>
+              <span className="text-xs font-medium opacity-90 mt-1">
+                គាំទ្ររូបភាពពីកុំព្យូទ័រ (PNG, JPG, WebP) ឬរូបដែលទាញពីគេហទំព័រផ្សេងៗ
+              </span>
+            </div>
+          )}
+
           {/* Header */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 dark:border-slate-800 bg-slate-50/70 dark:bg-slate-900/70 shrink-0">
             <div className="flex items-center gap-3">
@@ -244,7 +251,11 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             )}
 
             {/* Profile Avatar Showcase & Upload Action */}
-            <div className="flex flex-col sm:flex-row items-center gap-5 p-4 sm:p-5 rounded-2xl bg-slate-50 dark:bg-slate-950/50 border border-slate-200/80 dark:border-slate-800">
+            <div className={`flex flex-col sm:flex-row items-center gap-5 p-4 sm:p-5 rounded-2xl border transition-all ${
+              isDraggingOver
+                ? 'bg-indigo-500/10 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/30'
+                : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200/80 dark:border-slate-800'
+            }`}>
               {/* Circular Avatar Preview */}
               <div className="relative group shrink-0">
                 <div className={`w-24 h-24 sm:w-28 sm:h-28 rounded-full overflow-hidden border-4 border-white dark:border-slate-800 shadow-lg ${badgeBg} flex items-center justify-center text-white`}>
@@ -315,6 +326,18 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     <span>ថតរូប</span>
                   </button>
 
+                  {/* Paste from Clipboard Button */}
+                  <button
+                    type="button"
+                    onClick={pasteFromClipboard}
+                    disabled={isProcessing}
+                    className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
+                    title="បិទភ្ជាប់រូបភាពពី Clipboard ឬ Screenshot (Ctrl+V)"
+                  >
+                    <ClipboardPaste className="w-3.5 h-3.5" />
+                    <span>បិទភ្ជាប់រូប (Paste)</span>
+                  </button>
+
                   {/* Remove photo */}
                   {avatarUrl && (
                     <button
@@ -326,6 +349,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       <span>លុបរូប</span>
                     </button>
                   )}
+                </div>
+
+                {/* Helpful drag-and-drop & paste hint */}
+                <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1.5 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50 inline-flex items-center gap-1.5 mt-1">
+                  <Sparkles className="w-3 h-3 shrink-0 text-indigo-500" />
+                  <span>អាចទាញទម្លាក់រូប (Drag & Drop) ឬចុច Ctrl+V ដើម្បី Paste រូបភាពពីគ្រប់ទីកន្លែង</span>
                 </div>
 
                 {/* Hidden File Inputs */}

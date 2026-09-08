@@ -1,6 +1,7 @@
-import { initializeApp } from 'firebase/app';
+import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  initializeFirestore,
+  getFirestore,
+  getDocFromServer,
   doc, 
   getDoc, 
   setDoc, 
@@ -9,7 +10,9 @@ import {
   deleteDoc, 
   query, 
   where,
-  onSnapshot
+  onSnapshot,
+  DocumentSnapshot,
+  QuerySnapshot
 } from 'firebase/firestore';
 import firebaseConfig from '../../firebase-applet-config.json';
 
@@ -20,12 +23,24 @@ if (typeof window !== 'undefined') {
   } catch {}
 }
 
-const app = initializeApp(firebaseConfig);
+const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with forced long polling to avoid 10s WebChannel timeout in container/browser environments
-export const db = initializeFirestore(app, {
-  experimentalForceLongPolling: true,
-}, firebaseConfig.firestoreDatabaseId);
+// Initialize Firestore with database ID specified in firebaseConfig as per Firebase skill
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+
+// Validate connection on boot as recommended in skill guidelines
+export async function testConnection() {
+  try {
+    await getDocFromServer(doc(db, 'test', 'connection'));
+  } catch (error) {
+    if (error instanceof Error && error.message.includes('the client is offline')) {
+      console.warn('[Firestore] Notice: Operating in offline mode. Client will synchronize when online.');
+    }
+  }
+}
+if (typeof window !== 'undefined') {
+  testConnection();
+}
 
 export const isQuotaExceeded = () => false;
 
@@ -44,6 +59,55 @@ export const cleanFirestoreData = (obj: any): any => {
     }
   }
   return cleaned;
+};
+
+export const safeGetDoc = async (docRef: any): Promise<{ exists: () => boolean; data: () => any; id: string } | DocumentSnapshot> => {
+  try {
+    return await getDoc(docRef);
+  } catch (error: any) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errCode = error?.code || '';
+    if (
+      errMsg.includes('client is offline') ||
+      errMsg.includes("Backend didn't respond within 10 seconds") ||
+      errCode === 'unavailable' ||
+      errCode === 'failed-precondition'
+    ) {
+      console.warn(`[Firestore] Notice: Offline mode active for ${docRef?.path || 'doc'}. Utilizing local state.`);
+    } else {
+      handleFirestoreError(error, OperationType.GET, docRef?.path || null);
+    }
+    return {
+      exists: () => false,
+      data: () => undefined,
+      id: docRef?.id || '',
+    };
+  }
+};
+
+export const safeGetDocs = async (collOrQuery: any): Promise<QuerySnapshot | { empty: boolean; size: number; docs: any[]; forEach: (cb: (doc: any) => void) => void }> => {
+  try {
+    return await getDocs(collOrQuery);
+  } catch (error: any) {
+    const errMsg = error instanceof Error ? error.message : String(error);
+    const errCode = error?.code || '';
+    if (
+      errMsg.includes('client is offline') ||
+      errMsg.includes("Backend didn't respond within 10 seconds") ||
+      errCode === 'unavailable' ||
+      errCode === 'failed-precondition'
+    ) {
+      console.warn(`[Firestore] Notice: Offline mode active for query. Continuing with local data.`);
+    } else {
+      handleFirestoreError(error, OperationType.LIST, collOrQuery?.path || null);
+    }
+    return {
+      empty: true,
+      size: 0,
+      docs: [],
+      forEach: () => {},
+    };
+  }
 };
 
 export const safeSetDoc = async (docRef: any, data: any, options?: any) => {
@@ -106,7 +170,9 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     errMessage.includes('resource-exhausted') ||
     errMessage.includes('Quota exceeded') ||
     errMessage.includes('Could not reach Cloud Firestore backend') ||
-    errMessage.includes("Backend didn't respond within 10 seconds")
+    errMessage.includes("Backend didn't respond within 10 seconds") ||
+    errMessage.includes('client is offline') ||
+    errMessage.includes('offline')
   ) {
     console.warn('[Firestore] Notice: Operating in offline mode or network reconnecting. Data is saved locally and will synchronize automatically.', errMessage);
     return;

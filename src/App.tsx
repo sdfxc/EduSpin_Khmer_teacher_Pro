@@ -16,7 +16,7 @@ import GroupDivider from './components/GroupDivider';
 import StudentManager from './components/StudentManager';
 import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass } from './types';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot } from './lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
@@ -413,8 +413,8 @@ export default function App() {
         // Fetch latest teacher profile from Cloud Firestore to keep schoolName fresh
         try {
           const teacherDocRef = doc(db, 'teachers', teacher.id);
-          const teacherSnap = await getDoc(teacherDocRef);
-          if (teacherSnap.exists()) {
+          const teacherSnap = await safeGetDoc(teacherDocRef);
+          if (teacherSnap && teacherSnap.exists()) {
             const cloudTeacher = teacherSnap.data() as TeacherAccount;
             if (cloudTeacher) {
               setTeacher(prev => {
@@ -429,11 +429,11 @@ export default function App() {
             }
           }
         } catch (tErr) {
-          console.error("Failed to sync teacher profile from cloud:", tErr);
+          console.warn("Notice: Cloud teacher profile sync deferred while offline.");
         }
 
         const classesCollRef = collection(db, 'teachers', teacher.id, 'classes');
-        const classesSnap = await getDocs(classesCollRef);
+        const classesSnap = await safeGetDocs(classesCollRef);
         
         let fetchedClasses: ClassInfo[] = [];
         const seenIds = new Set<string>();
@@ -529,7 +529,7 @@ export default function App() {
           setActiveClassId('');
         }
       } catch (err) {
-        console.error('Failed to load classes from cloud Firestore:', err);
+        console.warn('Notice: Operating with local class data while cloud sync is reconnecting:', err);
       } finally {
         setLoadingCloudData(false);
       }
@@ -566,7 +566,7 @@ export default function App() {
         
         // 1. Fetch class doc
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
-        const classSnap = await getDoc(classDocRef);
+        const classSnap = await safeGetDoc(classDocRef);
         
         let loadedSubjects: QuizSubject[] = [];
         let loadedActiveSubjectId: string | null = null;
