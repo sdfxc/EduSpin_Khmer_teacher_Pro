@@ -11,13 +11,14 @@ import * as XLSX from 'xlsx';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 import { StudentScoreTable, SortMode } from './StudentScoreTable';
 import { StudentProfileModal } from './StudentProfileModal';
+import { GenderBadgePicker } from './GenderBadgePicker';
 
 interface StudentManagerProps {
   students: Student[];
   classes: ClassInfo[];
   activeClassId: string;
   isDarkMode?: boolean;
-  onAddStudentDetail: (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => void;
+  onAddStudentDetail: (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string; studentId?: string }) => void;
   onRemoveStudent: (id: string) => void;
   onClearStudents?: () => void;
   onBulkAddStudents: (list: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ' }[], targetClassId?: string) => void;
@@ -58,7 +59,7 @@ export default function StudentManager({
       const statusKh = status === 'present' ? 'វត្តមាន' : status === 'permission' ? 'មានច្បាប់' : status === 'late' ? 'យឺតយ៉ាវ' : 'អវត្តមាន';
       worksheetData.push([
         index + 1,
-        student.studentId || student.id,
+        student.studentId || '',
         student.name,
         student.gender || 'ប្រុស',
         statusKh
@@ -138,6 +139,7 @@ export default function StudentManager({
 
   // Single student form toggle & states
   const [showAddForm, setShowAddForm] = useState(false);
+  const [newStudentId, setNewStudentId] = useState('');
   const [newName, setNewName] = useState('');
   const [newGender, setNewGender] = useState<'ប្រុស' | 'ស្រី'>('ប្រុស');
   const [newStatus, setNewStatus] = useState<'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'>('សកម្ម');
@@ -254,6 +256,7 @@ export default function StudentManager({
     e.preventDefault();
     if (newName.trim()) {
       onAddStudentDetail({
+        studentId: newStudentId.trim() || undefined,
         name: newName.trim(),
         gender: newGender,
         status: newStatus,
@@ -261,6 +264,7 @@ export default function StudentManager({
       });
       // Reset
       setNewName('');
+      setNewStudentId('');
       setShowAddForm(false);
     }
   };
@@ -728,7 +732,18 @@ export default function StudentManager({
                 </button>
               </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-5 gap-4">
+                <div className="flex flex-col gap-1 sm:col-span-1">
+                  <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">ID សិស្ស</label>
+                  <input
+                    type="text"
+                    placeholder="ឧ. 187770"
+                    value={newStudentId}
+                    onChange={(e) => setNewStudentId(e.target.value)}
+                    className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-mono font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
+                  />
+                </div>
+
                 <div className="flex flex-col gap-1 sm:col-span-2">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">ឈ្មោះសិស្ស</label>
                   <input
@@ -942,13 +957,16 @@ export default function StudentManager({
                           }`}>
                             {studentClass}
                           </span>
-                          <span className={`text-[10px] font-bold px-2 py-0.5 rounded-md ${
-                            student.gender === 'ស្រី' 
-                              ? isDarkMode ? 'bg-pink-950/40 text-pink-300' : 'bg-pink-50 text-pink-700'
-                              : isDarkMode ? 'bg-blue-950/40 text-blue-300' : 'bg-blue-50 text-blue-700'
-                          }`}>
-                            {student.gender || 'ប្រុស'}
-                          </span>
+                          <GenderBadgePicker
+                            gender={student.gender || 'ប្រុស'}
+                            compact={true}
+                            onChange={(newGender) => {
+                              if (onUpdateStudentDetail) {
+                                onUpdateStudentDetail(student.id, { gender: newGender });
+                              }
+                            }}
+                            isDarkMode={isDarkMode}
+                          />
                           <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${statusPillColor}`}>
                             {statusKey}
                           </span>
@@ -1264,10 +1282,19 @@ export default function StudentManager({
                           isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'
                         }`}>
                           <td className="p-4 text-center text-slate-400 font-mono font-bold">{index + 1}</td>
-                          <td className="p-4 text-center">
-                            <span className="px-2.5 py-1 rounded-lg text-xs font-mono font-black bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 border border-slate-200/50 dark:border-slate-700/50">
-                              {student.studentId || student.id.slice(0, 6)}
-                            </span>
+                          <td className="p-3 text-center">
+                            <input
+                              type="text"
+                              value={student.studentId || ''}
+                              placeholder={`${(index + 1).toString().padStart(3, '0')}`}
+                              onChange={(e) => {
+                                if (onUpdateStudentDetail) {
+                                  onUpdateStudentDetail(student.id, { studentId: e.target.value });
+                                }
+                              }}
+                              className="w-24 text-center py-1.5 px-2 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 rounded-xl font-mono font-black text-slate-800 dark:text-slate-100 text-xs border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-2xs"
+                              title="កែប្រែ ID សិស្ស (បញ្ចូលតែម្ដង ភ្ជាប់ទាំងពិន្ទុ និងវត្តមាន)"
+                            />
                           </td>
                           <td className="p-4">
                             <div className="flex items-center gap-3">
@@ -1285,14 +1312,16 @@ export default function StudentManager({
                               </div>
                             </div>
                           </td>
-                          <td className="p-4 text-center">
-                            <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black ${
-                              student.gender === 'ស្រី' 
-                                ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20' 
-                                : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
-                            }`}>
-                              {student.gender || 'ប្រុស'}
-                            </span>
+                          <td className="p-3 text-center">
+                            <GenderBadgePicker
+                              gender={student.gender || 'ប្រុស'}
+                              onChange={(newGender) => {
+                                if (onUpdateStudentDetail) {
+                                  onUpdateStudentDetail(student.id, { gender: newGender });
+                                }
+                              }}
+                              isDarkMode={isDarkMode}
+                            />
                           </td>
                           <td className="p-4">
                             <div className="flex items-center justify-center gap-2">

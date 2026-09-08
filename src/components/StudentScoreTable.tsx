@@ -8,6 +8,7 @@ import {
 import { Student, ClassInfo, MonthlyDetailedScore, WeeklyScoreBreakdown } from '../types';
 import * as XLSX from 'xlsx';
 import SovannaphumiLogo from './SovannaphumiLogo';
+import { GenderBadgePicker } from './GenderBadgePicker';
 
 export type SortMode = 'default' | 'id' | 'name' | 'score-desc' | 'score-asc' | 'rank-asc' | 'avg-desc' | 'avg-asc';
 
@@ -958,10 +959,17 @@ export function StudentScoreTable({
                         </td>
 
                         {/* Gender */}
-                        <td className="p-2 border-r border-slate-200 dark:border-slate-800 font-bold">
-                          <span className={student.gender === 'ស្រី' ? 'text-pink-500' : 'text-blue-500'}>
-                            {genderShort}
-                          </span>
+                        <td className="p-1 border-r border-slate-200 dark:border-slate-800 font-bold text-center">
+                          <GenderBadgePicker
+                            gender={student.gender || 'ប្រុស'}
+                            compact={true}
+                            onChange={(newGender) => {
+                              if (onUpdateStudentDetail) {
+                                onUpdateStudentDetail(student.id, { gender: newGender });
+                              }
+                            }}
+                            isDarkMode={isDarkMode}
+                          />
                         </td>
 
                         {/* Column 1: សរុប (ដក Exam) - Auto-calculated & Teacher Editable */}
@@ -1331,11 +1339,16 @@ export function StudentScoreTable({
                           )}
                         </div>
                         <div className="flex items-center gap-1.5 mt-0.5">
-                          <span className={`text-[10px] font-bold ${
-                            student.gender === 'ស្រី' ? 'text-pink-500' : 'text-blue-500'
-                          }`}>
-                            {student.gender || 'ប្រុស'}
-                          </span>
+                          <GenderBadgePicker
+                            gender={student.gender || 'ប្រុស'}
+                            compact={true}
+                            onChange={(newGender) => {
+                              if (onUpdateStudentDetail) {
+                                onUpdateStudentDetail(student.id, { gender: newGender });
+                              }
+                            }}
+                            isDarkMode={isDarkMode}
+                          />
                           <span className="text-[10px] text-slate-400 font-semibold">• ខែ {selectedMonth}</span>
                         </div>
                       </div>

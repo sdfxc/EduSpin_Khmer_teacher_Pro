@@ -1869,10 +1869,11 @@ export default function App() {
     });
   }, [activeClassId, teacher]);
 
-  const addStudentDetail = useCallback(async (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string }) => {
+  const addStudentDetail = useCallback(async (fields: { name: string; gender: 'ប្រុស' | 'ស្រី'; status: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ'; classId: string; studentId?: string }) => {
     const randomEmoji = EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
     const newStudent: Student = {
       id: `s-${Date.now()}-${Math.random()}`,
+      studentId: fields.studentId?.trim() || undefined,
       name: fields.name,
       score: 0,
       emoji: randomEmoji,
