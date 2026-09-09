@@ -84,6 +84,16 @@ export function preprocessText(text: string): string {
   // 2.8. Convert degree symbols \circ or ^\circ (with optional extra backslahes) to superscript o
   processed = processed.replace(/\^?\\\\?circ\b/g, "<sup>o</sup>");
 
+  // 2.8.5. Repair broken LaTeX commands like rac{...}{...} -> \frac{...}{...} and ext{...} -> ...
+  processed = processed.replace(/\\?rac\{([^{}]+)\}\{([^{}]+)\}/g, "\\frac{$1}{$2}");
+  processed = processed.replace(/\\?ext\{([^}]+)\}/g, "$1");
+
+  // 2.8.6. Convert \vec{x} to vector notation with arrow overlay
+  processed = processed.replace(/\\vec\{([^}]+)\}/g, '<span style="display:inline-block; position:relative;"><span style="position:absolute; top:-0.65em; left:0; right:0; text-align:center; font-size:0.75em; line-height:1;">→</span>$1</span>');
+
+  // 2.9. Clean up LaTeX text/formatting wrappers like \text{...}, \mathbf{...}, \mathrm{...}, \underline{...}, \operatorname{...}
+  processed = processed.replace(/\\(?:text|mathbf|mathrm|underline|operatorname)\{([^}]+)\}/g, "$1");
+
   // 3. Replace symbolic representations in the map
   Object.entries(SYMBOL_MAP).forEach(([pattern, replacement]) => {
     const regex = new RegExp(pattern, "g");

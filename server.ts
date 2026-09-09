@@ -636,7 +636,7 @@ async function startServer() {
       res.sendFile(indexPath, (err) => {
         if (err) {
           console.error("Error serving index.html:", err);
-          res.status(200).send('<!DOCTYPE html><html><head><title>Remix: EduSpin Quiz Master</title></head><body><div id="root"></div></body></html>');
+          res.status(200).send('<!DOCTYPE html><html><head><title>Teacher EduSpin</title></head><body><div id="root"></div></body></html>');
         }
       });
     });
