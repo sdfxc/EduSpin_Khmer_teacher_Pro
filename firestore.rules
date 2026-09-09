@@ -21,6 +21,11 @@ service cloud.firestore {
       allow read, write: if true;
     }
 
+    // External documents collection (PDFs, PowerPoint metadata per class)
+    match /external_docs/{docId} {
+      allow read, write: if true;
+    }
+
     // Teachers collection and all subcollections (classes, students, groupsData, etc.)
     match /teachers/{teacherId} {
       allow read, write: if true;

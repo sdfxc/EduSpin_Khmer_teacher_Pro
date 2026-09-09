@@ -1,7 +1,6 @@
 import express from "express";
 import path from "path";
 import fs from "fs";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI, Type } from "@google/genai";
 import dotenv from "dotenv";
 
@@ -11,7 +10,7 @@ const app = express();
 const PORT = 3000;
 
 // Health check routes for Cloud Run deployment health checks & uptime monitors
-app.get(["/api/health", "/health", "/_health"], (_req, res) => {
+app.get(["/api/health", "/health", "/_health", "/_ah/health", "/healthz"], (_req, res) => {
   res.status(200).json({ status: "ok", timestamp: new Date().toISOString() });
 });
 
@@ -471,8 +470,147 @@ Provide the response in JSON format.`;
   }
 });
 
+// API route to generate Cambodian MoEYS 5-step Lesson Plan
+app.post("/api/generate-lesson-plan", async (req, res) => {
+  const {
+    subject = "រូបវិទ្យា",
+    grade = "ថ្នាក់ទី ៩",
+    chapter = "",
+    lessonTitle = "ច្បាប់អូម",
+    duration = "៥០ នាទី",
+    schoolName = "សាលារៀនសុវណ្ណភូមិ",
+    teacherName = "លោកគ្រូ / អ្នកគ្រូ",
+    extraInstructions = ""
+  } = req.body;
+
+  const clientApiKey = (req.headers["x-api-key"] as string || "").trim();
+  const activeApiKey = clientApiKey || process.env.GEMINI_API_KEY || "";
+
+  if (!activeApiKey) {
+    return res.status(400).json({
+      error: "សូមបញ្ចូលសោរ API Key របស់អ្នកជាមុនសិន! (Please configure Gemini API Key first)"
+    });
+  }
+
+  const activeAi = new GoogleGenAI({
+    apiKey: activeApiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
+
+  const prompt = `អ្នកជាអ្នកជំនាញរៀបចំកិច្ចតែងការបង្រៀនគរុកោសល្យខ្មែរ (MoEYS Standard Lesson Plan Expert) ប្រចាំប្រទេសកម្ពុជា។
+សូមរៀបចំកិច្ចតែងការបង្រៀនស្តង់ដារ ៥ ជំហាន ឱ្យបានលម្អិត ត្រឹមត្រូវ និងទាក់ទាញបំផុត ដូចខាងក្រោម៖
+
+ព័ត៌មានមេរៀន៖
+- សាលារៀន៖ ${schoolName}
+- មុខវិជ្ជា៖ ${subject}
+- ថ្នាក់ទី៖ ${grade}
+- ជំពូក៖ ${chapter || 'ជំពូកពាក់ព័ន្ធ'}
+- ចំណងជើងមេរៀន៖ ${lessonTitle}
+- រយៈពេល៖ ${duration}
+- គ្រូបង្រៀន៖ ${teacherName}
+${extraInstructions ? `- សេចក្តីណែនាំបន្ថែម៖ ${extraInstructions}` : ''}
+
+សូមបង្កើតជាទម្រង់ JSON ត្រឹមត្រូវ 100% តាមរចនាសម្ព័ន្ធខាងក្រោម (ជាភាសាខ្មែរទាំងអស់ ហាមសរសេរអក្សរឡាតាំង លើកលែងរូបមន្ត ឬពាក្យបច្ចេកទេស)៖
+{
+  "title": "កិច្ចតែងការបង្រៀន៖ ${lessonTitle}",
+  "objectives": {
+    "knowledge": ["ចំណេះដឹងទី១...", "ចំណេះដឹងទី២..."],
+    "skills": ["បំណិនទី១...", "បំណិនទី២..."],
+    "attitude": ["ឥរិយាបថទី១...", "ឥរិយាបថទី២..."]
+  },
+  "teachingAids": {
+    "teacher": "សម្ភារឧបទេសគ្រូ (សៀវភៅពុម្ព, ស្លាយ, ឧបករណ៍ពិសោធន៍...)",
+    "student": "សម្ភារឧបទេសសិស្ស (សៀវភៅសរសេរ, ប៊ិច, បន្ទាត់...)"
+  },
+  "steps": {
+    "step1Admin": {
+      "teacherActivity": "ពិនិត្យអនាម័យ សណ្ដាប់ធ្នាប់ វត្តមានសិស្ស និងសម្តែងការស្វាគមន៍",
+      "studentActivity": "ប្រធានថ្នាក់រាយការណ៍វត្តមាន និងសិស្សអង្គុយប្រកបដោយរបៀបរៀបរយ",
+      "duration": "៥ នាទី"
+    },
+    "step2Review": {
+      "teacherActivity": "សួរសំណួររំលឹកមេរៀនចាស់...",
+      "content": "ខ្លឹមសារសង្ខេបនៃមេរៀនចាស់ និងចម្លើយត្រឹមត្រូវ...",
+      "studentActivity": "សិស្សលើកដៃឆ្លើយសំណួរ និងផ្ទៀងផ្ទាត់...",
+      "duration": "៥ នាទី"
+    },
+    "step3NewLesson": {
+      "teacherActivity": "សកម្មភាពគ្រូក្នុងដំណើរការបង្រៀនមេរៀនថ្មី ពន្យល់ ធ្វើពិសោធន៍ ឬលើកឧទាហរណ៍...",
+      "content": "ខ្លឹមសារលម្អិតនៃមេរៀនថ្មី រូបមន្ត និយមន័យ ចំណុចសំខាន់ៗ...",
+      "studentActivity": "សិស្សសង្កេត ស្ដាប់ កត់ត្រា និងសួរដេញដោល...",
+      "duration": "២៥ នាទី"
+    },
+    "step4Strengthen": {
+      "teacherActivity": "ដាក់សំណួរពង្រឹង ឬលំហាត់អនុវត្តជាក់ស្តែង...",
+      "content": "ខ្លឹមសារសំណួរពង្រឹង និងដំណោះស្រាយ...",
+      "studentActivity": "សិស្សអនុវត្តជាបុគ្គល ឬជាក្រុម...",
+      "duration": "១០ នាទី"
+    },
+    "step5Homework": {
+      "teacherActivity": "ដាក់កិច្ចការផ្ទះ និងផ្តាំផ្ញើសិស្ស...",
+      "content": "ប្រធានកិច្ចការផ្ទះ ឬការណែនាំរំលឹកមេរៀន...",
+      "studentActivity": "សិស្សកត់ត្រាកិច្ចការផ្ទះ...",
+      "duration": "៥ នាទី"
+    }
+  },
+  "evaluation": "ការវាយតម្លៃលទ្ធផលការបង្រៀនរំពឹងទុក...",
+  "selfReflection": "ការកែលម្អផ្ទាល់ខ្លួនសម្រាប់ម៉ោងបង្រៀនបន្ទាប់..."
+}`;
+
+  try {
+    const modelsToTry = [
+      "gemini-2.5-flash",
+      "gemini-3.5-flash",
+      "gemini-3.1-flash-lite",
+      "gemini-flash-latest"
+    ];
+
+    let rawText = "";
+    for (const modelName of modelsToTry) {
+      try {
+        const result = await activeAi.models.generateContent({
+          model: modelName,
+          contents: prompt,
+          config: {
+            temperature: 0.7,
+            responseMimeType: "application/json"
+          }
+        });
+        rawText = result.text || "";
+        if (rawText.trim()) break;
+      } catch (err: any) {
+        console.warn(`Model ${modelName} failed for lesson plan:`, err?.message);
+      }
+    }
+
+    if (!rawText.trim()) {
+      throw new Error("Unable to generate lesson plan content from Gemini");
+    }
+
+    // Clean JSON if needed
+    const cleanJson = rawText
+      .replace(/^```json\s*/i, "")
+      .replace(/^```\s*/i, "")
+      .replace(/\s*```$/i, "")
+      .trim();
+
+    const parsed = JSON.parse(cleanJson);
+    res.json(parsed);
+  } catch (error: any) {
+    console.error("Error generating lesson plan:", error);
+    res.status(500).json({
+      error: "មិនអាចបង្កើតកិច្ចតែងការដោយ AI បានទេ សូមព្យាយាមម្តងទៀត ឬបញ្ចូលដោយដៃ។ " + (error?.message || "")
+    });
+  }
+});
+
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
+    const { createServer: createViteServer } = await import("vite");
     const vite = await createViteServer({
       server: { middlewareMode: true },
       appType: "spa",
@@ -498,15 +636,27 @@ async function startServer() {
       res.sendFile(indexPath, (err) => {
         if (err) {
           console.error("Error serving index.html:", err);
-          res.status(200).send('<!DOCTYPE html><html><head><title>EduSpin Quiz Master</title></head><body><div id="root"></div></body></html>');
+          res.status(200).send('<!DOCTYPE html><html><head><title>Remix: EduSpin Quiz Master</title></head><body><div id="root"></div></body></html>');
         }
       });
     });
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
+  const server = app.listen(PORT, "0.0.0.0", () => {
     console.log(`Server running on http://localhost:${PORT}`);
   });
+
+  // Handle termination signals gracefully for Cloud Run
+  const shutdown = () => {
+    console.log("Shutting down server gracefully...");
+    server.close(() => {
+      console.log("Server closed.");
+      process.exit(0);
+    });
+  };
+
+  process.on("SIGTERM", shutdown);
+  process.on("SIGINT", shutdown);
 }
 
 startServer().catch((err) => {

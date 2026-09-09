@@ -23,15 +23,21 @@ import {
   Settings,
   Eye,
   Layers,
-  Link as LinkIcon
+  Link as LinkIcon,
+  FolderDown,
+  Copy,
+  Pin
 } from 'lucide-react';
 import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
 import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import { generateQuestions, getSavedApiKey, saveApiKey } from '../lib/gemini';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import { PREBUILT_LESSONS } from '../lib/templates';
-import { Question } from '../types';
+import { Question, ClassInfo } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
+import ExamPaperView from './ExamPaperView';
+import LessonsPanel from './lessons/LessonsPanel';
+import ExternalDocumentsPanel from './external-docs/ExternalDocumentsPanel';
 import { db, safeSetDoc, safeGetDoc } from '../lib/firebase';
 import { doc } from 'firebase/firestore';
 import { 
@@ -113,6 +119,8 @@ interface ExamsPanelProps {
   activeClassName: string;
   isDarkMode: boolean;
   teacher: any;
+  classes?: ClassInfo[];
+  onSwitchClass?: (classId: string) => void;
 }
 
 const DEFAULT_PHYSICS_QUESTIONS: ExamQuestion[] = [
@@ -230,7 +238,14 @@ const DEFAULT_EXAMS: ExamPaper[] = [
   }
 ];
 
-export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode, teacher }: ExamsPanelProps) {
+export default function ExamsPanel({ 
+  activeClassId, 
+  activeClassName, 
+  isDarkMode, 
+  teacher,
+  classes = [],
+  onSwitchClass
+}: ExamsPanelProps) {
   const { confirmAction } = useConfirm();
   const defaultSchool = teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ';
 
@@ -261,6 +276,7 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
     }));
   });
 
+  const [activeMainTab, setActiveMainTab] = useState<'exams' | 'lessons' | 'external'>('exams');
   const [activeType, setActiveType] = useState<'monthly' | 'semester'>('monthly');
   const [selectedExamId, setSelectedExamId] = useState<string>(() => {
     const defaultList = DEFAULT_EXAMS.filter(e => e.type === 'monthly');
@@ -269,6 +285,60 @@ export default function ExamsPanel({ activeClassId, activeClassName, isDarkMode,
 
   // Active Subject selector
   const [activeSubjectId, setActiveSubjectId] = useState<string>('sub-p');
+
+  // Copy exam from another class state
+  const [isCopyModalOpen, setIsCopyModalOpen] = useState(false);
+  const [copySourceClassId, setCopySourceClassId] = useState('');
+  const [sourceExams, setSourceExams] = useState<ExamPaper[]>([]);
+  const [selectedExamToCopyId, setSelectedExamToCopyId] = useState('');
+
+  // Load exams when source class selected in copy modal
+  useEffect(() => {
+    if (!copySourceClassId) {
+      setSourceExams([]);
+      setSelectedExamToCopyId('');
+      return;
+    }
+    const key = `khmer_exams_${copySourceClassId}`;
+    const saved = localStorage.getItem(key);
+    if (saved) {
+      try {
+        const parsed: ExamPaper[] = JSON.parse(saved);
+        setSourceExams(parsed);
+        if (parsed.length > 0) setSelectedExamToCopyId(parsed[0].id);
+      } catch {
+        setSourceExams([]);
+      }
+    } else {
+      setSourceExams([]);
+    }
+  }, [copySourceClassId]);
+
+  const handleCopyExamFromClass = () => {
+    const examToClone = sourceExams.find(e => e.id === selectedExamToCopyId);
+    if (!examToClone) return;
+
+    const clonedExam: ExamPaper = {
+      ...examToClone,
+      id: `exam-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      title: `${examToClone.title} (ចម្លង)`,
+      createdAt: Date.now(),
+      subjects: examToClone.subjects.map(s => ({
+        ...s,
+        id: `sub-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+        questions: s.questions.map(q => ({
+          ...q,
+          id: `eq-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`
+        }))
+      }))
+    };
+
+    const updated = [clonedExam, ...exams];
+    saveState(updated);
+    setSelectedExamId(clonedExam.id);
+    setIsCopyModalOpen(false);
+    alert(`បានចម្លងវិញ្ញាសា «${examToClone.title}» ចូលក្នុងថ្នាក់ ${activeClassName} ដោយជោគជ័យ!`);
+  };
 
   // Edit Exams Modal (Creator / Metadata editor)
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
@@ -1037,7 +1107,7 @@ Output the response in JSON format.`;
     if (grouped.choice.length > 0) {
       questionsHtml += `
         <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-          ផ្នែកទី ១៖ សំណួរ គូសធីក ចំនួន ${grouped.choice.length}
+          ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions) — ${toKhmerNum(grouped.choice.length)} សំណួរ
         </div>
       `;
       grouped.choice.forEach((card) => {
@@ -1080,7 +1150,7 @@ Output the response in JSON format.`;
 
         questionsHtml += `
           <div class="question-block">
-            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div class="question-text">សំណួរទី ${toKhmerNum(globalIdx)}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${toKhmerNum(card.question.points || 2)} ពិន្ទុ)</span></div>
             ${optionsHtml}
           </div>
         `;
@@ -1089,9 +1159,10 @@ Output the response in JSON format.`;
 
     // 2. Matching Section
     if (grouped.matching.length > 0) {
+      const totalPoints = grouped.matching.reduce((acc, c) => acc + (c.question.points || 4), 0);
       questionsHtml += `
         <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-          ផ្នែកទី ២៖ ផ្គូផ្គង សំណួរ-ចម្លើយ ចំនួន ${grouped.matching.length} សំណួរ
+          ផ្នែកទី ២៖ សំណួរផ្គូផ្គង (${toKhmerNum(totalPoints)} ពិន្ទុ)
         </div>
       `;
       grouped.matching.forEach((card) => {
@@ -1124,13 +1195,13 @@ Output the response in JSON format.`;
 
         questionsHtml += `
           <div class="question-block">
-            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div class="question-text">សំណួរទី ${toKhmerNum(globalIdx)}៖ ${renderFormulaToHtml(card.question.text || 'ចូរផ្គូផ្គងល្បារ ឬនិមិត្តសញ្ញានៅជួរ (A) ទៅនឹងនិយមន័យ ឬការពិពណ៌នាដែលត្រូវគ្នានៅជួរ (B) ឱ្យបានត្រឹមត្រូវ៖')} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${toKhmerNum(card.question.points || 4)} ពិន្ទុ)</span></div>
             <table style="width: 100%; border-collapse: collapse; margin-top: 8px; margin-bottom: 12px; max-width: 550px; margin-left: auto; margin-right: auto; border: 2px solid #000;">
               <thead>
                 <tr style="background-color: #f3f4f6; border-bottom: 2px solid #000;">
-                  <th style="width: 40%; border-right: 1px solid #000; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">A</th>
-                  <th style="width: 42%; border-right: 1px solid #000; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">B</th>
-                  <th style="width: 18%; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">ចម្លើយ</th>
+                  <th style="width: 40%; border-right: 1px solid #000; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">ជួរ (A)</th>
+                  <th style="width: 42%; border-right: 1px solid #000; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">ជួរ (B)</th>
+                  <th style="width: 18%; padding: 6px; text-align: center; font-size: 9.5pt; font-weight: bold;">ចម្លើយផ្គូផ្គង</th>
                 </tr>
               </thead>
               <tbody>
@@ -1187,7 +1258,7 @@ Output the response in JSON format.`;
           <div class="question-block" style="margin-bottom: 12px;">
             <div class="question-text" style="font-size: ${bodyFontSize}pt; line-height: 1.6; text-align: left;">
               <span style="font-weight: bold;">${toKhmerNum(qIdx + 1)}. </span>${renderFormulaToHtml(fillBlankText)} 
-              <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span>
+              <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${toKhmerNum(card.question.points || 2)} ពិន្ទុ)</span>
             </div>
           </div>
         `;
@@ -1198,7 +1269,7 @@ Output the response in JSON format.`;
     if (grouped.theory.length > 0) {
       questionsHtml += `
         <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-          ផ្នែកទី ៤៖ សំណួរ ទូទៅទ្រឹស្ដី និងការរស់នៅអំពីមេរៀន ចំនួន ${grouped.theory.length}
+          ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions) — ${toKhmerNum(grouped.theory.length)} សំណួរ
         </div>
       `;
       grouped.theory.forEach((card) => {
@@ -1225,14 +1296,13 @@ Output the response in JSON format.`;
               <div>............................................................................................................................................................................</div>
               <div>............................................................................................................................................................................</div>
               <div>............................................................................................................................................................................</div>
-              <div>............................................................................................................................................................................</div>
             </div>
           `;
         }
 
         questionsHtml += `
           <div class="question-block">
-            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div class="question-text">សំណួរទី ${toKhmerNum(globalIdx)}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${toKhmerNum(card.question.points || 2)} ពិន្ទុ)</span></div>
             ${theoryAnsHtml}
           </div>
         `;
@@ -1243,7 +1313,7 @@ Output the response in JSON format.`;
     if (grouped.exercise.length > 0) {
       questionsHtml += `
         <div style="font-family: ${selectedHeaderFontObj.cssValue}; font-weight: bold; font-size: ${bodyFontSize + 1}pt; border-bottom: 2px solid #000; padding-bottom: 3px; margin-top: 20px; margin-bottom: 10px; color: #000;">
-          ផ្នែកទី ៥៖ លំហាត់ ចំនួន ${grouped.exercise.length}
+          ផ្នែកទី ៥៖ លំហាត់គណនា ឬអនុវត្ត (Exercises / Problems) — ${toKhmerNum(grouped.exercise.length)} លំហាត់
         </div>
       `;
       grouped.exercise.forEach((card) => {
@@ -1272,15 +1342,13 @@ Output the response in JSON format.`;
               <div>............................................................................................................................................................................</div>
               <div>............................................................................................................................................................................</div>
               <div>............................................................................................................................................................................</div>
-              <div>............................................................................................................................................................................</div>
-              <div>............................................................................................................................................................................</div>
             </div>
           `;
         }
 
         questionsHtml += `
           <div class="question-block">
-            <div class="question-text">សំណួរទី ${globalIdx}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${card.question.points || 2} ពិន្ទុ)</span></div>
+            <div class="question-text">សំណួរទី ${toKhmerNum(globalIdx)}៖ ${renderFormulaToHtml(card.question.text)} <span style="font-size: 8.5pt; font-weight: normal; color: #555;">(${toKhmerNum(card.question.points || 5)} ពិន្ទុ)</span></div>
             ${exerciseAnsHtml}
           </div>
         `;
@@ -1452,6 +1520,28 @@ Output the response in JSON format.`;
           ${questionsHtml}
         </div>
 
+        <!-- Footer Signatures in Word doc -->
+        <table style="width: 100%; border-collapse: collapse; margin-top: 30px; page-break-inside: avoid;">
+          <tr>
+            <td colspan="2" style="text-align: right; font-style: italic; font-size: 9.5pt; padding-bottom: 15px;">
+              ថ្ងៃ.................. ទី......... ខែ............... ឆ្នាំ២០២.......
+            </td>
+          </tr>
+          <tr>
+            <td style="width: 50%; text-align: center; vertical-align: top; font-size: 10pt;">
+              <div style="font-weight: bold; font-family: ${selectedHeaderFontObj.cssValue}; margin-bottom: 50px;">ហត្ថលេខា និងឈ្មោះគ្រូបង្រៀន</div>
+              <div style="color: #94a3b8; font-size: 9pt;">.........................................................</div>
+            </td>
+            <td style="width: 50%; text-align: center; vertical-align: top; font-size: 10pt;">
+              <div style="font-weight: bold; font-family: ${selectedHeaderFontObj.cssValue};">
+                <div>បានឃើញ និងឯកភាព</div>
+                <div style="font-size: 9pt; font-weight: normal;">ប្រធានគណៈកម្មការ / នាយកសាលា</div>
+              </div>
+              <div style="margin-top: 40px; color: #94a3b8; font-size: 9pt;">.........................................................</div>
+            </td>
+          </tr>
+        </table>
+
         <!-- MSO Footers for MS Word exports -->
         <table id="hrdftrtbl" border="0" cellspacing="0" cellpadding="0" style="display:none;">
           <tr>
@@ -1475,14 +1565,10 @@ Output the response in JSON format.`;
     const selectedHeaderFontObj = AVAILABLE_FONTS.find(f => f.id === headerFont) || AVAILABLE_FONTS[0];
     const selectedBodyFontObj = AVAILABLE_FONTS.find(f => f.id === bodyFont) || AVAILABLE_FONTS[0];
 
-    // Map activeSubject questions to cards array format so helper functions work perfectly
+    // Map activeSubject questions with full properties
     const mappedCards = activeSubject.questions.map(q => ({
       id: q.id,
-      question: {
-        text: q.text,
-        options: q.options,
-        correctIndex: q.correctIndex
-      }
+      question: q
     }));
 
     const htmlContent = generateDocHtml(selectedHeaderFontObj, selectedBodyFontObj, mappedCards);
@@ -2793,32 +2879,168 @@ Output the response in JSON format.`;
       }`}>
         <div className="flex items-center gap-4 relative z-10">
           <div className="w-12 h-12 rounded-2xl bg-indigo-600 text-white flex items-center justify-center font-black shadow-md shadow-indigo-600/20">
-            <GraduationCap className="w-6 h-6 animate-pulse" />
+            {activeMainTab === 'exams' ? (
+              <GraduationCap className="w-6 h-6 animate-pulse" />
+            ) : activeMainTab === 'lessons' ? (
+              <BookOpen className="w-6 h-6 animate-pulse" />
+            ) : (
+              <FolderDown className="w-6 h-6 animate-pulse" />
+            )}
           </div>
           <div className="text-left">
             <h1 className="text-xl sm:text-2xl font-black font-sans tracking-tight text-indigo-600 dark:text-indigo-400">
-              បន្ទប់វិញ្ញាសាប្រឡង
+              {activeMainTab === 'exams'
+                ? 'បន្ទប់វិញ្ញាសាប្រឡង'
+                : activeMainTab === 'lessons'
+                ? 'បន្ទប់មេរៀន និងឯកសារបង្រៀន'
+                : 'ឯកសារពីខាងក្រៅ (PDF & PowerPoint)'}
             </h1>
             <p className="text-xs sm:text-sm font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
-              រៀបចំ បង្កើត និងកែសម្រួលវិញ្ញាសាប្រចាំខែ និងឆមាស សម្រាប់ថ្នាក់រៀន
+              {activeMainTab === 'exams'
+                ? 'រៀបចំ បង្កើត និងកែសម្រួលវិញ្ញាសាប្រចាំខែ និងឆមាស សម្រាប់ថ្នាក់រៀន'
+                : activeMainTab === 'lessons'
+                ? 'គ្រប់គ្រងឯកសារ Word, ស្លាយបង្រៀន, និងកិច្ចតែងការបង្រៀន ៥ ជំហាន'
+                : 'បញ្ចូលឯកសារ PDF និងស្លាយ PowerPoint ពីក្រៅ ជាមួយការបើកមើលជា Visual PowerPoint'}
             </p>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-2shrink-0 relative z-10">
+        <div className="flex flex-wrap items-center gap-2 shrink-0 relative z-10">
           <span className="text-[11px] font-black font-mono px-3 py-1.5 rounded-xl bg-orange-500/10 text-orange-600 dark:text-orange-400 border border-orange-500/10">
             {activeClassName ? `ថ្នាក់៖ ${activeClassName}` : 'ថ្នាក់រៀនគ្មានឈ្មោះ'}
           </span>
+          {activeMainTab === 'exams' && (
+            <button
+              onClick={() => setIsCreateModalOpen(true)}
+              className="flex items-center gap-2 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black font-sans text-xs transition-all cursor-pointer active:scale-95 shadow-md shadow-indigo-600/10 shrink-0 border-none"
+            >
+              <Plus className="w-4 h-4" />
+              <span>បង្កើតវិញ្ញាសាថ្មី</span>
+            </button>
+          )}
+        </div>
+      </div>
+
+      {/* Classroom Switcher Bar for fast class switching & isolation */}
+      {classes && classes.length > 0 && (
+        <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 transition-all ${
+          isDarkMode ? 'bg-[#111827] border-indigo-950/80' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
+              <School className="w-4 h-4 text-indigo-500" />
+              <span>ជ្រើសរើសថ្នាក់រៀន៖</span>
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {classes.map((cls) => {
+                const isActive = cls.id === activeClassId;
+                return (
+                  <button
+                    key={cls.id}
+                    type="button"
+                    onClick={() => onSwitchClass?.(cls.id)}
+                    className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-sm shadow-indigo-600/20'
+                        : isDarkMode
+                        ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    {cls.isPinned && (
+                      <Pin className={`w-3 h-3 -rotate-45 shrink-0 ${isActive ? 'text-amber-300 fill-amber-300' : 'text-amber-500 fill-amber-500'}`} />
+                    )}
+                    <span>{cls.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+
+          {classes.length > 1 && (
+            <button
+              type="button"
+              onClick={() => {
+                const other = classes.find(c => c.id !== activeClassId);
+                if (other) setCopySourceClassId(other.id);
+                setIsCopyModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/50 hover:bg-indigo-100 dark:hover:bg-indigo-900/60 border border-indigo-200 dark:border-indigo-800/60 transition-all cursor-pointer shrink-0"
+              title="ចម្លងវិញ្ញាសាពីថ្នាក់រៀនផ្សេងមកប្រើប្រាស់ក្នុងថ្នាក់នេះ"
+            >
+              <Copy className="w-3.5 h-3.5" />
+              <span>ចម្លងវិញ្ញាសាពីថ្នាក់ផ្សេង...</span>
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Main Mode Navigation Tabs (បន្ទប់វិញ្ញាសា និង មេរៀន) */}
+      <div className={`p-1.5 rounded-2xl border flex flex-wrap items-center justify-between gap-3 transition-all ${
+        isDarkMode ? 'bg-[#111827] border-indigo-950/80' : 'bg-white border-slate-200'
+      }`}>
+        <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-none w-full sm:w-auto">
           <button
-            onClick={() => setIsCreateModalOpen(true)}
-            className="flex items-center gap-2 px-4.5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-black font-sans text-xs transition-all cursor-pointer active:scale-95 shadow-md shadow-indigo-600/10 shrink-0 border-none"
+            type="button"
+            onClick={() => setActiveMainTab('exams')}
+            className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-black font-sans text-xs sm:text-sm transition-all cursor-pointer border-none shrink-0 ${
+              activeMainTab === 'exams'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
           >
-            <Plus className="w-4 h-4" />
-            <span>បង្កើតវិញ្ញាសាថ្មី</span>
+            <GraduationCap className="w-4 h-4" />
+            <span>បន្ទប់វិញ្ញាសា</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-mono font-bold ${
+              activeMainTab === 'exams' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-600 dark:text-slate-400'
+            }`}>
+              {exams.length}
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('lessons')}
+            className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-black font-sans text-xs sm:text-sm transition-all cursor-pointer border-none shrink-0 ${
+              activeMainTab === 'lessons'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <BookOpen className="w-4 h-4" />
+            <span>មេរៀន</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-sans font-bold ${
+              activeMainTab === 'lessons'
+                ? 'bg-white/20 text-white'
+                : 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20'
+            }`}>
+              Word • ស្លាយ • កិច្ចតែងការ
+            </span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setActiveMainTab('external')}
+            className={`flex items-center gap-2.5 px-5 py-2.5 rounded-xl font-black font-sans text-xs sm:text-sm transition-all cursor-pointer border-none shrink-0 ${
+              activeMainTab === 'external'
+                ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white hover:bg-slate-100 dark:hover:bg-slate-800/60'
+            }`}
+          >
+            <FolderDown className="w-4 h-4" />
+            <span>ឯកសារពីខាងក្រៅ</span>
+            <span className={`text-[10px] px-2 py-0.5 rounded-full font-sans font-bold ${
+              activeMainTab === 'external'
+                ? 'bg-white/20 text-white'
+                : 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border border-emerald-500/20'
+            }`}>
+              PDF • PowerPoint
+            </span>
           </button>
         </div>
       </div>
 
-      {/* Main split dashboard view */}
+      {activeMainTab === 'exams' ? (
+      /* Main split dashboard view */
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
         
         {/* Left Column: Exams Categorization & lists */}
@@ -3761,6 +3983,140 @@ Output the response in JSON format.`;
         </div>
 
       </div>
+      ) : activeMainTab === 'lessons' ? (
+        <LessonsPanel
+          key={`lessons-${activeClassId || 'general'}`}
+          activeClassId={activeClassId}
+          activeClassName={activeClassName}
+          isDarkMode={isDarkMode}
+          teacher={teacher}
+        />
+      ) : (
+        <ExternalDocumentsPanel
+          key={`extdocs-${activeClassId || 'general'}`}
+          activeClassId={activeClassId}
+          activeClassName={activeClassName}
+          isDarkMode={isDarkMode}
+          teacher={teacher}
+        />
+      )}
+
+      {/* MODAL 0: Copy Exam From Another Class */}
+      <AnimatePresence>
+        {isCopyModalOpen && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 z-55 overflow-y-auto">
+            <motion.div
+              initial={{ scale: 0.95, opacity: 0 }}
+              animate={{ scale: 1, opacity: 1 }}
+              exit={{ scale: 0.95, opacity: 0 }}
+              className={`w-full max-w-lg rounded-3xl shadow-xl overflow-hidden text-left p-6 ${
+                isDarkMode ? 'bg-[#121829] border border-indigo-950/80 text-white' : 'bg-white border text-slate-850'
+              }`}
+            >
+              <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-slate-800">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 flex items-center justify-center">
+                    <Copy className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="font-black font-sans text-sm">ចម្លងវិញ្ញាសាពីថ្នាក់ផ្សេង</h3>
+                    <p className="text-[10px] text-slate-400">ចម្លងវិញ្ញាសាដែលមានស្រាប់ពីថ្នាក់មួយ ចូលមកកាន់ថ្នាក់ «{activeClassName}»</p>
+                  </div>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setIsCopyModalOpen(false)}
+                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 border-none cursor-pointer"
+                >
+                  <X className="w-4 h-4" />
+                </button>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1.5">
+                    ជ្រើសរើសថ្នាក់ប្រភព (Source Class)
+                  </label>
+                  <select
+                    value={copySourceClassId}
+                    onChange={(e) => setCopySourceClassId(e.target.value)}
+                    className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
+                  >
+                    <option value="">-- សូមជ្រើសរើសថ្នាក់ដែលចង់ចម្លង --</option>
+                    {classes
+                      .filter((c) => c.id !== activeClassId)
+                      .map((c) => (
+                        <option key={c.id} value={c.id}>
+                          {c.name}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+
+                {copySourceClassId && (
+                  <div>
+                    <label className="block text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase mb-1.5">
+                      ជ្រើសរើសវិញ្ញាសាដែលចង់ចម្លង ({sourceExams.length} វិញ្ញាសាមានស្រាប់)
+                    </label>
+                    {sourceExams.length === 0 ? (
+                      <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-900 text-center text-xs text-slate-400">
+                        ថ្នាក់នេះមិនទាន់មានវិញ្ញាសាដែលបានរក្សាទុកនៅឡើយទេ។
+                      </div>
+                    ) : (
+                      <div className="space-y-2 max-h-48 overflow-y-auto pr-1">
+                        {sourceExams.map((ex) => {
+                          const isSelected = selectedExamToCopyId === ex.id;
+                          return (
+                            <div
+                              key={ex.id}
+                              onClick={() => setSelectedExamToCopyId(ex.id)}
+                              className={`p-3 rounded-xl border text-xs font-bold flex items-center justify-between cursor-pointer transition-all ${
+                                isSelected
+                                  ? 'border-indigo-600 bg-indigo-50/70 dark:bg-indigo-950/40 text-indigo-700 dark:text-indigo-300'
+                                  : 'border-slate-200 dark:border-slate-800 hover:bg-slate-50 dark:hover:bg-slate-900/50'
+                              }`}
+                            >
+                              <div className="flex items-center gap-2">
+                                <FileText className="w-4 h-4 text-indigo-500" />
+                                <div>
+                                  <p className="font-sans">{ex.title}</p>
+                                  <p className="text-[10px] text-slate-400">
+                                    {ex.type === 'monthly' ? 'វិញ្ញាសាប្រចាំខែ' : 'វិញ្ញាសាឆមាស'} • {ex.subjects.length} មុខវិជ្ជា
+                                  </p>
+                                </div>
+                              </div>
+                              {isSelected && <Check className="w-4 h-4 text-indigo-600" />}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                <div className="flex gap-2 justify-end pt-3 border-t dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setIsCopyModalOpen(false)}
+                    className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white border-none cursor-pointer"
+                  >
+                    បោះបង់
+                  </button>
+                  <button
+                    type="button"
+                    disabled={!selectedExamToCopyId || sourceExams.length === 0}
+                    onClick={handleCopyExamFromClass}
+                    className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-40 text-white rounded-2xl text-xs font-extrabold cursor-pointer active:scale-95 transition-all outline-none border-none flex items-center gap-1.5"
+                  >
+                    <Copy className="w-3.5 h-3.5" />
+                    <span>ចម្លងចូលថ្នាក់ «{activeClassName}»</span>
+                  </button>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
 
       {/* MODAL 1: Create Exam Paper Modal */}
       <AnimatePresence>
@@ -4827,8 +5183,8 @@ Output the response in JSON format.`;
 
                 {/* Right print preview sheet column */}
                 <div className="lg:col-span-7 flex flex-col gap-3 h-full">
-                  <div className="flex-1 bg-white dark:bg-slate-900 border rounded-2xl shadow-sm p-4 overflow-y-auto max-h-[60vh] lg:max-h-[70vh]">
-                    <div className="text-center font-bold text-xs text-slate-400 mb-2 font-mono uppercase">ផ្ទាំងឯកសារមើលជាមុន (A4 Print Layout Preview)</div>
+                  <div className="flex-1 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner p-4 overflow-y-auto max-h-[60vh] lg:max-h-[70vh]">
+                    <div className="text-center font-bold text-xs text-slate-500 mb-3 font-mono uppercase tracking-wider">ផ្ទាំងឯកសារមើលជាមុន (Standard MOEYS Print Preview)</div>
                     <div 
                       style={{
                         paddingTop: `${marginTop}${marginUnit}`,
@@ -4836,389 +5192,44 @@ Output the response in JSON format.`;
                         paddingLeft: `${marginLeft}${marginUnit}`,
                         paddingRight: `${marginRight}${marginUnit}`,
                       }}
-                      className="p-8 bg-white text-black rounded-lg border border-slate-200 shadow-xs text-[11px] sm:text-[12px] leading-relaxed font-serif min-h-[500px]"
+                      className="bg-white text-black rounded-lg border border-slate-300 shadow-md p-6 max-w-3xl mx-auto min-h-[500px]"
                     >
-                      {/* Identical Layout Paper Sheet columns */}
-                      <div className="grid grid-cols-12 gap-1 pb-4 text-black border-none select-none">
-                        <div className={`${layoutWidths.left.className} flex flex-col gap-1.5 text-left font-black text-slate-950 font-sans leading-snug`} style={{ ...headerInlineStyle, ...layoutWidths.left.style }}>
-                          <div className="truncate font-sans font-bold">មណ្ឌលប្រឡង៖ {renderDotField(examCenter, '.....................................................')}</div>
-                          <div className="truncate font-sans font-bold">លេខបន្ទប់៖ {renderDotField(roomNumber, '..................')}</div>
-                          <div className="truncate font-sans font-bold">វិញ្ញាសា៖ {renderDotField(activeSubject?.name || '.....................................', '.....................................')}</div>
-                          <div className="truncate font-sans font-bold">លេខតុ៖ {renderDotField(deskNumber, '..................')}</div>
-                        </div>
-
-                        <div className={`${layoutWidths.center.className} flex flex-col items-center justify-start text-center`} style={{ ...headerInlineStyle, ...layoutWidths.center.style }}>
-                          <div className="w-12 h-12 mb-1 flex items-center justify-center">
-                            {customLogo ? (
-                              <img src={customLogo} alt="Logo" className="w-12 h-12 object-contain pointer-events-none mx-auto" />
-                            ) : imageFailed ? (
-                              <SovannaphumiLogoSVG />
-                            ) : (
-                              <img src={imgSrc} alt="Logo" className="w-12 h-12 object-contain pointer-events-none mx-auto" />
-                            )}
-                          </div>
-                          <div className="font-black text-[9px] text-slate-900 leading-tight font-sans tracking-wide truncate max-w-full">{logoText1}</div>
-                          {headerLayout !== '5-1-6' && (
-                            <div className="text-[8px] font-semibold text-slate-800 leading-tight tracking-tight mt-0.5 truncate max-w-full">{logoText2}</div>
-                          )}
-                        </div>
-
-                        <div className={`${layoutWidths.right.className} flex items-start justify-between gap-1.5 text-left font-black text-slate-950 pl-2 leading-snug font-sans`} style={{ ...headerInlineStyle, ...layoutWidths.right.style }}>
-                          <div className="flex-1 flex flex-col gap-1.5 min-w-0 font-sans">
-                            <div className="flex justify-between items-center w-full truncate font-sans font-bold">
-                              <span>ប្រឡង៖ {renderDotField(examName, '..................')}</span>
-                              <span>ថ្នាក់ទី៖ {renderDotField(gradeNumber, '...............')}</span>
-                            </div>
-                            <div className="truncate font-sans font-bold">សម័យប្រឡង៖ {renderDotField(examSession, '......../......../........')}</div>
-                            <div className="truncate font-sans font-bold">រយៈពេល៖ {renderDotField(durationTime, '................ នាទី')} <span className="font-black text-[9px]">({totalScore || '...... ពិន្ទុ'})</span></div>
-                          </div>
-                          <div className="border-double border-[3px] border-slate-900 rounded-[50%/50%] w-[84px] h-[64px] flex flex-col items-center justify-center shrink-0 self-end mt-4 p-1 translate-y-3">
-                            <div className="border-t border-dashed border-slate-700 w-[55px] my-auto"></div>
-                          </div>
-                        </div>
-                      </div>
-
-                      <div className="border-b-4 border-double border-black my-2"></div>
-
-                      <div className="text-center mb-4" style={bodyInlineStyle}>
-                        <div className="font-black text-slate-900 uppercase tracking-wider text-[11px] sm:text-xs font-sans">សន្លឹកកិច្ចការវិញ្ញាសា</div>
-                        <div className="text-[10px] sm:text-[10.5px] font-black text-slate-700 mt-1">សេចក្តីណែនាំ៖ ចូរគូសរង្វង់លើចម្លើយត្រឹមត្រូវតែមួយគត់</div>
-                      </div>
-
-                      <div className="space-y-4 text-slate-900 mt-2 font-sans text-black animate-none" style={bodyInlineStyle}>
-                        {(() => {
-                          const questions = activeSubject?.questions || [];
-                          const grouped = {
-                            choice: [] as ExamQuestion[],
-                            matching: [] as ExamQuestion[],
-                            fill_blank: [] as ExamQuestion[],
-                            theory: [] as ExamQuestion[],
-                            exercise: [] as ExamQuestion[],
-                          };
-
-                          questions.forEach(q => {
-                            const cat = q.category || 'choice';
-                            if (grouped[cat]) {
-                              grouped[cat].push(q);
-                            } else {
-                              grouped['choice'].push(q);
-                            }
-                          });
-
-                          const showSections = 
-                            grouped.matching.length > 0 || 
-                            grouped.fill_blank.length > 0 || 
-                            grouped.theory.length > 0 || 
-                            grouped.exercise.length > 0;
-
-                          let globalIdx = 0;
-
-                          return (
-                            <div className="space-y-6 text-slate-900">
-                              {/* 1. Choice Section */}
-                              {grouped.choice.length > 0 && (
-                                <div className="space-y-2">
-                                  {showSections && (
-                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
-                                    </div>
-                                  )}
-                                  <div className="space-y-4">
-                                    {grouped.choice.map((q) => {
-                                      globalIdx++;
-                                      return (
-                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left">
-                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
-                                          </div>
-                                          <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left font-sans text-xs ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                                            {q.options.map((opt, oIdx) => {
-                                              const isCorrectIdx = oIdx === q.correctIndex;
-                                              return (
-                                                <div 
-                                                  key={oIdx} 
-                                                  className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
-                                                    highlightKey && isCorrectIdx 
-                                                      ? 'bg-emerald-50 text-emerald-850 font-bold border border-emerald-250/30' 
-                                                      : 'text-slate-800'
-                                                  }`}
-                                                >
-                                                  <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
-                                                  <span>{opt}</span>
-                                                </div>
-                                              );
-                                            })}
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* 2. Matching Section */}
-                              {grouped.matching.length > 0 && (
-                                <div className="space-y-2 text-left">
-                                  {showSections && (
-                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី២៖ សំណួរផ្គូផ្គង ({toKhmerNum(grouped.matching.reduce((acc, cur) => acc + (cur.points || 4), 0))} ពិន្ទុ)
-                                    </div>
-                                  )}
-                                  <div className="space-y-4">
-                                    {grouped.matching.map((q) => {
-                                      globalIdx++;
-                                      return (
-                                        <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
-                                          <div className="font-bold text-left text-slate-900 leading-relaxed font-sans text-xs">
-                                            <span>{q.text || 'ចូរផ្គូផ្គងល្បារ ឬនិមិត្តសញ្ញានៅជួរ (A) ទៅនឹងនិយមន័យ ឬការពិពណ៌នាដែលត្រូវគ្នានៅជួរ (B) ឱ្យបានត្រឹមត្រូវ៖'}</span>
-                                          </div>
-                                          
-                                          {/* Classic table matching layout */}
-                                          <div className="my-3 max-w-2xl mx-auto overflow-x-auto avoid-break text-slate-900">
-                                            <table className="w-full border-collapse border-2 border-slate-950 text-xs text-slate-900 font-sans">
-                                              <thead>
-                                                <tr className="bg-slate-100/80 border-b-2 border-slate-950 font-bold">
-                                                  <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[40%] text-slate-950">
-                                                    ជួរ (A)
-                                                  </th>
-                                                  <th className="border-r border-slate-950 font-black text-center py-2 px-3 w-[42%] text-slate-950">
-                                                    ជួរ (B)
-                                                  </th>
-                                                  <th className="font-black text-center py-2 px-3 w-[18%] text-slate-950">
-                                                    ចម្លើយផ្គូផ្គង
-                                                  </th>
-                                                </tr>
-                                              </thead>
-                                              <tbody>
-                                                {(() => {
-                                                  const lhs = [q.options[0], q.options[1]].filter(Boolean);
-                                                  const rhs = q.options.slice(2).filter(Boolean);
-                                                  const maxRows = Math.max(lhs.length, rhs.length);
-                                                  const rows = [];
-                                                  for (let i = 0; i < maxRows; i++) {
-                                                    rows.push({
-                                                      left: lhs[i] || '',
-                                                      right: rhs[i] || '',
-                                                      ansNum: i < lhs.length ? i + 1 : null
-                                                    });
-                                                  }
-                                                  return rows.map((row, rIdx) => {
-                                                    const leftLetter = rIdx === 0 ? '១' : rIdx === 1 ? '២' : rIdx === 2 ? '៣' : String(rIdx + 1);
-                                                    const rightLetter = rIdx === 0 ? 'ក' : rIdx === 1 ? 'ខ' : rIdx === 2 ? 'គ' : rIdx === 3 ? 'ឃ' : String.fromCharCode(97 + rIdx);
-                                                    
-                                                    return (
-                                                      <tr key={rIdx} className="border-b border-slate-950 last:border-b-0 min-h-[38px] min-w-0">
-                                                        {/* Column A */}
-                                                        <td className="border-r border-slate-950 py-2 px-3 text-left font-bold align-middle">
-                                                          {row.left ? (
-                                                            <div className="flex items-start gap-1">
-                                                              <span className="font-black shrink-0">{leftLetter}.</span>
-                                                              <span>{stripPrefix(row.left)}</span>
-                                                            </div>
-                                                          ) : null}
-                                                        </td>
-                                                        {/* Column B */}
-                                                        <td className="border-r border-slate-950 py-2 px-3 text-left font-bold align-middle">
-                                                          {row.right ? (
-                                                            <div className="flex items-start gap-1">
-                                                              <span className="font-black shrink-0">{rightLetter}.</span>
-                                                              <span>{stripPrefix(row.right)}</span>
-                                                            </div>
-                                                          ) : null}
-                                                        </td>
-                                                        {/* Answer Space */}
-                                                        <td className="py-2 px-3 text-center font-bold align-middle">
-                                                          {row.ansNum !== null ? (
-                                                            <div className="flex items-center justify-center gap-1.5 font-bold">
-                                                              <span>{leftLetter} ➔</span>
-                                                              {highlightKey ? (
-                                                                <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-250 dark:border-emerald-800/60 font-sans text-xs">
-                                                                  {getMatchingAnswerForIndex(q, row.ansNum)}
-                                                                </span>
-                                                              ) : (
-                                                                <span className="text-slate-400 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
-                                                              )}
-                                                            </div>
-                                                          ) : null}
-                                                        </td>
-                                                      </tr>
-                                                    );
-                                                  });
-                                                })()}
-                                              </tbody>
-                                            </table>
-                                          </div>
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* 3. Fill Blank Section */}
-                              {grouped.fill_blank.length > 0 && (() => {
-                                const totalPoints = grouped.fill_blank.reduce((acc, cur) => acc + (cur.points || 2), 0);
-                                const allOptions = Array.from(new Set(
-                                  grouped.fill_blank.flatMap(q => q.options || [])
-                                )).filter(Boolean);
-                                if (allOptions.length === 0) {
-                                  grouped.fill_blank.forEach(q => {
-                                    const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
-                                    if (ans) allOptions.push(ans);
-                                  });
-                                }
-
-                                return (
-                                  <div className="space-y-2 text-left font-sans">
-                                    {showSections && (
-                                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                        ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ ({toKhmerNum(totalPoints)} ពិន្ទុ)
-                                      </div>
-                                    )}
-                                    <div className="text-xs font-bold text-slate-800 dark:text-slate-200 leading-relaxed mt-2 font-sans">
-                                      ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖
-                                    </div>
-                                    {allOptions.length > 0 && (
-                                      <div className="my-3 p-3 px-5 border border-dashed border-slate-300 dark:border-slate-700 bg-slate-50/50 dark:bg-slate-900/30 rounded-xl text-center font-bold text-slate-800 dark:text-slate-200 tracking-wide text-xs font-sans max-w-2xl mx-auto">
-                                        ( {allOptions.join(', ')} )
-                                      </div>
-                                    )}
-                                    <div className="space-y-4">
-                                      {grouped.fill_blank.map((q, qIdx) => {
-                                        globalIdx++;
-                                        return (
-                                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
-                                            <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                              <span>
-                                                {toKhmerNum(qIdx + 1)}.{' '}
-                                                {(() => {
-                                                  const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
-                                                  if (!ans || !highlightKey) {
-                                                    return q.text;
-                                                  }
-                                                  const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
-                                                  if (blankRegex.test(q.text)) {
-                                                    const parts = q.text.split(blankRegex);
-                                                    return (
-                                                      <span>
-                                                        {parts.map((part: string, idx: number) => (
-                                                          <span key={idx}>
-                                                            {part}
-                                                            {idx < parts.length - 1 && (
-                                                              <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-250 dark:border-emerald-800/60 inline-block font-sans">
-                                                                {ans}
-                                                              </span>
-                                                            )}
-                                                          </span>
-                                                        ))}
-                                                      </span>
-                                                    );
-                                                  } else {
-                                                    return (
-                                                      <span>
-                                                        {q.text} ➔{' '}
-                                                        <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-250 dark:border-emerald-800/60 inline-block font-sans">
-                                                          {ans}
-                                                        </span>
-                                                      </span>
-                                                    );
-                                                  }
-                                                })()}
-                                              </span>
-                                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
-                                            </div>
-                                          </div>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                );
-                              })()}
-
-                              {/* 4. Theory Section */}
-                              {grouped.theory.length > 0 && (
-                                <div className="space-y-4 text-left">
-                                  {showSections && (
-                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី៤៖ សំណួរទូទៅ ទ្រឹស្ដី និងការរស់នៅ ({toKhmerNum(grouped.theory.reduce((acc, cur) => acc + (cur.points || 3), 0))} ពិន្ទុ)
-                                    </div>
-                                  )}
-                                  <div className="space-y-5">
-                                    {grouped.theory.map((q, qIdx) => {
-                                      globalIdx++;
-                                      return (
-                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
-                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>{toKhmerNum(qIdx + 1)}. {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
-                                          </div>
-                                          {highlightKey ? (
-                                            <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
-                                              <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                                ចម្លើយគំរូ (Model Answer)
-                                              </div>
-                                              <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap font-sans">
-                                                {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានចម្លើយគំរូ"}
-                                              </div>
-                                              {q.explanation && q.options && q.options[q.correctIndex] && (
-                                                <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5 font-sans">
-                                                  💡 ការពន្យល់បន្ថែម៖ {q.explanation}
-                                                </div>
-                                              )}
-                                            </div>
-                                          ) : null}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-
-                              {/* 5. Exercise Section */}
-                              {grouped.exercise.length > 0 && (
-                                <div className="space-y-4 text-left">
-                                  {showSections && (
-                                    <div className="font-extrabold text-[12px] uppercase border-b-2 border-slate-950 pb-1 mt-4 text-slate-950 font-sans tracking-wide">
-                                      ផ្នែកទី៥៖ លំហាត់ ({toKhmerNum(grouped.exercise.reduce((acc, cur) => acc + (cur.points || 5), 0))} ពិន្ទុ)
-                                    </div>
-                                  )}
-                                  <div className="space-y-6">
-                                    {grouped.exercise.map((q, qIdx) => {
-                                      globalIdx++;
-                                      return (
-                                        <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
-                                          <div className="font-extrabold text-left text-slate-950 leading-relaxed font-sans text-xs">
-                                            <span>លំហាត់ទី{toKhmerNum(qIdx + 1)}៖ {q.text}</span>
-                                            <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
-                                          </div>
-                                          {highlightKey ? (
-                                            <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
-                                              <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5 font-sans">
-                                                <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                                ដំណោះស្រាយគំរូ (Model Solution)
-                                              </div>
-                                              <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap font-sans">
-                                                {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ"}
-                                              </div>
-                                              {q.explanation && q.options && q.options[q.correctIndex] && (
-                                                <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5 font-sans">
-                                                  💡 គន្លឹះដោះស្រាយ៖ {q.explanation}
-                                                </div>
-                                              )}
-                                            </div>
-                                          ) : null}
-                                        </div>
-                                      );
-                                    })}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          );
-                        })()}
-                      </div>
+                      <ExamPaperView
+                        exam={activeExam || undefined}
+                        subject={activeSubject || undefined}
+                        optionsLayout={optionsLayout}
+                        optionStyle={optionStyle}
+                        highlightKey={highlightKey}
+                        examCenter={examCenter}
+                        roomNumber={roomNumber}
+                        deskNumber={deskNumber}
+                        gradeNumber={gradeNumber}
+                        examName={examName}
+                        examSession={examSession}
+                        durationTime={durationTime}
+                        totalScore={totalScore}
+                        logoText1={logoText1}
+                        logoText2={logoText2}
+                        customLogo={customLogo}
+                        imgSrc={imgSrc}
+                        imageFailed={imageFailed}
+                        onImageError={() => {
+                          if (imgSrc === '/Sovannphomi.png') {
+                            setImgSrc('/sovannaphumi.png');
+                          } else {
+                            setImageFailed(true);
+                          }
+                        }}
+                        headerFont={headerFont}
+                        bodyFont={bodyFont}
+                        headerFontSize={headerFontSize}
+                        bodyFontSize={bodyFontSize}
+                        headerLayout={headerLayout}
+                        customLeftSpan={customLeftSpan}
+                        customCenterSpan={customCenterSpan}
+                        customRightSpan={customRightSpan}
+                        isPrintMode={false}
+                      />
                     </div>
                   </div>
                 </div>
@@ -5320,434 +5331,43 @@ Output the response in JSON format.`;
           }
         }
       `}</style>
-      <div className="hidden print:block printable-sheet bg-white text-black p-0 font-sans w-full max-w-4xl mx-auto min-h-screen text-[11px] sm:text-[12px] leading-relaxed select-text">
-        <div className="grid grid-cols-12 gap-2 w-full text-black">
-          {/* Left Column */}
-          <div className={`${layoutWidths.left.className} flex flex-col justify-start text-left font-black gap-2 mt-2`} style={{ ...headerInlineStyle, ...layoutWidths.left.style }}>
-            <div>មណ្ឌលប្រឡង៖ {renderDotField(examCenter, '.....................................................')}</div>
-            <div>លេខបន្ទប់៖ {renderDotField(roomNumber, '..................')}</div>
-            <div>វិញ្ញាសា៖ {renderDotField(activeSubject?.name || '.....................................', '.....................................')}</div>
-            <div>លេខតុ៖ {renderDotField(deskNumber, '..................')}</div>
-          </div>
-          
-          {/* Middle Column (Logo and school titles) */}
-          <div className={`${layoutWidths.center.className} flex flex-col items-center text-center justify-start`} style={{ ...headerInlineStyle, ...layoutWidths.center.style }}>
-            <div className="mb-2">
-              {customLogo ? (
-                <img 
-                  src={customLogo} 
-                  alt="Custom Logo" 
-                  className="w-16 h-16 object-contain pointer-events-none mx-auto"
-                />
-              ) : imageFailed ? (
-                <SovannaphumiLogoSVG />
-              ) : (
-                <img 
-                  src={imgSrc} 
-                  alt="Sovannphomi Logo" 
-                  className="w-16 h-16 object-contain pointer-events-none mx-auto"
-                  onError={() => {
-                    if (imgSrc === '/Sovannphomi.png') {
-                      setImgSrc('/sovannaphumi.png');
-                    } else {
-                      setImageFailed(true);
-                    }
-                  }}
-                />
-              )}
-            </div>
-            <div className="font-black text-xs text-slate-900 leading-tight tracking-wide font-sans truncate max-w-full">{logoText1}</div>
-            {headerLayout !== '5-1-6' && (
-              <div className="text-[10px] font-medium text-slate-800 leading-tight mt-0.5 truncate max-w-full">{logoText2}</div>
-            )}
-          </div>
-          
-          {/* Right Column */}
-          <div className={`${layoutWidths.right.className} flex items-start justify-between gap-1.5 mt-[6px] pl-4`} style={{ ...headerInlineStyle, ...layoutWidths.right.style }}>
-            <div className="flex-1 flex flex-col justify-start text-left font-black gap-2 min-w-0">
-              <div className="flex justify-between items-center w-full">
-                <span>ប្រឡង៖ {renderDotField(examName, '..................')}</span>
-                <span>ថ្នាក់ទី៖ {renderDotField(gradeNumber, '...............')}</span>
-              </div>
-              <div className="truncate">សម័យប្រឡង៖ {renderDotField(examSession, '......../......../........')}</div>
-              <div className="truncate">រយៈពេល៖ {renderDotField(durationTime, '................ នាទី')} <span className="font-medium">({totalScore || '...... ពិន្ទុ'})</span></div>
-            </div>
-
-            {/* Score Oval Place */}
-            <div className="border-double border-[3px] border-black rounded-[50%/50%] w-[88px] h-[66px] flex flex-col items-center justify-center shrink-0 self-end mt-4 p-1 translate-y-3" title="រង្វង់សម្រាប់ដាក់ពិន្ទុ">
-              <div className="border-t border-dashed border-black w-[58px] my-auto"></div>
-            </div>
-          </div>
-        </div>
-        
-        {/* Horizontal separator */}
-        <div className="border-b-4 border-double border-black my-4 w-full"></div>
-        
-        {/* Document Body */}
-        <div className="text-center mb-6" style={bodyInlineStyle}>
-          <div className="font-black text-[13px] tracking-wider uppercase text-slate-900 font-sans">
-            សន្លឹកកិច្ចការវិញ្ញាសា
-          </div>
-          <div className="text-[11.5px] font-black text-slate-800 mt-1.5 font-sans">
-            សេចក្តីណែនាំ៖ ចូរគូសរង្វង់លើចម្លើយត្រឹមត្រូវតែមួយគត់
-          </div>
-        </div>
-        
-        <div className="space-y-6 text-black mt-4 font-sans" style={bodyInlineStyle}>
-          {(() => {
-            const questions = activeSubject?.questions || [];
-            const grouped = {
-              choice: [] as ExamQuestion[],
-              matching: [] as ExamQuestion[],
-              fill_blank: [] as ExamQuestion[],
-              theory: [] as ExamQuestion[],
-              exercise: [] as ExamQuestion[],
-            };
-
-            questions.forEach(q => {
-              const cat = q.category || 'choice';
-              if (grouped[cat]) {
-                grouped[cat].push(q);
-              } else {
-                grouped['choice'].push(q);
-              }
-            });
-
-            const showSections = 
-              grouped.matching.length > 0 || 
-              grouped.fill_blank.length > 0 || 
-              grouped.theory.length > 0 || 
-              grouped.exercise.length > 0;
-
-            let globalIdx = 0;
-
-            return (
-              <div className="space-y-6 text-black">
-                {/* 1. Choice Section */}
-                {grouped.choice.length > 0 && (
-                  <div className="space-y-2">
-                    {showSections && (
-                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                        ផ្នែកទី ១៖ ជ្រើសរើសចម្លើយត្រឹមត្រូវ (Multiple Choice Questions)
-                      </div>
-                    )}
-                    <div className="space-y-4">
-                      {grouped.choice.map((q) => {
-                        globalIdx++;
-                        return (
-                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break text-left font-sans">
-                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                              <span className="text-[9px] text-slate-500 font-normal ml-1.5">({q.points || 2} ពិន្ទុ)</span>
-                            </div>
-                            <div className={`mt-2 pl-4 grid gap-x-4 gap-y-1 text-left font-sans text-xs ${optionsLayout === 'inline' ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                              {q.options.map((opt, oIdx) => {
-                                const isCorrectIdx = oIdx === q.correctIndex;
-                                return (
-                                  <div 
-                                    key={oIdx} 
-                                    className={`flex items-start gap-1.5 py-0.5 px-1.5 rounded-md ${
-                                      highlightKey && isCorrectIdx 
-                                        ? 'bg-slate-100 text-black font-bold border border-slate-300' 
-                                        : 'text-black'
-                                    }`}
-                                  >
-                                    <span className="font-black shrink-0">{getOptionPrefix(oIdx)}.</span>
-                                    <span>{opt}</span>
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-
-                {/* 2. Matching Section */}
-                {grouped.matching.length > 0 && (
-                  <div className="space-y-2 text-left">
-                    {showSections && (
-                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                        ផ្នែកទី២៖ សំណួរផ្គូផ្គង ({toKhmerNum(grouped.matching.reduce((acc, cur) => acc + (cur.points || 4), 0))} ពិន្ទុ)
-                      </div>
-                    )}
-                    <div className="space-y-4">
-                      {grouped.matching.map((q) => {
-                        globalIdx++;
-                        return (
-                          <div key={q.id || globalIdx} className={`space-y-1.5 avoid-break`}>
-                            <div className="font-bold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>{q.text || 'ចូរផ្គូផ្គងល្បារ ឬនិមិត្តសញ្ញានៅជួរ (A) ទៅនឹងនិយមន័យ ឬការពិពណ៌នាដែលត្រូវគ្នានៅជួរ (B) ឱ្យបានត្រឹមត្រូវ៖'}</span>
-                            </div>
-                            
-                            {/* Classic table matching layout */}
-                            <div className="my-3 max-w-2xl mx-auto overflow-x-auto avoid-break text-black">
-                              <table className="w-full border-collapse border-2 border-black text-xs text-black font-sans">
-                                <thead>
-                                  <tr className="bg-slate-100 border-b-2 border-black font-bold">
-                                    <th className="border-r border-black font-black text-center py-2 px-3 w-[40%]">
-                                      ជួរ (A)
-                                    </th>
-                                    <th className="border-r border-black font-black text-center py-2 px-3 w-[42%]">
-                                      ជួរ (B)
-                                    </th>
-                                    <th className="font-black text-center py-2 px-3 w-[18%]">
-                                      ចម្លើយផ្គូផ្គង
-                                    </th>
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {(() => {
-                                    const lhs = [q.options[0], q.options[1]].filter(Boolean);
-                                    const rhs = q.options.slice(2).filter(Boolean);
-                                    const maxRows = Math.max(lhs.length, rhs.length);
-                                    const rows = [];
-                                    for (let i = 0; i < maxRows; i++) {
-                                      rows.push({
-                                        left: lhs[i] || '',
-                                        right: rhs[i] || '',
-                                        ansNum: i < lhs.length ? i + 1 : null
-                                      });
-                                    }
-                                    return rows.map((row, rIdx) => {
-                                      const leftLetter = rIdx === 0 ? '១' : rIdx === 1 ? '២' : rIdx === 2 ? '៣' : String(rIdx + 1);
-                                      const rightLetter = rIdx === 0 ? 'ក' : rIdx === 1 ? 'ខ' : rIdx === 2 ? 'គ' : rIdx === 3 ? 'ឃ' : String.fromCharCode(97 + rIdx);
-                                      
-                                      return (
-                                        <tr key={rIdx} className="border-b border-black last:border-b-0 min-h-[38px] min-w-0">
-                                          {/* Column A */}
-                                          <td className="border-r border-black py-2 px-3 text-left font-bold align-middle">
-                                            {row.left ? (
-                                              <div className="flex items-start gap-1">
-                                                <span className="font-black shrink-0">{leftLetter}.</span>
-                                                <span>{stripPrefix(row.left)}</span>
-                                              </div>
-                                            ) : null}
-                                          </td>
-                                          {/* Column B */}
-                                          <td className="border-r border-black py-2 px-3 text-left font-bold align-middle">
-                                            {row.right ? (
-                                              <div className="flex items-start gap-1">
-                                                <span className="font-black shrink-0">{rightLetter}.</span>
-                                                <span>{stripPrefix(row.right)}</span>
-                                              </div>
-                                            ) : null}
-                                          </td>
-                                          {/* Answer Space */}
-                                          <td className="py-2 px-3 text-center font-bold align-middle">
-                                            {row.ansNum !== null ? (
-                                              <div className="flex items-center justify-center gap-1.5 font-bold">
-                                                <span>{leftLetter} ➔</span>
-                                                {highlightKey ? (
-                                                  <span className="text-emerald-600 dark:text-emerald-400 font-extrabold bg-emerald-50 dark:bg-emerald-950/20 px-2 py-0.5 rounded border border-emerald-200 dark:border-emerald-800/60 font-sans text-xs">
-                                                    {getMatchingAnswerForIndex(q, row.ansNum)}
-                                                  </span>
-                                                ) : (
-                                                  <span className="text-slate-500 font-light text-[9px] tracking-widest leading-none translate-y-[-2px]">.........</span>
-                                                )}
-                                              </div>
-                                            ) : null}
-                                          </td>
-                                        </tr>
-                                      );
-                                    });
-                                  })()}
-                                </tbody>
-                              </table>
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
- 
-                {/* 3. Fill Blank Section */}
-                {grouped.fill_blank.length > 0 && (() => {
-                  const totalPoints = grouped.fill_blank.reduce((acc, cur) => acc + (cur.points || 2), 0);
-                  const allOptions = Array.from(new Set(
-                    grouped.fill_blank.flatMap(q => q.options || [])
-                  )).filter(Boolean);
-                  if (allOptions.length === 0) {
-                    grouped.fill_blank.forEach(q => {
-                      const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
-                      if (ans) allOptions.push(ans);
-                    });
-                  }
-
-                  return (
-                    <div className="space-y-2 text-left font-sans">
-                      {showSections && (
-                        <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                          ផ្នែកទី៣៖ សំណួរបំពេញចន្លោះ ({toKhmerNum(totalPoints)} ពិន្ទុ)
-                        </div>
-                      )}
-                      <div className="text-xs font-bold text-black leading-relaxed mt-2 font-sans">
-                        ចូរជ្រើសរើសពាក្យក្នុងប្រអប់ខាងក្រោម ទៅបំពេញក្នុងចន្លោះនៃល្បារនីមួយៗខាងក្រោមឱ្យបានត្រឹមត្រូវ៖
-                      </div>
-                      {allOptions.length > 0 && (
-                        <div className="my-3 p-3 px-5 border border-dashed border-black bg-slate-50 text-center font-bold text-black tracking-wide text-xs font-sans max-w-2xl mx-auto">
-                          ( {allOptions.join(', ')} )
-                        </div>
-                      )}
-                      <div className="space-y-4">
-                        {grouped.fill_blank.map((q, qIdx) => {
-                          globalIdx++;
-                          return (
-                            <div key={q.id || globalIdx} className="space-y-1.5 avoid-break font-sans">
-                              <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                                <span>
-                                  {toKhmerNum(qIdx + 1)}.{' '}
-                                  {(() => {
-                                    const ans = (q.options && q.options[q.correctIndex]) ? q.options[q.correctIndex] : '';
-                                    if (!ans || !highlightKey) {
-                                      return q.text;
-                                    }
-                                    const blankRegex = /_{3,}|\.{3,}|-{3,}/g;
-                                    if (blankRegex.test(q.text)) {
-                                      const parts = q.text.split(blankRegex);
-                                      return (
-                                        <span>
-                                          {parts.map((part: string, idx: number) => (
-                                            <span key={idx}>
-                                              {part}
-                                              {idx < parts.length - 1 && (
-                                                <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 mx-1 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
-                                                  {ans}
-                                                </span>
-                                              )}
-                                            </span>
-                                          ))}
-                                        </span>
-                                      );
-                                    } else {
-                                      return (
-                                        <span>
-                                          {q.text} ➔{' '}
-                                          <span className="text-emerald-600 dark:text-emerald-400 font-black bg-emerald-50 dark:bg-emerald-950/20 px-1.5 py-0.5 ml-1.5 rounded border border-emerald-200 dark:border-emerald-800/60 inline-block font-sans">
-                                            {ans}
-                                          </span>
-                                        </span>
-                                      );
-                                    }
-                                  })()}
-                                </span>
-                                <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  );
-                })()}
- 
-                {/* 4. Theory Section */}
-                {grouped.theory.length > 0 && (
-                  <div className="space-y-4 text-left font-sans">
-                    {showSections && (
-                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                        ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី ឬចម្លើយខ្លី (Theory Questions)
-                      </div>
-                    )}
-                    <div className="space-y-5 animate-none">
-                      {grouped.theory.map((q) => {
-                        globalIdx++;
-                        return (
-                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
-                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
-                            </div>
-                            {/* Answer lines on paper */}
-                            {highlightKey ? (
-                              <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
-                                <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                  ចម្លើយគំរូ (Model Answer)
-                                </div>
-                                <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap">
-                                  {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានចម្លើយគំរូ"}
-                                </div>
-                                {q.explanation && q.options && q.options[q.correctIndex] && (
-                                  <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5">
-                                    💡 ការពន្យល់បន្ថែម៖ {q.explanation}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-2 pt-2 max-w-2xl font-sans">
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
- 
-                {/* 5. Exercise Section */}
-                {grouped.exercise.length > 0 && (
-                  <div className="space-y-4 text-left font-sans">
-                    {showSections && (
-                      <div className="font-extrabold text-[12px] uppercase border-b-2 border-black pb-1 mt-4 text-black font-sans tracking-wide">
-                        ផ្នែកទី ៥៖ លំហាត់គណនា ឬប្រធានតែងសេចក្តី (Exercises / Essays)
-                      </div>
-                    )}
-                    <div className="space-y-6">
-                      {grouped.exercise.map((q) => {
-                        globalIdx++;
-                        return (
-                          <div key={q.id || globalIdx} className="space-y-1.5 avoid-break">
-                            <div className="font-extrabold text-left text-black leading-relaxed font-sans text-xs">
-                              <span>សំណួរទី {globalIdx}៖ {q.text}</span>
-                              <span className="text-[9px] text-slate-500 font-normal ml-1.5 font-sans">({q.points || 2} ពិន្ទុ)</span>
-                            </div>
-                            {/* Workspace solving lines on paper */}
-                            {highlightKey ? (
-                              <div className="mt-2 p-3 bg-emerald-50/40 dark:bg-emerald-950/10 border border-emerald-200 dark:border-emerald-800/60 rounded-xl space-y-2 text-left font-sans max-w-2xl">
-                                <div className="text-[10px] font-black text-emerald-800 dark:text-emerald-300 uppercase tracking-wider flex items-center gap-1.5">
-                                  <span className="w-2 h-2 rounded-full bg-emerald-500"></span>
-                                  ដំណោះស្រាយគំរូ (Model Solution)
-                                </div>
-                                <div className="text-xs text-slate-800 dark:text-slate-200 leading-relaxed pl-3.5 whitespace-pre-wrap">
-                                  {q.options && q.options[q.correctIndex] ? q.options[q.correctIndex] : q.explanation || "មិនទាន់មានដំណោះស្រាយគំរូ"}
-                                </div>
-                                {q.explanation && q.options && q.options[q.correctIndex] && (
-                                  <div className="text-[10px] text-slate-500 pl-3.5 italic border-t border-dashed border-emerald-100 dark:border-emerald-900/40 pt-1.5">
-                                    💡 គន្លឹះដោះស្រាយ៖ {q.explanation}
-                                  </div>
-                                )}
-                              </div>
-                            ) : (
-                              <div className="space-y-2 pt-2 max-w-2xl font-sans">
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                                <div className="border-b border-dotted border-black h-5.5 w-full"></div>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  </div>
-                )}
-              </div>
-            );
-          })()}
-        </div>
+      <div className="hidden print:block printable-sheet bg-white text-black p-0 font-sans w-full max-w-4xl mx-auto min-h-screen select-text">
+        <ExamPaperView
+          exam={activeExam || undefined}
+          subject={activeSubject || undefined}
+          optionsLayout={optionsLayout}
+          optionStyle={optionStyle}
+          highlightKey={highlightKey}
+          examCenter={examCenter}
+          roomNumber={roomNumber}
+          deskNumber={deskNumber}
+          gradeNumber={gradeNumber}
+          examName={examName}
+          examSession={examSession}
+          durationTime={durationTime}
+          totalScore={totalScore}
+          logoText1={logoText1}
+          logoText2={logoText2}
+          customLogo={customLogo}
+          imgSrc={imgSrc}
+          imageFailed={imageFailed}
+          onImageError={() => {
+            if (imgSrc === '/Sovannphomi.png') {
+              setImgSrc('/sovannaphumi.png');
+            } else {
+              setImageFailed(true);
+            }
+          }}
+          headerFont={headerFont}
+          bodyFont={bodyFont}
+          headerFontSize={headerFontSize}
+          bodyFontSize={bodyFontSize}
+          headerLayout={headerLayout}
+          customLeftSpan={customLeftSpan}
+          customCenterSpan={customCenterSpan}
+          customRightSpan={customRightSpan}
+          isPrintMode={true}
+        />
       </div>
 
     </div>

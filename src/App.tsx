@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera } from 'lucide-react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera, Pin, PinOff } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
@@ -75,17 +75,16 @@ const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
     return true;
   });
 
-  const hasOrder = filtered.some(c => typeof c.order === 'number');
-  let sorted: ClassInfo[];
-  if (hasOrder) {
-    sorted = [...filtered].sort((a, b) => {
-      const orderA = typeof a.order === 'number' ? a.order : 999;
-      const orderB = typeof b.order === 'number' ? b.order : 999;
-      return orderA - orderB;
-    });
-  } else {
-    sorted = [...filtered];
-  }
+  const sorted = [...filtered].sort((a, b) => {
+    const pinA = a.isPinned ? 1 : 0;
+    const pinB = b.isPinned ? 1 : 0;
+    if (pinA !== pinB) {
+      return pinB - pinA; // Pinned items stay at the front
+    }
+    const orderA = typeof a.order === 'number' ? a.order : 999;
+    const orderB = typeof b.order === 'number' ? b.order : 999;
+    return orderA - orderB;
+  });
 
   return sorted.map((c, idx) => ({ ...c, order: idx }));
 };
@@ -311,6 +310,10 @@ export default function App() {
   const [canDrag, setCanDrag] = useState<boolean>(false);
 
   const handleClassDragStart = (e: React.DragEvent, index: number) => {
+    if (classes[index]?.isPinned) {
+      e.preventDefault();
+      return;
+    }
     setDraggedClassIndex(index);
     e.dataTransfer.effectAllowed = 'move';
     e.dataTransfer.setData('text/plain', index.toString());
@@ -319,6 +322,8 @@ export default function App() {
   const handleClassDragOver = (e: React.DragEvent, index: number) => {
     e.preventDefault();
     if (draggedClassIndex === null || draggedClassIndex === index) return;
+    // Cannot reorder onto or from a pinned class
+    if (classes[draggedClassIndex]?.isPinned || classes[index]?.isPinned) return;
     
     const updated = [...classes];
     const draggedItem = updated[draggedClassIndex];
@@ -344,7 +349,8 @@ export default function App() {
             for (let i = 0; i < finalizedClasses.length; i++) {
               const cls = finalizedClasses[i];
               await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                order: i
+                order: i,
+                isPinned: !!cls.isPinned
               }, { merge: true });
             }
           } catch (err) {
@@ -358,10 +364,47 @@ export default function App() {
     });
   };
 
+  const handleTogglePinClass = async (e: React.MouseEvent, classId: string) => {
+    e.stopPropagation();
+    const targetClass = classes.find(c => c.id === classId);
+    if (!targetClass) return;
+
+    const newPinnedState = !targetClass.isPinned;
+
+    setClasses(prevClasses => {
+      const updated = prevClasses.map(c => 
+        c.id === classId ? { ...c, isPinned: newPinnedState } : c
+      );
+      const finalizedClasses = sortClasses(updated);
+      const currentTeacherId = teacher?.id || null;
+      if (currentTeacherId) {
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
+        (async () => {
+          try {
+            for (let i = 0; i < finalizedClasses.length; i++) {
+              const cls = finalizedClasses[i];
+              await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+                order: i,
+                isPinned: !!cls.isPinned
+              }, { merge: true });
+            }
+          } catch (err) {
+            console.error("Failed to save pinned class state to Firestore:", err);
+          }
+        })();
+      } else {
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
+      }
+      return finalizedClasses;
+    });
+  };
+
   const handleMoveClass = async (e: React.MouseEvent, index: number, direction: 'left' | 'right') => {
     e.stopPropagation();
     const targetIndex = direction === 'left' ? index - 1 : index + 1;
     if (targetIndex < 0 || targetIndex >= classes.length) return;
+    // Strictly prevent moving if either the moving class or target position is pinned
+    if (classes[index]?.isPinned || classes[targetIndex]?.isPinned) return;
 
     setClasses(prevClasses => {
       const updated = [...prevClasses];
@@ -378,7 +421,8 @@ export default function App() {
             for (let i = 0; i < finalizedClasses.length; i++) {
               const cls = finalizedClasses[i];
               await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                order: i
+                order: i,
+                isPinned: !!cls.isPinned
               }, { merge: true });
             }
           } catch (err) {
@@ -518,7 +562,7 @@ export default function App() {
 
         for (let i = 0; i < sortedCloudClasses.length; i++) {
           const c = sortedCloudClasses[i];
-          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { id: c.id, name: c.name, order: i }, { merge: true }).catch(() => {});
+          safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', c.id), { id: c.id, name: c.name, order: i, isPinned: !!c.isPinned }, { merge: true }).catch(() => {});
         }
         
         if (sortedCloudClasses.length > 0) {
@@ -2615,7 +2659,7 @@ export default function App() {
                   whileHover={{ scale: 1.03 }}
                   whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
                   transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                  draggable={canDrag}
+                  draggable={canDrag && !cls.isPinned}
                   onDragStart={(e) => handleClassDragStart(e as any, idx)}
                   onDragOver={(e) => handleClassDragOver(e as any, idx)}
                   onDragEnd={handleClassDragEnd}
@@ -2673,20 +2717,32 @@ export default function App() {
                     transition={{ type: "spring", stiffness: 450, damping: 22 }}
                     className="relative z-10 flex items-center gap-1.5"
                   >
-                    <div
-                      onMouseDown={() => setCanDrag(true)}
-                      onTouchStart={() => setCanDrag(true)}
-                      onMouseUp={() => setCanDrag(false)}
-                      onTouchEnd={() => setCanDrag(false)}
-                      className={`cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90 ${
-                        isActive 
-                          ? isDarkMode ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-500/10 text-blue-600' 
-                          : isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/10 text-slate-500'
-                      }`}
-                      title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
-                    >
-                      <GripVertical className="w-3 h-3" />
-                    </div>
+                    {!cls.isPinned ? (
+                      <div
+                        onMouseDown={() => setCanDrag(true)}
+                        onTouchStart={() => setCanDrag(true)}
+                        onMouseUp={() => setCanDrag(false)}
+                        onTouchEnd={() => setCanDrag(false)}
+                        className={`cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90 ${
+                          isActive 
+                            ? isDarkMode ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-500/10 text-blue-600' 
+                            : isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/10 text-slate-500'
+                        }`}
+                        title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
+                      >
+                        <GripVertical className="w-3 h-3" />
+                      </div>
+                    ) : (
+                      /* Visual Pin (ម្ជុល) if pinned */
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePinClass(e, cls.id)}
+                        className="p-0.5 -ml-0.5 rounded-full hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
+                        title="បានខ្ទាស់ម្ជុលជាប់ (ចុចដោះម្ជុលចេញវិញដើម្បីអាចប្ដូរទីតាំងបាន)"
+                      >
+                        <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500 -rotate-45 drop-shadow-xs" />
+                      </button>
+                    )}
                     
                     <span className={
                       isActive 
@@ -2700,7 +2756,28 @@ export default function App() {
 
                     {/* Discrete action buttons (reveal on hover) */}
                     <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity ml-0.5">
-                      {idx > 0 && (
+                      {/* Pin / Unpin Button (ម្ជុល) */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePinClass(e, cls.id)}
+                        className={`p-0.5 rounded transition-colors cursor-pointer ${
+                          cls.isPinned
+                            ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/20'
+                            : isActive 
+                              ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:text-amber-500' 
+                              : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-500'
+                        }`}
+                        title={cls.isPinned ? "ដោះម្ជុលចេញវិញ (Unpin ដើម្បីប្ដូរទីតាំងបាន)" : "ខ្ទាស់ម្ជុល (Pin)"}
+                      >
+                        {cls.isPinned ? (
+                          <PinOff className="w-2.5 h-2.5 text-amber-500" />
+                        ) : (
+                          <Pin className="w-2.5 h-2.5" />
+                        )}
+                      </button>
+
+                      {/* Moving left/right is only allowed for unpinned classes among other unpinned classes */}
+                      {!cls.isPinned && idx > 0 && !classes[idx - 1]?.isPinned && (
                         <button
                           onClick={(e) => handleMoveClass(e, idx, 'left')}
                           className={`p-0.5 rounded transition-colors ${
@@ -2713,7 +2790,7 @@ export default function App() {
                           <ChevronLeft className="w-3 h-3" />
                         </button>
                       )}
-                      {idx < classes.length - 1 && (
+                      {!cls.isPinned && idx < classes.length - 1 && !classes[idx + 1]?.isPinned && (
                         <button
                           onClick={(e) => handleMoveClass(e, idx, 'right')}
                           className={`p-0.5 rounded transition-colors ${
@@ -2942,6 +3019,8 @@ export default function App() {
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
               isDarkMode={isDarkMode}
               teacher={teacher}
+              classes={classes}
+              onSwitchClass={handleSwitchClass}
             />
           </div>
         )}

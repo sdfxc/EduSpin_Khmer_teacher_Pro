@@ -83,6 +83,7 @@ export interface ClassInfo {
   id: string;
   name: string;
   order?: number;
+  isPinned?: boolean;
 }
 
 export interface TeacherAccount {

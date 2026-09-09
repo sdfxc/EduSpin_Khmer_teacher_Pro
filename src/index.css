@@ -177,4 +177,324 @@ sup {
   margin-left: 0.02em !important;
 }
 
+/* ============================================================
+   POWERPOINT HIGH-FIDELITY VIEWER, TRANSITIONS & ANIMATIONS
+   ============================================================ */
+
+/* ============================================================
+   KHMER & MATH COMPREHENSIVE FONT ALIASES & COMPATIBILITY
+   ============================================================ */
+
+/* Khmer OS Siemreap / Siemreap */
+@font-face {
+  font-family: 'Khmer OS Siemreap';
+  src: local('Khmer OS Siemreap'), local('KhmerOS Siemreap'), local('Siemreap'), url('https://fonts.gstatic.com/s/siemreap/v24/jizZREpt52Q9GfE140Vn-00.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Siemreap';
+  src: local('Siemreap'), local('Khmer OS Siemreap'), url('https://fonts.gstatic.com/s/siemreap/v24/jizZREpt52Q9GfE140Vn-00.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* Khmer OS Battambang / Battambang / Khmer Battambang */
+@font-face {
+  font-family: 'Khmer OS Battambang';
+  src: local('Khmer OS Battambang'), local('KhmerOS Battambang'), local('Battambang'), url('https://fonts.gstatic.com/s/battambang/v26/kJEnBzbL32ywu6O993_b71yY.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Khmer Battambang';
+  src: local('Khmer Battambang'), local('Khmer OS Battambang'), local('Battambang'), url('https://fonts.gstatic.com/s/battambang/v26/kJEnBzbL32ywu6O993_b71yY.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* Khmer OS Content / Khmer OS / Content */
+@font-face {
+  font-family: 'Khmer OS Content';
+  src: local('Khmer OS Content'), local('KhmerOS Content'), local('Content'), url('https://fonts.gstatic.com/s/content/v23/z7NLdRft0b2n2A32n_c.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Khmer OS';
+  src: local('Khmer OS'), local('KhmerOS'), local('Khmer OS System'), local('Content'), url('https://fonts.gstatic.com/s/content/v23/z7NLdRft0b2n2A32n_c.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* Khmer OS Muol Light / Khmer OS Moullight / Moul Light / Muol Light */
+@font-face {
+  font-family: 'Khmer OS Muol Light';
+  src: local('Khmer OS Muol Light'), local('KhmerOS Muol Light'), local('Khmer OS Moullight'), local('Moulpali'), local('Moul'), url('https://fonts.gstatic.com/s/moulpali/v23/z7NLdRft0b2n2A32n_c.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Khmer OS Moullight';
+  src: local('Khmer OS Moullight'), local('Khmer OS Muol Light'), local('Moulpali'), local('Moul');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Khmer OS Moul';
+  src: local('Khmer OS Moul'), local('Khmer OS Muol'), local('Moul'), url('https://fonts.gstatic.com/s/moul/v24/nuFvD-F4W45j-zU_lA.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Khmer OS Muol';
+  src: local('Khmer OS Muol'), local('Khmer OS Moul'), local('Moul'), url('https://fonts.gstatic.com/s/moul/v24/nuFvD-F4W45j-zU_lA.woff2') format('woff2');
+  font-display: swap;
+}
+
+/* ANdong tep / Andong Tep / Khmer OS Andong Tep */
+@font-face {
+  font-family: 'ANdong tep';
+  src: local('ANdong tep'), local('Andong Tep'), local('Khmer OS Andong Tep'), local('Kantumruy Pro');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Andong Tep';
+  src: local('Andong Tep'), local('ANdong tep'), local('Khmer OS Andong Tep'), local('Kantumruy Pro');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Khmer OS Andong Tep';
+  src: local('Khmer OS Andong Tep'), local('ANdong tep'), local('Andong Tep'), local('Kantumruy Pro');
+  font-display: swap;
+}
+
+/* Tacteing / Tacteng (Dingbats, symbols, bullets, geometric shapes) */
+@font-face {
+  font-family: 'Tacteing';
+  src: local('Tacteing'), local('Tacteng'), local('Wingdings'), local('Segoe UI Symbol'), local('Apple Symbols'), local('Symbol');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Tacteng';
+  src: local('Tacteng'), local('Tacteing'), local('Wingdings'), local('Segoe UI Symbol'), local('Apple Symbols'), local('Symbol');
+  font-display: swap;
+}
+
+/* Times New Roman / Tinos / Time New Romand */
+@font-face {
+  font-family: 'Times New Roman';
+  src: local('Times New Roman'), local('Times'), local('Tinos'), url('https://fonts.gstatic.com/s/tinos/v24/buExpoOum9G3Zev35-66.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Time New Romand';
+  src: local('Times New Roman'), local('Times'), local('Tinos');
+  font-display: swap;
+}
+
+/* Math and Physics Fonts */
+@font-face {
+  font-family: 'STIX Two Math';
+  src: local('STIX Two Math'), local('STIXTwoMath-Regular'), url('https://fonts.gstatic.com/s/stixtwomath/v8/FBV1dDe3P93297N82dC-w5A8.woff2') format('woff2');
+  font-display: swap;
+}
+@font-face {
+  font-family: 'Cambria Math';
+  src: local('Cambria Math'), local('STIX Two Math'), local('Times New Roman');
+  font-display: swap;
+}
+
+/* Slide Transitions */
+@keyframes pptxFade {
+  0% { opacity: 0; transform: scale(0.99); }
+  100% { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pptxPushNext {
+  0% { transform: translateX(100%); opacity: 0.7; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pptxPushPrev {
+  0% { transform: translateX(-100%); opacity: 0.7; }
+  100% { transform: translateX(0); opacity: 1; }
+}
+
+@keyframes pptxWipe {
+  0% { clip-path: polygon(0 0, 0 0, 0 100%, 0 100%); }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+}
+
+@keyframes pptxZoom {
+  0% { transform: scale(0.78); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+@keyframes pptxFlip {
+  0% { transform: perspective(1400px) rotateY(-80deg); opacity: 0; }
+  100% { transform: perspective(1400px) rotateY(0deg); opacity: 1; }
+}
+
+@keyframes pptxSplit {
+  0% { clip-path: polygon(50% 0, 50% 0, 50% 100%, 50% 100%); }
+  100% { clip-path: polygon(0 0, 100% 0, 100% 100%, 0 100%); }
+}
+
+/* Shape Entrance Animation */
+@keyframes pptxShapeEntrance {
+  0% {
+    opacity: 0;
+    transform: translateY(22px) scale(0.97);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.pptx-transition-fade {
+  animation: pptxFade 0.38s ease-out both;
+}
+
+.pptx-transition-push-next {
+  animation: pptxPushNext 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pptx-transition-push-prev {
+  animation: pptxPushPrev 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pptx-transition-wipe {
+  animation: pptxWipe 0.48s ease-out both;
+}
+
+.pptx-transition-zoom {
+  animation: pptxZoom 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+.pptx-transition-flip {
+  animation: pptxFlip 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+.pptx-transition-split {
+  animation: pptxSplit 0.48s ease-out both;
+}
+
+.pptx-animated-shape {
+  animation: pptxShapeEntrance 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* ============================================================
+   KHMER TEXT ASCENDER & DIACRITIC CLIPPING RESOLUTION (NO CUT-OFF)
+   ============================================================ */
+
+/* Global protection for Khmer Unicode vowels, ascenders and descenders */
+.pptx-stage-content,
+.pptx-slide,
+[class*="pptx-"],
+.pptx-shape,
+.pptx-text,
+.pptx-paragraph,
+.pptx-run {
+  font-family: 'Kantumruy Pro', 'Khmer OS Siemreap', 'Siemreap', 'Khmer OS Battambang', 'Battambang', 'Khmer OS Content', 'Content', 'Khmer OS Muol Light', 'Moul', 'Times New Roman', 'Inter', Calibri, Arial, sans-serif;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Ensure all shapes and paragraphs do not clip tall vowels */
+.pptx-stage-content .pptx-shape,
+.pptx-stage-content .pptx-text,
+.pptx-stage-content .pptx-paragraph,
+.pptx-stage-content .pptx-run,
+.pptx-stage-content p,
+.pptx-stage-content span,
+.pptx-stage-content h1,
+.pptx-stage-content h2,
+.pptx-stage-content h3,
+.pptx-stage-content h4 {
+  overflow: visible !important;
+  overflow-y: visible !important;
+  line-height: 1.48 !important;
+}
+
+/* Specific headroom padding for slide titles and header shapes */
+.pptx-stage-content h1,
+.pptx-stage-content h2,
+.pptx-stage-content .pptx-shape > div,
+.pptx-stage-content [data-text] {
+  overflow: visible !important;
+  overflow-y: visible !important;
+}
+
+/* Prevent SVG text elements in PowerPoint shapes from being cropped */
+.pptx-stage-content svg text,
+.pptx-stage-content svg tspan {
+  overflow: visible !important;
+  dominant-baseline: auto;
+}
+
+.pptx-stage-content svg {
+  overflow: visible !important;
+}
+
+/* Make sure all hidden/animated exercise content, tables & formulas are visible */
+.pptx-stage-content [style*="visibility: hidden"],
+.pptx-stage-content [style*="opacity: 0"],
+.pptx-stage-content [style*="opacity:0"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Fix any white-on-white text inside shape containers */
+.pptx-stage-content [data-slide-index] {
+  margin: 0 auto;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+}
+
+/* ============================================================
+   EXAM PAPER TEMPLATE & PRINT PERFECTION (MOEYS & SCHOOL STANDARD)
+   ============================================================ */
+
+.printable-sheet,
+.exam-paper-preview {
+  font-feature-settings: "liga", "clig";
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+}
+
+.printable-sheet *,
+.exam-paper-preview * {
+  box-sizing: border-box;
+}
+
+/* Prevent Khmer diacritics clipping across exam sheets */
+.printable-sheet div,
+.printable-sheet span,
+.printable-sheet p,
+.printable-sheet td,
+.printable-sheet th,
+.exam-paper-preview div,
+.exam-paper-preview span,
+.exam-paper-preview p,
+.exam-paper-preview td,
+.exam-paper-preview th {
+  overflow: visible !important;
+  line-height: 1.6;
+}
+
+.exam-header-title {
+  font-family: 'Khmer OS Muol Light', 'Moul', 'Moulpali', serif;
+  letter-spacing: 0.5px;
+  line-height: 1.65;
+}
+
+.exam-header-sub {
+  font-family: 'Khmer OS Siemreap', 'Siemreap', 'Khmer OS Battambang', 'Battambang', sans-serif;
+  line-height: 1.55;
+}
+
+.exam-divider-double {
+  border-bottom: 3px double #000;
+  margin: 8px 0 16px 0;
+}
+
+.exam-dotted-line {
+  border-bottom: 1px dotted #000;
+  min-height: 24px;
+  width: 100%;
+}
+
+
 

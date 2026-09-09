@@ -1,12 +1,32 @@
 <!doctype html>
-<html lang="en">
+<html lang="km">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>EduSpin Pro - សាលារៀនសុវណ្ណភូមិ (Sovannaphumi School)</title>
-    <meta name="description" content="កម្មវិធីគ្រប់គ្រងការបង្រៀន បង្វិលឈ្មោះសិស្ស បែងចែកក្រុម ក្ដារសំណួរ និងវិញ្ញាសាប្រឡងបែបវិជ្ជាជីវៈ" />
-    <meta property="og:title" content="EduSpin Pro - សាលារៀនសុវណ្ណភូមិ (Sovannaphumi School)" />
-    <meta property="og:description" content="កម្មវិធីគ្រប់គ្រងការបង្រៀន បង្វិលឈ្មោះសិស្ស បែងចែកក្រុម ក្ដារសំណួរ និងវិញ្ញាសាប្រឡងបែបវិជ្ជាជីវៈ" />
+    <title>Remix: EduSpin Quiz Master</title>
+    <meta name="description" content="An interactive classroom game with a student randomizer and AI-powered flashcard quizzes generated from lesson content." />
+    <meta property="og:title" content="Remix: EduSpin Quiz Master" />
+    <meta property="og:description" content="An interactive classroom game with a student randomizer and AI-powered flashcard quizzes generated from lesson content." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Angkor&family=Battambang:wght@400;700;900&family=Bokor&family=Chenla&family=Content:wght@400;700&family=Fasthand&family=Hanuman:wght@400;700;900&family=Kantumruy+Pro:ital,wght@0,300..700;1,300..700&family=Koulen&family=Moul&family=Moulpali&family=Nokora:wght@400;700&family=Noto+Sans+Khmer:wght@300;400;500;600;700;800;900&family=Noto+Serif+Khmer:wght@300;400;500;600;700;800;900&family=Odor+Mean+Chey&family=Preahvihear&family=Siemreap&family=Suwannaphum:wght@400;700&family=Taprom&family=STIX+Two+Math&family=Tinos:ital,wght@0,400;0,700;1,400;1,700&family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@500;700&display=swap" rel="stylesheet" />
+    <!-- MathJax 3 for Mathematics and Physics Formulas Rendering -->
+    <script>
+      window.MathJax = {
+        tex: {
+          inlineMath: [['$', '$'], ['\\(', '\\)']],
+          displayMath: [['$$', '$$'], ['\\[', '\\]']],
+          processEscapes: true
+        },
+        svg: {
+          fontCache: 'global'
+        },
+        options: {
+          skipHtmlTags: ['script', 'noscript', 'style', 'textarea', 'pre']
+        }
+      };
+    </script>
+    <script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-chtml.js"></script>
   </head>
   <body>
     <div id="root"></div>

@@ -64,9 +64,24 @@
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["exams"]
+    },
+    "ExternalDoc": {
+      "title": "ExternalDoc",
+      "description": "Represent external PDF and PowerPoint document metadata for a classroom",
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string" },
+        "docs": { "type": "array" },
+        "updatedAt": { "type": "number" }
+      },
+      "required": ["classId", "docs"]
     }
   },
   "firestore": {
+    "/external_docs/{docId}": {
+      "schema": "ExternalDoc",
+      "description": "Metadata for external PDF and PowerPoint documents associated with a class."
+    },
     "/teachers/{teacherId}": {
       "schema": "Teacher",
       "description": "Collection of teachers."

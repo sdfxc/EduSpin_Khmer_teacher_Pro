@@ -14,6 +14,7 @@ import {
   DocumentSnapshot,
   QuerySnapshot
 } from 'firebase/firestore';
+export { doc, setDoc, getDoc, getDocs, collection, deleteDoc, query, where, onSnapshot };
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Clear any residual quota block key from past runs
@@ -45,7 +46,17 @@ if (typeof window !== 'undefined') {
 export const isQuotaExceeded = () => false;
 
 export const cleanFirestoreData = (obj: any): any => {
-  if (obj === null || typeof obj !== 'object') {
+  if (obj === null || obj === undefined) {
+    return obj;
+  }
+  if (typeof obj === 'string') {
+    // Strip giant base64 data URIs (>100KB) to strictly avoid Firestore 1MB document limit
+    if (obj.length > 100000 && obj.startsWith('data:')) {
+      return '';
+    }
+    return obj;
+  }
+  if (typeof obj !== 'object') {
     return obj;
   }
   if (Array.isArray(obj)) {
