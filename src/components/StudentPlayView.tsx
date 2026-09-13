@@ -3,8 +3,8 @@ import {
   Award, Trophy, Smartphone, Sparkles, User, RefreshCw, CheckCircle2, 
   XCircle, Timer, AlertCircle, HelpCircle, ArrowRight, Heart
 } from 'lucide-react';
-import { db, handleFirestoreError, OperationType, safeSetDoc, safeOnSnapshot } from '../lib/firebase';
-import { doc, getDoc, collection, getDocs } from 'firebase/firestore';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeOnSnapshot, safeGetDocs } from '../lib/firebase';
+import { doc, collection } from 'firebase/firestore';
 import { Student, QuizCard, Question } from '../types';
 import confetti from 'canvas-confetti';
 import FormulaRenderer from './FormulaRenderer';
@@ -360,7 +360,7 @@ export default function StudentPlayView() {
     try {
       // Check if student with this name already exists in the classroom to load their score!
       const stdColl = collection(db, 'teachers', teacherId, 'classes', classId, 'students');
-      const stdSnap = await getDocs(stdColl);
+      const stdSnap = await safeGetDocs(stdColl);
       
       let matchedStudent: Student | null = null;
       stdSnap.forEach(snap => {

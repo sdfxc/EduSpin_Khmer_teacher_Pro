@@ -323,11 +323,37 @@ Ensure that approximately 20% of these questions connect directly to real daily-
 `;
   }
 
-  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${totalRequestedCount} high-quality questions for students. 
+  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${totalRequestedCount} high-quality, concise multiple-choice questions for students. 
 
 ${languagePrompt}
 
 ${categoryRatiosPrompt}
+
+========================================================================
+CRITICAL MANDATORY REQUIREMENT: SHORT, CONCISE, EASY TO UNDERSTAND & QUICK TO READ
+(លក្ខខណ្ឌដាច់ខាត៖ សំណួរខ្លី ច្បាស់ ងាយយល់ និងជម្រើសចម្លើយខ្លីៗ រហ័សសម្រាប់សិស្ស)
+========================================================================
+The questions will be displayed on a big classroom screen and spinning wheel with a 15-20 second countdown timer.
+Students must be able to read and understand the question and all 4 options IN SECONDS.
+DO NOT generate wordy, convoluted, or lengthy sentences! Keep everything clean, punchy, and accessible.
+
+1. QUESTION TEXT (សំណួរខ្លី ខ្លឹម ចំគោលដៅ ងាយយល់):
+   - MUST be short, direct, and concise: Strictly 1 to 2 lines (ideally 8 to 15 Khmer words, maximum 75-80 characters).
+   - Get straight to the key concept. DO NOT add unnecessary preambles, long winding descriptive clauses, or repetitive phrases.
+   - ❌ FORBIDDEN (Too long, slow to read): "តើមួយណាជាបរិមាណវ៉ិចទ័រដែលបង្ហាញពីការផ្លាស់ប្តូរទីតាំងរបស់វត្ថុពីចំណុចចាប់ផ្តើមទៅចំណុចបញ្ចប់?"
+   - ✅ REQUIRED (Short, crisp, instantly understood): "តើបម្លាស់ទីជាអ្វី?" ឬ "តើបរិមាណណាជាបម្លាស់ទី?" ឬ "តើឯកតា SI នៃកម្លាំងគឺអ្វី?" ឬ "តើរូបមន្តល្បឿនគឺអ្វី?"
+   - ❌ FORBIDDEN: "ប្រសិនបើសិស្សម្នាក់ធ្វើការសង្កេតលើចលនារបស់រថយន្តមួយដែលធ្វើដំណើរលើផ្លូវត្រង់ស្មើ... តើចម្ងាយចរគិតយ៉ាងដូចម្តេច?"
+   - ✅ REQUIRED: "តើចលនាត្រង់ស្មើមានរូបមន្តចម្ងាយអ្វី?" ឬ "តើ $v = \\frac{s}{t}$ ជារូបមន្តអ្វី?"
+
+2. OPTIONS / CHOICES (ចម្លើយ A, B, C, D ខ្លីៗ ច្បាស់ៗ):
+   - Each option MUST be very short and concise: Strictly 1 to 3 words, a single term, a number with unit, or a short formula.
+   - NEVER write full sentences or explanatory paragraphs inside options.
+   - ❌ FORBIDDEN: "ជាបម្លាស់ទីដែលកើតឡើងនៅពេលវត្ថុផ្លាស់ប្តូរទីតាំងពីចំណុចមួយទៅចំណុចមួយទៀត"
+   - ✅ REQUIRED: "បម្លាស់ទី", "ល្បឿន", "សំទុះ", "ចម្ងាយចរ"
+   - ✅ REQUIRED: "10 m/s", "5 N", "v = s/t", "H_2O", "100°C"
+
+3. EXPLANATION (ការពន្យល់):
+   - Keep the explanation also brief, concise, and clear (1 to 2 short sentences).
 
 CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
 If the questions involve math, physics, or chemistry:
@@ -339,7 +365,7 @@ If the questions involve math, physics, or chemistry:
   - Chemical reaction arrows: write using "->" or "-->" or "\\rightarrow" (e.g., "2H_2 + O_2 -> 2H_2O").
   - Mathematics symbols: use LaTeX style formatting: "\\pm" for ±, "\\times" for ×, "\\div" for ÷, "\\le" for ≤, "\\ge" for ≥, "\\pi" for π, "\\Delta" for Δ, "\\alpha" for α, "\\beta" for β, "\\theta" for θ.
 
-Please thoroughly analyze all provided resource attachments (images, PDF documents, and extracted text from Word, PowerPoint, or Excel files) and formulate questions testing the main concepts.
+Please thoroughly analyze all provided resource attachments (images, PDF documents, and extracted text from Word, PowerPoint, or Excel files) and formulate short, concise questions testing the main concepts.
 
 Provide the response in JSON format.`;
 
@@ -413,15 +439,18 @@ Provide the response in JSON format.`;
                   items: {
                     type: Type.OBJECT,
                     properties: {
-                      text: { type: Type.STRING, description: "The question text, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" },
+                      text: { 
+                        type: Type.STRING, 
+                        description: "Short, direct, concise question text (strictly under 15 words). Easy for students to read and understand at a glance in under 3-5 seconds. NEVER write long convoluted sentences or long paragraphs." 
+                      },
                       options: { 
                         type: Type.ARRAY, 
                         items: { type: Type.STRING },
-                        description: "Exactly 4 multiple choice options, matching Column A and B for matching, plausible terms/numerical/text for others"
+                        description: "Exactly 4 very short, concise options (strictly 1 to 3 words, single key term, or short formula/number each). NEVER write full sentences."
                       },
                       correctIndex: { type: Type.INTEGER, description: "The 0-based index of the correct option" },
                       category: { type: Type.STRING, description: "The precise category of the question: choice, matching, fill_blank, theory, or exercise" },
-                      explanation: { type: Type.STRING, description: "Detailed explanation and steps" }
+                      explanation: { type: Type.STRING, description: "Short, concise explanation (1-2 sentences only)" }
                     },
                     required: ["text", "options", "correctIndex", "category"]
                   }

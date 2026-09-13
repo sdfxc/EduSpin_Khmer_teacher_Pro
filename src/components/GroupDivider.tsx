@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList } from 'lucide-react';
+import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList, Timer } from 'lucide-react';
 import { Student, TeacherAccount } from '../types';
 import * as XLSX from 'xlsx';
 import { db, handleFirestoreError, OperationType, safeSetDoc, safeGetDoc } from '../lib/firebase';
 import { doc } from 'firebase/firestore';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
+import StopwatchPanel from './StopwatchPanel';
 
 interface GroupDividerProps {
   students: Student[];
@@ -13,6 +14,7 @@ interface GroupDividerProps {
   teacher: TeacherAccount | null;
   isDarkMode?: boolean;
   onBatchSyncStudents?: (names: string[], mode: 'replace' | 'append') => void | Promise<void>;
+  onNavigateTab?: (tab: string) => void;
 }
 
 interface GroupMember extends Student {
@@ -32,8 +34,10 @@ export default function GroupDivider({
   activeClassId,
   teacher,
   isDarkMode = false,
-  onBatchSyncStudents
+  onBatchSyncStudents,
+  onNavigateTab
 }: GroupDividerProps) {
+  const [activeSubTab, setActiveSubTab] = useState<'groups' | 'stopwatch'>('groups');
   const [numGroups, setNumGroups] = useState(4);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupScoreInputs, setGroupScoreInputs] = useState<Record<number, string>>({});
@@ -486,97 +490,152 @@ export default function GroupDivider({
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      {/* Set Number of Teams Panel */}
-      <div className={`p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 border transition-all duration-300 ${
-        isDarkMode ? 'bg-[#121829] border-slate-805 border-indigo-950/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
+      {/* Sub-Tabs Switcher */}
+      <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-fit shadow-xs ${
+        isDarkMode ? 'bg-slate-900/90 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
       }`}>
-        <div className="flex items-center gap-4">
-          <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-305 duration-300 ${
-            isDarkMode ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600'
-          }`}>
-            <Users className="w-6 h-6" />
-          </div>
-          <div>
-            <h2 className={`text-xl font-extrabold leading-tight transition-all duration-300 ${
-              isDarkMode ? 'text-white' : 'text-slate-800'
-            }`}>កំណត់ការបែងចែកក្រុមស្មើគ្នា</h2>
-            <p className={`text-xs mt-1 font-semibold flex items-center gap-2 flex-wrap transition-all duration-300 ${
-              isDarkMode ? 'text-slate-400' : 'text-slate-500'
-            }`}>
-              <span>ថ្នាក់៖ <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{activeClassName}</span></span>
-              <span>•</span>
-              <span>សិស្សសរុប៖ <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{students.length} នាក់</span></span>
-            </p>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('groups')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'groups'
+              ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
+              : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+          }`}
+        >
+          <Users className="w-4 h-4" />
+          <span>បែងចែកក្រុម (Groups)</span>
+        </button>
 
-        {/* Adjusters & Buttons */}
-        <div className="flex flex-wrap items-center gap-4 self-end lg:self-auto">
-          {/* Quick View, Copy, Paste, & Edit All Students */}
-          <button
-            type="button"
-            onClick={() => setShowQuickEditModal(true)}
-            className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
-              isDarkMode 
-                ? 'bg-purple-950/40 border-purple-900/50 text-purple-300 hover:bg-purple-900/60' 
-                : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
-            }`}
-            title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
-          >
-            <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
-            <span>បញ្ជី & កែឈ្មោះសិស្ស</span>
-          </button>
-
-          {groups.length > 0 && (
-            <button
-              onClick={exportGroupsToExcel}
-              className="px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold flex items-center gap-2 shadow-md shadow-green-500/10 cursor-pointer text-xs"
-            >
-              <FileSpreadsheet className="w-4 h-4" />
-              <span>ទាញយករបាយការណ៍ពិន្ទុ (Excel)</span>
-            </button>
-          )}
-
-          <div className={`flex items-center rounded-2xl p-1 shadow-inner select-none border transition-all duration-300 ${
-            isDarkMode ? 'bg-slate-950 border-slate-850 border-indigo-950/80' : 'bg-slate-100 border-slate-200'
-          }`}>
-            <button
-              onClick={handleDecrement}
-              disabled={numGroups <= 2}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl disabled:opacity-40 transition-all cursor-pointer border ${
-                isDarkMode 
-                  ? 'text-slate-400 bg-slate-905 bg-slate-900 border-slate-800 hover:bg-slate-800' 
-                  : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Minus className="w-4 h-4" />
-            </button>
-            <span className={`w-12 text-center text-lg font-black font-mono transition-all duration-300 ${
-              isDarkMode ? 'text-white' : 'text-slate-800'
-            }`}>{numGroups}</span>
-            <button
-              onClick={handleIncrement}
-              disabled={numGroups >= students.length}
-              className={`w-10 h-10 flex items-center justify-center rounded-xl disabled:opacity-40 transition-all cursor-pointer border ${
-                isDarkMode 
-                  ? 'text-slate-400 bg-slate-905 bg-slate-900 border-slate-800 hover:bg-slate-800' 
-                  : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
-              }`}
-            >
-              <Plus className="w-4 h-4" />
-            </button>
-          </div>
-
-          <button
-            onClick={splitGroups}
-            disabled={students.length === 0}
-            className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/15 cursor-pointer active:scale-95 transition-all text-xs"
-          >
-            <Shuffle className="w-4 h-4" />
-            <span>បែងចែកក្រុមឥឡូវនេះ</span>
-          </button>
-        </div>
+        <button
+          type="button"
+          onClick={() => setActiveSubTab('stopwatch')}
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+            activeSubTab === 'stopwatch'
+              ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-600/25'
+              : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
+          }`}
+        >
+          <Timer className="w-4 h-4 text-cyan-400 animate-pulse" />
+          <span>Stopwatch & Timer ក្នុងក្រុម</span>
+        </button>
       </div>
+
+      {activeSubTab === 'stopwatch' ? (
+        <StopwatchPanel
+          isDarkMode={isDarkMode}
+          activeClassId={activeClassId}
+          className={activeClassName}
+          onNavigateTab={onNavigateTab}
+        />
+      ) : (
+        <>
+          {/* Set Number of Teams Panel */}
+          <div className={`p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 border transition-all duration-300 ${
+            isDarkMode ? 'bg-[#121829] border-slate-805 border-indigo-950/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
+          }`}>
+            <div className="flex items-center gap-4">
+              <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-305 duration-300 ${
+                isDarkMode ? 'bg-indigo-950/40 text-indigo-400 border border-indigo-500/20' : 'bg-indigo-50 text-indigo-600'
+              }`}>
+                <Users className="w-6 h-6" />
+              </div>
+              <div>
+                <h2 className={`text-xl font-extrabold leading-tight transition-all duration-300 ${
+                  isDarkMode ? 'text-white' : 'text-slate-800'
+                }`}>កំណត់ការបែងចែកក្រុមស្មើគ្នា</h2>
+                <p className={`text-xs mt-1 font-semibold flex items-center gap-2 flex-wrap transition-all duration-300 ${
+                  isDarkMode ? 'text-slate-400' : 'text-slate-500'
+                }`}>
+                  <span>ថ្នាក់៖ <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{activeClassName}</span></span>
+                  <span>•</span>
+                  <span>សិស្សសរុប៖ <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{students.length} នាក់</span></span>
+                </p>
+              </div>
+            </div>
+
+            {/* Adjusters & Buttons */}
+            <div className="flex flex-wrap items-center gap-4 self-end lg:self-auto">
+              {/* Quick View, Copy, Paste, & Edit All Students */}
+              <button
+                type="button"
+                onClick={() => setShowQuickEditModal(true)}
+                className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
+                  isDarkMode 
+                    ? 'bg-purple-950/40 border-purple-900/50 text-purple-300 hover:bg-purple-900/60' 
+                    : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
+                }`}
+                title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
+              >
+                <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span>បញ្ជី & កែឈ្មោះសិស្ស</span>
+              </button>
+
+              {/* Stopwatch direct shortcut button */}
+              <button
+                type="button"
+                onClick={() => setActiveSubTab('stopwatch')}
+                className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
+                  isDarkMode 
+                    ? 'bg-blue-950/40 border-blue-900/50 text-blue-300 hover:bg-blue-900/60' 
+                    : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
+                }`}
+                title="បើក Stopwatch & នាឡិកាកំណត់ម៉ោងសម្រាប់ក្រុម"
+              >
+                <Timer className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
+                <span>Stopwatch</span>
+              </button>
+
+              {groups.length > 0 && (
+                <button
+                  onClick={exportGroupsToExcel}
+                  className="px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold flex items-center gap-2 shadow-md shadow-green-500/10 cursor-pointer text-xs"
+                >
+                  <FileSpreadsheet className="w-4 h-4" />
+                  <span>ទាញយករបាយការណ៍ពិន្ទុ (Excel)</span>
+                </button>
+              )}
+
+              <div className={`flex items-center rounded-2xl p-1 shadow-inner select-none border transition-all duration-300 ${
+                isDarkMode ? 'bg-slate-950 border-slate-850 border-indigo-950/80' : 'bg-slate-100 border-slate-200'
+              }`}>
+                <button
+                  onClick={handleDecrement}
+                  disabled={numGroups <= 2}
+                  className={`w-10 h-10 flex items-center justify-center rounded-xl disabled:opacity-40 transition-all cursor-pointer border ${
+                    isDarkMode 
+                      ? 'text-slate-400 bg-slate-905 bg-slate-900 border-slate-800 hover:bg-slate-800' 
+                      : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <Minus className="w-4 h-4" />
+                </button>
+                <span className={`w-12 text-center text-lg font-black font-mono transition-all duration-300 ${
+                  isDarkMode ? 'text-white' : 'text-slate-800'
+                }`}>{numGroups}</span>
+                <button
+                  onClick={handleIncrement}
+                  disabled={numGroups >= students.length}
+                  className={`w-10 h-10 flex items-center justify-center rounded-xl disabled:opacity-40 transition-all cursor-pointer border ${
+                    isDarkMode 
+                      ? 'text-slate-400 bg-slate-905 bg-slate-900 border-slate-800 hover:bg-slate-800' 
+                      : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  <Plus className="w-4 h-4" />
+                </button>
+              </div>
+
+              <button
+                onClick={splitGroups}
+                disabled={students.length === 0}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/15 cursor-pointer active:scale-95 transition-all text-xs"
+              >
+                <Shuffle className="w-4 h-4" />
+                <span>បែងចែកក្រុមឥឡូវនេះ</span>
+              </button>
+            </div>
+          </div>
 
       {shuffleStats && (
         <div className={`p-4 rounded-3xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 animate-in fade-in slide-in-from-top-4 duration-300 ${
@@ -843,6 +902,8 @@ export default function GroupDivider({
             </div>
           )}
         </div>
+      )}
+        </>
       )}
 
       {/* Quick View, Edit, Copy & Paste Modal */}

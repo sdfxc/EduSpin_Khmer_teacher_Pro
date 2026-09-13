@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { motion, AnimatePresence } from 'motion/react';
-import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye, Pencil, Link as LinkIcon } from 'lucide-react';
+import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, RotateCcw, BookOpen, Plus, Trash2, Layers, Folder, Edit3, Check, X, ChevronDown, Printer, Download, Sparkles, Settings, Eye, Pencil, Link as LinkIcon, Volume2, VolumeX } from 'lucide-react';
 import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
 import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import confetti from 'canvas-confetti';
@@ -29,6 +30,7 @@ interface QuizPanelProps {
   onAnswer: (correct: boolean) => void;
   onReset: () => void;
   activeCard: QuizCard | null;
+  onCloseActiveCard?: () => void;
   selectedStudent: Student | null;
   chapters: QuizChapter[];
   activeRoomId: string | null;
@@ -87,6 +89,7 @@ export default function QuizPanel({
   onAnswer, 
   onReset,
   activeCard,
+  onCloseActiveCard,
   selectedStudent,
   chapters = [],
   activeRoomId = null,
@@ -119,6 +122,71 @@ export default function QuizPanel({
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [correctIndex, setCorrectIndex] = useState<number>(0);
   const [showResult, setShowResult] = useState<'correct' | 'wrong' | null>(null);
+  const [soundEnabled, setSoundEnabled] = useState(true);
+
+  const playTickSynth = () => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(950, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(350, ctx.currentTime + 0.04);
+      gain.gain.setValueAtTime(0.08, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.04);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.04);
+    } catch (e) {}
+  };
+
+  const playCorrectSynth = () => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      [523.25, 659.25, 783.99, 1046.50].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(freq, now + i * 0.09);
+        gain.gain.setValueAtTime(0.18, now + i * 0.09);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.09 + 0.3);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i * 0.09);
+        osc.stop(now + i * 0.09 + 0.3);
+      });
+    } catch (e) {}
+  };
+
+  const playWrongSynth = () => {
+    if (!soundEnabled) return;
+    try {
+      const AudioCtx = window.AudioContext || (window as any).webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const now = ctx.currentTime;
+      [320, 240].forEach((freq, i) => {
+        const osc = ctx.createOscillator();
+        const gain = ctx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(freq, now + i * 0.14);
+        gain.gain.setValueAtTime(0.14, now + i * 0.14);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.14 + 0.22);
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.start(now + i * 0.14);
+        osc.stop(now + i * 0.14 + 0.22);
+      });
+    } catch (e) {}
+  };
   
   // Teacher QA editing states
   const [isEditQuestionsModalOpen, setIsEditQuestionsModalOpen] = useState(false);
@@ -1919,13 +1987,22 @@ export default function QuizPanel({
     let timer: NodeJS.Timeout;
     if (activeCard && activeCard.status === 'idle' && timeLeft > 0 && !showResult) {
       timer = setInterval(() => {
-        setTimeLeft(prev => prev - 1);
+        setTimeLeft(prev => {
+          if (prev <= 1) {
+            return 0;
+          }
+          if (prev <= 6) {
+            playTickSynth();
+          }
+          return prev - 1;
+        });
       }, 1000);
     } else if (timeLeft === 0 && !showResult) {
+      playWrongSynth();
       handleAnswer(-1); // Timeout
     }
     return () => clearInterval(timer);
-  }, [activeCard, timeLeft, showResult]);
+  }, [activeCard, timeLeft, showResult, soundEnabled]);
 
   useEffect(() => {
     if (activeCard?.question) {
@@ -1960,12 +2037,15 @@ export default function QuizPanel({
     setShowResult(isCorrect ? 'correct' : 'wrong');
 
     if (isCorrect) {
+      playCorrectSynth();
       confetti({
-        particleCount: 150,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#4F46E5', '#10B981', '#F59E0B']
+        particleCount: 160,
+        spread: 80,
+        origin: { y: 0.55 },
+        colors: ['#4F46E5', '#10B981', '#F59E0B', '#EC4899']
       });
+    } else {
+      playWrongSynth();
     }
   };
 
@@ -1975,165 +2055,44 @@ export default function QuizPanel({
     }
   };
 
-  if (activeCard) {
-    return (
-      <div className="flex-1 flex flex-col p-8 bg-transparent relative transition-colors duration-300 overflow-y-auto custom-scrollbar">
-        <div className="max-w-3xl mx-auto w-full flex-1 flex flex-col">
-          {/* Question Header */}
-          <div className="flex items-center justify-between mb-8">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-indigo-600 text-white rounded-2xl flex items-center justify-center font-bold text-xl shadow-lg shadow-indigo-500/20">
-                {activeCard.number}
-              </div>
-              <div>
-                <h3 className="text-sm font-semibold text-slate-400 dark:text-slate-500 uppercase tracking-wider">សំណួរដែលត្រូវឆ្លើយ</h3>
-                <p className="text-xl font-bold text-slate-800 dark:text-white">សន្លឹកប័ណ្ណសំណួរ</p>
-              </div>
-            </div>
-            
-            <div className="flex flex-col items-end">
-              <div className={`flex items-center gap-2 mb-1 ${timeLeft <= 5 ? 'text-red-500 animate-pulse' : 'text-slate-600 dark:text-slate-400'}`}>
-                <Timer className="w-5 h-5 text-indigo-500" />
-                <span className="text-base font-bold">រយៈពេលនៅសល់៖ <span className="text-xl font-black font-mono">{timeLeft}</span> វិនាទី</span>
-              </div>
-              <div className="w-48 h-1.5 bg-slate-200 dark:bg-slate-800 rounded-full overflow-hidden">
-                <motion.div 
-                  initial={{ width: '100%' }}
-                  animate={{ width: `${(timeLeft / 25) * 100}%` }}
-                  className={`h-full ${timeLeft <= 5 ? 'bg-red-500' : 'bg-indigo-500'}`}
-                />
-              </div>
-            </div>
-          </div>
+  const handleCloseModal = () => {
+    if (onCloseActiveCard) {
+      onCloseActiveCard();
+    } else {
+      onAnswer(false);
+    }
+  };
 
-          {/* Question Content */}
-          <motion.div 
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            className="flex-1 flex flex-col"
-          >
-            <div className="bg-white dark:bg-white border-2 border-slate-200 shadow-md rounded-[2rem] p-10 mb-8 flex-1 flex flex-col items-center justify-center relative overflow-hidden">
-              <HelpCircle className="absolute -top-12 -right-12 w-48 h-48 text-indigo-500/5 rotate-12" />
-              <div className="flex items-center gap-2 mb-4">
-                <span className="text-xs uppercase font-black tracking-widest text-indigo-600 bg-indigo-50 px-3 py-1 rounded-full">សំណួរលេខ {activeCard.number}</span>
-                <span className={`text-xs font-black px-3 py-1 rounded-full ${
-                  activeCard.question?.questionType === 'pisa'
-                    ? 'text-indigo-805 bg-indigo-50 border border-indigo-200 text-indigo-600'
-                    : 'text-amber-805 bg-amber-50 border border-amber-200 text-amber-600'
-                }`}>
-                  {activeCard.question?.questionType === 'pisa' ? '🎯 តេស្ត PISA' : '📚 មេរៀនទូទៅ'}
-                </span>
-              </div>
-              <h2 className="text-3xl sm:text-4xl font-black text-slate-950 text-center leading-relaxed relative z-10 max-w-2xl break-words whitespace-normal word-break-break-word">
-                <FormulaRenderer text={activeCard.question?.text || ''} />
-              </h2>
-            </div>
+  useEffect(() => {
+    if (!activeCard) return;
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5 mb-8">
-              {shuffledOptions.map((option, idx) => (
-                <button
-                  key={idx}
-                  onClick={() => handleAnswer(idx)}
-                  disabled={showResult !== null}
-                  className={`relative p-6 rounded-3xl border-3 text-left transition-all group overflow-hidden cursor-pointer ${
-                    showResult === null 
-                      ? 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-indigo-600 hover:shadow-2xl hover:shadow-indigo-500/10 shadow-sm text-slate-800 dark:text-slate-100 hover:scale-[1.02]'
-                      : idx === correctIndex
-                        ? 'bg-green-500/15 border-green-500 shadow-xl shadow-green-500/10 text-green-950 dark:text-green-100 scale-[1.01]'
-                        : showResult === 'wrong' && idx !== correctIndex
-                          ? 'bg-red-500/5 border-red-500/20 opacity-50 text-slate-900 dark:text-slate-100'
-                          : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800 opacity-65 text-slate-400 dark:text-slate-500'
-                  }`}
-                >
-                  <div className="flex items-center gap-5 relative z-10 w-full">
-                    <span className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black text-xl shadow-md transition-all shrink-0 ${
-                      idx === correctIndex && showResult !== null
-                        ? 'bg-green-600 text-white'
-                        : showResult !== null
-                          ? 'bg-slate-200 dark:bg-slate-800 text-slate-400'
-                          : 'bg-indigo-600 text-white group-hover:bg-indigo-700 animate-in zoom-in-30 duration-200'
-                    }`}>
-                      {String.fromCharCode(65 + idx)}
-                    </span>
-                    <span className={`text-lg sm:text-xl font-bold tracking-tight leading-snug break-words whitespace-normal flex-1 ${
-                      idx === correctIndex && showResult !== null
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-slate-800 dark:text-slate-200'
-                    }`}>
-                      <FormulaRenderer text={option} />
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
-          </motion.div>
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
-          {/* Result Feedback Overlay */}
-          <AnimatePresence>
-            {showResult && (
-              <motion.div
-                initial={{ scale: 0.5, opacity: 0 }}
-                animate={{ scale: 1, opacity: 1 }}
-                className={`flex items-center gap-3 p-6 rounded-3xl border-4 shadow-xl relative overflow-hidden ${
-                  showResult === 'correct' 
-                    ? 'bg-green-500/10 border-green-500/50 text-green-700 dark:text-green-400' 
-                    : 'bg-red-500/10 border-red-500/50 text-red-700 dark:text-red-400'
-                }`}
-              >
-                <div className="flex-1">
-                  <div className="flex items-center gap-3 mb-2">
-                    {showResult === 'correct' ? <CheckCircle className="w-8 h-8 text-green-600" /> : <XCircle className="w-8 h-8 text-red-600" />}
-                    <h4 className="text-xl font-bold uppercase tracking-tight">
-                      {showResult === 'correct' ? 'អស្ចារ្យណាស់! +៣ ពិន្ទុ' : 'គួរឲ្យសោកស្ដាយ! មិនទាន់ត្រឹមត្រូវទេ'}
-                    </h4>
-                  </div>
-                  {showResult === 'wrong' && (
-                    <div className="flex items-start gap-2 text-red-700 dark:text-red-400 bg-red-500/5 p-3 rounded-xl mt-4 max-w-lg mb-4 border border-red-500/20">
-                      <Info className="w-5 h-5 shrink-0 mt-0.5" />
-                      <p className="text-sm font-medium">
-                        ចម្លើយត្រឹមត្រូវគឺ៖ <span className="font-bold underline text-slate-800 dark:text-white">{shuffledOptions[correctIndex]}</span>
-                      </p>
-                    </div>
-                  )}
+      if (e.key === 'Escape') {
+        handleCloseModal();
+      } else if (showResult !== null) {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          handleContinue();
+        }
+      } else if (activeCard.status === 'idle') {
+        const key = e.key.toUpperCase();
+        if (key === 'A' || key === '1') {
+          handleAnswer(0);
+        } else if (key === 'B' || key === '2') {
+          handleAnswer(1);
+        } else if (key === 'C' || key === '3') {
+          handleAnswer(2);
+        } else if (key === 'D' || key === '4') {
+          handleAnswer(3);
+        }
+      }
+    };
 
-                  {activeCard?.question?.explanation && (
-                    <div className="mb-4 p-4 bg-white/40 dark:bg-slate-900/40 border border-white/20 dark:border-slate-800 rounded-2xl max-w-lg text-slate-800 dark:text-slate-200">
-                      <div className="flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-700 dark:text-indigo-300 mb-1.5 tracking-wide">
-                        <span>💡 ការពន្យល់ស្ដង់ដា (Standard Explanation)៖</span>
-                      </div>
-                      <p className="text-[12.5px] leading-relaxed font-semibold">
-                        {activeCard.question.explanation}
-                      </p>
-                    </div>
-                  )}
-
-                  <button
-                    onClick={handleContinue}
-                    className={`px-6 py-2.5 rounded-xl font-bold text-sm shadow-md transition-all active:scale-95 cursor-pointer ${
-                      showResult === 'correct' 
-                        ? 'bg-green-600 text-white hover:bg-green-700 shadow-green-500/20' 
-                        : 'bg-red-600 text-white hover:bg-red-700 shadow-red-500/20'
-                    }`}
-                  >
-                    បន្តទៅទៀត
-                  </button>
-                </div>
-                {showResult === 'correct' && (
-                  <motion.div 
-                    animate={{ rotate: [0, 10, -10, 0] }}
-                    transition={{ repeat: Infinity, duration: 1 }}
-                    className="p-4 bg-green-500 text-white rounded-full hidden sm:block shadow-lg shadow-green-500/20"
-                  >
-                    <Trophy className="w-10 h-10 text-yellow-300" />
-                  </motion.div>
-                )}
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </div>
-      </div>
-    );
-  }
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeCard, showResult, correctIndex, onCloseActiveCard]);
 
   const selectedHeaderFontObj = AVAILABLE_FONTS.find(f => f.id === headerFont) || AVAILABLE_FONTS[0];
   const selectedBodyFontObj = AVAILABLE_FONTS.find(f => f.id === bodyFont) || AVAILABLE_FONTS[0];
@@ -2236,6 +2195,7 @@ export default function QuizPanel({
   const layoutWidths = getLayoutClasses(headerLayout);
 
   return (
+    <>
     <div 
       ref={containerRef}
       className="flex-1 flex flex-col px-8 pt-8 pb-[500px] bg-transparent overflow-y-auto custom-scrollbar transition-colors duration-300"
@@ -2340,46 +2300,26 @@ export default function QuizPanel({
             </div>
           )}
 
-          <AnimatePresence>
-            {!selectedStudent && cards.length > 0 && (
-              <motion.div
-                initial={{ y: -10, opacity: 0 }}
-                animate={{ y: 0, opacity: 1 }}
-                exit={{ y: -10, opacity: 0 }}
-                className="mb-4 flex items-center gap-2 px-3 py-2 bg-yellow-50 dark:bg-yellow-950/20 text-yellow-800 dark:text-yellow-400 rounded-xl font-bold border border-yellow-200 dark:border-yellow-900 shadow-sm shadow-yellow-500/5 animate-pulse"
-              >
-                <AlertCircle className="w-4 h-4 text-yellow-600 dark:text-yellow-400 shrink-0" />
-                <span className="text-[11px]">សូមបង្វិលរកឈ្មោះសិស្សដំបូងសិន មុននឹងជ្រើសរើសសន្លឹកប័ណ្ណសំណួរ!</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-
           <div className="grid grid-cols-2 xs:grid-cols-3 sm:grid-cols-4 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-7 gap-6">
             {cards.map((card) => (
               <motion.button
                 key={card.id}
-                whileHover={selectedStudent && !card.isRevealed ? { y: -5, scale: 1.05 } : {}}
-                whileTap={selectedStudent && !card.isRevealed ? { scale: 0.95 } : {}}
-                onClick={() => !card.isRevealed && selectedStudent && onCardClick(card)}
-                disabled={card.isRevealed || !selectedStudent}
+                whileHover={!card.isRevealed ? { y: -5, scale: 1.05 } : {}}
+                whileTap={!card.isRevealed ? { scale: 0.95 } : {}}
+                onClick={() => !card.isRevealed && onCardClick(card)}
+                disabled={card.isRevealed}
                 className={`aspect-square rounded-[2rem] flex flex-col items-center justify-center relative transition-all shadow-md overflow-hidden group border ${
                   card.isRevealed
                     ? card.status === 'correct'
                       ? 'bg-green-500 border-green-500 text-white shadow-green-500/20 cursor-default'
                       : 'bg-red-500 border-red-500 text-white shadow-red-500/20 cursor-default'
-                    : selectedStudent
-                      ? 'bg-slate-950 border-slate-900 hover:border-indigo-500 hover:ring-4 hover:ring-indigo-500/20 cursor-pointer text-white shadow-lg'
-                      : 'bg-[#f8fafc] dark:bg-[#1e293b] text-slate-300 dark:text-slate-600 opacity-40 grayscale cursor-not-allowed border-slate-200 dark:border-slate-800'
+                    : 'bg-slate-950 border-slate-900 hover:border-indigo-500 hover:ring-4 hover:ring-indigo-500/20 cursor-pointer text-white shadow-lg'
                 }`}
               >
                 {card.isRevealed ? (
                   card.status === 'correct' ? <CheckCircle className="w-12 h-12" /> : <XCircle className="w-12 h-12" />
                 ) : (
                   <span className="text-3xl font-black drop-shadow-sm">{card.number}</span>
-                )}
-                
-                {!selectedStudent && !card.isRevealed && (
-                  <div className="absolute inset-0 bg-transparent" />
                 )}
               </motion.button>
             ))}
@@ -4152,5 +4092,278 @@ export default function QuizPanel({
         </div>
       </div>
     </div>
+
+    {/* Fullscreen Question & Answer Modal with Blurred Glass Backdrop */}
+    {activeCard && typeof document !== 'undefined' && createPortal(
+      <AnimatePresence>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-[9999] flex flex-col justify-between overflow-y-auto bg-slate-950/85 backdrop-blur-2xl p-4 sm:p-6 md:p-10 text-white select-none custom-scrollbar"
+        >
+          {/* Top Navigation & Status Bar */}
+          <div className="w-full max-w-6xl mx-auto flex items-center justify-between gap-4 border-b border-white/10 pb-4 shrink-0">
+            {/* Left: Card badge & metadata */}
+            <div className="flex items-center gap-4">
+              <motion.div 
+                initial={{ scale: 0.8, rotate: -5 }}
+                animate={{ scale: 1, rotate: 0 }}
+                className="w-12 h-12 sm:w-14 sm:h-14 rounded-2xl bg-indigo-600 border border-indigo-400/40 text-white flex items-center justify-center font-black text-2xl sm:text-3xl shadow-xl shadow-indigo-600/30"
+              >
+                {activeCard.number}
+              </motion.div>
+              <div>
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] sm:text-xs uppercase tracking-widest font-black text-indigo-400">
+                    សន្លឹកប័ណ្ណសំណួរលេខ {activeCard.number}
+                  </span>
+                  <span className={`text-[10px] sm:text-xs font-black px-2.5 py-0.5 rounded-full border ${
+                    activeCard.question?.questionType === 'pisa'
+                      ? 'text-indigo-300 bg-indigo-950/60 border-indigo-500/40'
+                      : 'text-amber-300 bg-amber-950/60 border-amber-500/40'
+                  }`}>
+                    {activeCard.question?.questionType === 'pisa' ? '🎯 តេស្ត PISA' : '📚 មេរៀនទូទៅ'}
+                  </span>
+                </div>
+                <h3 className="text-base sm:text-xl font-black text-white tracking-tight">
+                  ផ្ទាំងសំណួរ និងចម្លើយពេញអេក្រង់
+                </h3>
+              </div>
+
+              {/* Selected Student Tag if present */}
+              {selectedStudent && (
+                <div className="hidden lg:flex items-center gap-2 px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-300">
+                  <span className="text-xs font-semibold text-amber-400/80">សិស្សឆ្លើយ៖</span>
+                  <span className="text-sm font-black">{selectedStudent.name}</span>
+                  {selectedStudent.emoji && <span className="text-base">{selectedStudent.emoji}</span>}
+                </div>
+              )}
+            </div>
+
+            {/* Right: Big Timer, Sound Toggle, and Close Button */}
+            <div className="flex items-center gap-3 sm:gap-5">
+              {/* High Visibility Jumping Countdown Timer */}
+              <div className={`flex flex-col items-end px-3 sm:px-4 py-1.5 sm:py-2 rounded-2xl border transition-all ${
+                timeLeft <= 5 
+                  ? 'bg-red-500/20 border-red-500 text-red-300 shadow-lg shadow-red-500/30 animate-pulse' 
+                  : 'bg-white/5 border-white/15 text-indigo-200'
+              }`}>
+                <div className="flex items-center gap-2">
+                  <Timer className={`w-5 h-5 sm:w-6 sm:h-6 ${timeLeft <= 5 ? 'text-red-400 animate-spin' : 'text-indigo-400'}`} />
+                  <span className="text-xs sm:text-sm font-bold text-slate-300">
+                    នៅសល់៖
+                  </span>
+                  <motion.span
+                    key={timeLeft}
+                    initial={{ scale: 1.25, y: -2 }}
+                    animate={{ scale: 1, y: 0 }}
+                    className={`text-2xl sm:text-3xl md:text-4xl font-black font-mono tracking-tight ${
+                      timeLeft <= 5 ? 'text-red-400' : 'text-white'
+                    }`}
+                  >
+                    {timeLeft}
+                  </motion.span>
+                  <span className="text-xs font-bold text-slate-400">វិនាទី</span>
+                </div>
+                <div className="w-32 sm:w-44 h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
+                  <motion.div 
+                    initial={{ width: '100%' }}
+                    animate={{ width: `${(timeLeft / 25) * 100}%` }}
+                    className={`h-full transition-all duration-300 ${
+                      timeLeft <= 5 ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-emerald-400'
+                    }`}
+                  />
+                </div>
+              </div>
+
+              {/* Sound Toggle */}
+              <button
+                type="button"
+                onClick={() => setSoundEnabled(prev => !prev)}
+                className={`w-10 h-10 sm:w-12 sm:h-12 rounded-xl border flex items-center justify-center transition-all cursor-pointer ${
+                  soundEnabled 
+                    ? 'bg-white/10 hover:bg-white/20 border-white/20 text-white' 
+                    : 'bg-red-950/40 border-red-500/30 text-red-400'
+                }`}
+                title={soundEnabled ? 'បិទសំឡេង' : 'បើកសំឡេង'}
+              >
+                {soundEnabled ? <Volume2 className="w-5 h-5" /> : <VolumeX className="w-5 h-5" />}
+              </button>
+
+              {/* Close Button */}
+              <button
+                type="button"
+                onClick={handleCloseModal}
+                className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl bg-white/10 hover:bg-red-600/80 hover:border-red-500 border border-white/20 text-white flex items-center justify-center transition-all cursor-pointer active:scale-95 shadow-lg"
+                title="បិទ (Esc)"
+              >
+                <X className="w-5 h-5 sm:w-6 sm:h-6" />
+              </button>
+            </div>
+          </div>
+
+          {/* Center Content: Huge Clear Question + Large Clear Options */}
+          <div className="w-full max-w-5xl mx-auto my-auto py-6 sm:py-8 flex flex-col justify-center flex-1">
+            {/* Question Box */}
+            <motion.div
+              initial={{ y: 20, opacity: 0 }}
+              animate={{ y: 0, opacity: 1 }}
+              className="relative w-full rounded-3xl sm:rounded-[2.5rem] bg-gradient-to-b from-white/15 to-white/5 border-2 border-white/20 shadow-2xl p-6 sm:p-10 md:p-14 backdrop-blur-xl overflow-hidden flex flex-col items-center justify-center text-center mb-6 sm:mb-8"
+            >
+              <HelpCircle className="absolute -top-10 -right-10 w-48 h-48 sm:w-64 sm:h-64 text-white/5 pointer-events-none rotate-12" />
+              
+              <div className="flex items-center gap-2 mb-3 sm:mb-4">
+                <span className="text-xs uppercase font-black tracking-widest text-indigo-300 bg-indigo-500/20 border border-indigo-400/30 px-3.5 py-1 rounded-full">
+                  សំណួរលេខ {activeCard.number}
+                </span>
+              </div>
+
+              <h2 className="text-2xl sm:text-3xl md:text-4xl lg:text-5xl font-black text-white leading-relaxed md:leading-relaxed max-w-4xl drop-shadow-md break-words whitespace-normal word-break-break-word">
+                <FormulaRenderer text={activeCard.question?.text || ''} />
+              </h2>
+            </motion.div>
+
+            {/* Options Grid (Huge, high contrast buttons) */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 mb-6">
+              {shuffledOptions.map((option, idx) => {
+                const isSelectedCorrect = idx === correctIndex && showResult !== null;
+                const isSelectedWrong = showResult === 'wrong' && idx !== correctIndex;
+                const optionLetter = String.fromCharCode(65 + idx);
+
+                return (
+                  <motion.button
+                    key={idx}
+                    whileHover={showResult === null ? { scale: 1.02, y: -2 } : {}}
+                    whileTap={showResult === null ? { scale: 0.98 } : {}}
+                    onClick={() => handleAnswer(idx)}
+                    disabled={showResult !== null}
+                    className={`relative p-5 sm:p-6 md:p-7 rounded-2xl sm:rounded-3xl border-2 sm:border-3 text-left transition-all group overflow-hidden cursor-pointer shadow-lg flex items-center gap-4 sm:gap-6 ${
+                      showResult === null
+                        ? 'bg-slate-900/75 hover:bg-indigo-950/80 border-white/20 hover:border-indigo-400 hover:shadow-2xl hover:shadow-indigo-500/20 text-white'
+                        : isSelectedCorrect
+                          ? 'bg-emerald-600/30 border-emerald-400 text-emerald-100 shadow-2xl shadow-emerald-500/30 scale-[1.02] ring-4 ring-emerald-500/30'
+                          : isSelectedWrong
+                            ? 'bg-red-950/30 border-red-500/30 opacity-40 text-slate-400'
+                            : 'bg-slate-900/30 border-white/10 opacity-30 text-slate-500'
+                    }`}
+                  >
+                    {/* Option Letter Badge */}
+                    <span className={`w-12 h-12 sm:w-14 sm:h-14 rounded-2xl font-black text-xl sm:text-2xl flex items-center justify-center shrink-0 shadow-md transition-all ${
+                      isSelectedCorrect
+                        ? 'bg-emerald-500 text-white ring-4 ring-emerald-400/40'
+                        : showResult !== null
+                          ? 'bg-slate-800 text-slate-400'
+                          : 'bg-indigo-600 group-hover:bg-indigo-500 text-white group-hover:ring-4 group-hover:ring-indigo-400/30'
+                    }`}>
+                      {optionLetter}
+                    </span>
+
+                    {/* Option Text with Math Formula rendering */}
+                    <span className={`text-lg sm:text-xl md:text-2xl font-bold tracking-tight leading-snug flex-1 break-words whitespace-normal ${
+                      isSelectedCorrect
+                        ? 'text-emerald-300'
+                        : 'text-white'
+                    }`}>
+                      <FormulaRenderer text={option} />
+                    </span>
+                  </motion.button>
+                );
+              })}
+            </div>
+
+            {/* Result Feedback Banner */}
+            <AnimatePresence>
+              {showResult && (
+                <motion.div
+                  initial={{ scale: 0.9, opacity: 0, y: 20 }}
+                  animate={{ scale: 1, opacity: 1, y: 0 }}
+                  className={`flex flex-col sm:flex-row items-center justify-between gap-6 p-6 sm:p-8 rounded-3xl border-3 shadow-2xl backdrop-blur-2xl ${
+                    showResult === 'correct'
+                      ? 'bg-emerald-950/90 border-emerald-400 text-emerald-100 shadow-emerald-500/20'
+                      : 'bg-red-950/90 border-red-400 text-red-100 shadow-red-500/20'
+                  }`}
+                >
+                  <div className="flex-1">
+                    <div className="flex items-center gap-3 mb-2">
+                      {showResult === 'correct' ? (
+                        <CheckCircle className="w-9 h-9 text-emerald-400 shrink-0" />
+                      ) : (
+                        <XCircle className="w-9 h-9 text-red-400 shrink-0" />
+                      )}
+                      <h4 className="text-xl sm:text-2xl font-black uppercase tracking-tight text-white">
+                        {showResult === 'correct' ? '🎉 អស្ចារ្យណាស់! ចម្លើយត្រឹមត្រូវ (+៣ ពិន្ទុ)' : '❌ គួរឲ្យសោកស្ដាយ! មិនទាន់ត្រឹមត្រូវទេ'}
+                      </h4>
+                    </div>
+
+                    {showResult === 'wrong' && (
+                      <div className="flex items-start gap-2 text-red-200 bg-red-900/40 p-3.5 rounded-2xl mt-3 max-w-2xl border border-red-500/30">
+                        <Info className="w-5 h-5 shrink-0 mt-0.5 text-red-300" />
+                        <p className="text-sm sm:text-base font-semibold">
+                          ចម្លើយត្រឹមត្រូវគឺ៖ <span className="font-black underline text-white">{shuffledOptions[correctIndex]}</span>
+                        </p>
+                      </div>
+                    )}
+
+                    {activeCard?.question?.explanation && (
+                      <div className="mt-3 p-4 bg-white/10 border border-white/15 rounded-2xl max-w-2xl text-slate-200">
+                        <div className="text-xs font-black uppercase text-indigo-300 mb-1 tracking-wide">
+                          💡 ការពន្យល់ស្ដង់ដា (Explanation)៖
+                        </div>
+                        <p className="text-sm sm:text-base leading-relaxed font-medium">
+                          {activeCard.question.explanation}
+                        </p>
+                      </div>
+                    )}
+                  </div>
+
+                  <div className="flex items-center gap-4 shrink-0">
+                    {showResult === 'correct' && (
+                      <motion.div 
+                        animate={{ rotate: [0, 10, -10, 0] }}
+                        transition={{ repeat: Infinity, duration: 1 }}
+                        className="p-4 bg-emerald-500 text-white rounded-full hidden md:block shadow-xl shadow-emerald-500/30"
+                      >
+                        <Trophy className="w-10 h-10 text-yellow-300" />
+                      </motion.div>
+                    )}
+
+                    <button
+                      type="button"
+                      onClick={handleContinue}
+                      className={`px-8 py-4 rounded-2xl font-black text-lg shadow-2xl transition-all hover:scale-105 active:scale-95 cursor-pointer flex items-center gap-2 ${
+                        showResult === 'correct'
+                          ? 'bg-emerald-500 hover:bg-emerald-400 text-slate-950 shadow-emerald-500/40'
+                          : 'bg-white hover:bg-slate-100 text-slate-950 shadow-white/20'
+                      }`}
+                    >
+                      <span>បន្តទៅទៀត (Enter)</span>
+                      <span>➔</span>
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+
+          {/* Bottom Keyboard Hint Bar */}
+          <div className="w-full max-w-5xl mx-auto flex items-center justify-between text-xs text-slate-400 border-t border-white/10 pt-3 shrink-0">
+            <div className="flex items-center gap-2">
+              <span className="bg-white/10 px-2 py-0.5 rounded text-[11px] font-mono text-white">A, B, C, D</span>
+              <span>ឬ</span>
+              <span className="bg-white/10 px-2 py-0.5 rounded text-[11px] font-mono text-white">1, 2, 3, 4</span>
+              <span>ដើម្បីជ្រើសរើសចម្លើយ</span>
+            </div>
+            <div className="flex items-center gap-3">
+              <span>ចុច <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-[11px] font-mono text-white">Enter</kbd> ដើម្បីបន្ត</span>
+              <span>•</span>
+              <span>ចុច <kbd className="bg-white/10 px-1.5 py-0.5 rounded text-[11px] font-mono text-white">Esc</kbd> ដើម្បីចាកចេញ</span>
+            </div>
+          </div>
+        </motion.div>
+      </AnimatePresence>,
+      document.body
+    )}
+    </>
   );
 }

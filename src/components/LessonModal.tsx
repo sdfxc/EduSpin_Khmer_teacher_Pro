@@ -576,6 +576,21 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                 )}
               </div>
 
+              {/* Concise Questions Badge */}
+              <div className="mb-6 p-3.5 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl flex items-center gap-3 text-emerald-900">
+                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-600 font-black text-base">
+                  ⚡
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-black text-emerald-900">
+                    សំណួរ និងចម្លើយខ្លី ងាយយល់ (Short & Concise Format)
+                  </p>
+                  <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
+                    សំណួរត្រូវបានកំណត់ឱ្យបង្កើតខ្លី ខ្លឹម ចំគោលដៅ និងជម្រើសចម្លើយខ្លីៗ ងាយស្រួលសិស្សអានយល់រហ័ស មិនមានអក្សរច្រើនពិបាកយល់ ឬចំណាយពេលអានយូរឡើយ។
+                  </p>
+                </div>
+              </div>
+
               <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
                 <div className="w-full sm:flex-1">
                   <div className="flex justify-between items-center mb-1">

@@ -13,6 +13,7 @@ import TeacherAuthModal from './components/TeacherAuthModal';
 import { TeacherProfileModal } from './components/TeacherProfileModal';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
+import StopwatchPanel from './components/StopwatchPanel';
 import StudentManager from './components/StudentManager';
 import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass } from './types';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
@@ -103,8 +104,9 @@ export default function App() {
 
   const { confirmAction } = useConfirm();
 
-  const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'students' | 'student-lobby' | 'exams-room'>('wheel');
+  const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'stopwatch' | 'students' | 'student-lobby' | 'exams-room'>('wheel');
   const [showWheelBulk, setShowWheelBulk] = useState(false);
+  const [quizLeftView, setQuizLeftView] = useState<'wheel' | 'list'>('wheel');
   const [loadingCloudData, setLoadingCloudData] = useState(false);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
@@ -739,7 +741,7 @@ export default function App() {
 
         // 2. Fetch students
         const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
-        const studentsSnap = await getDocs(studentsCollRef);
+        const studentsSnap = await safeGetDocs(studentsCollRef);
         
         const activeCls = classes.find(c => c.id === activeClassId);
         const activeClassName = activeCls?.name;
@@ -2211,18 +2213,27 @@ export default function App() {
   }, [pickedIds, saveClassMetadata]);
 
   const handleAnswer = useCallback((correct: boolean) => {
-    if (!activeCardId || !selectedStudentId) return;
+    if (!activeCardId) return;
 
-    // Update student score
-    let targetScore = 0;
-    setStudents(prev => prev.map(s => {
-      if (s.id === selectedStudentId) {
-        targetScore = s.score + (correct ? 3 : 0);
-        saveStudentScore(selectedStudentId, targetScore);
-        return { ...s, score: targetScore };
-      }
-      return s;
-    }));
+    // Update student score if student is selected
+    if (selectedStudentId) {
+      let targetScore = 0;
+      setStudents(prev => prev.map(s => {
+        if (s.id === selectedStudentId) {
+          targetScore = s.score + (correct ? 3 : 0);
+          saveStudentScore(selectedStudentId, targetScore);
+          return { ...s, score: targetScore };
+        }
+        return s;
+      }));
+
+      // Add student to picked list so they are not picked again
+      const updatedPickedIds = pickedIds.includes(selectedStudentId)
+        ? pickedIds
+        : [...pickedIds, selectedStudentId];
+      setPickedIds(updatedPickedIds);
+      saveClassMetadata(cards, updatedPickedIds);
+    }
 
     // Update card status
     const updatedCards = cards.map(c => {
@@ -2233,13 +2244,7 @@ export default function App() {
     });
     setCards(updatedCards);
 
-    // Add student to picked list so they are not picked again
-    const updatedPickedIds = pickedIds.includes(selectedStudentId)
-      ? pickedIds
-      : [...pickedIds, selectedStudentId];
-    setPickedIds(updatedPickedIds);
-
-    saveClassMetadata(updatedCards, updatedPickedIds);
+    saveClassMetadata(updatedCards, pickedIds);
     setActiveCardId(null);
   }, [activeCardId, selectedStudentId, cards, pickedIds, saveClassMetadata, saveStudentScore]);
 
@@ -2913,20 +2918,80 @@ export default function App() {
 
         {activeTab === 'quiz' && (
           <>
-            <aside className="basis-2/5 h-full shrink-0 hidden md:block">
-              <StudentPanel
-                students={currentClassStudents}
-                pickedIds={currentClassPickedIds}
-                onSetPickedIds={handleSetPickedIds}
-                onAddStudent={addStudent}
-                onRemoveStudent={removeStudent}
-                onClearStudents={clearStudents}
-                onSelectStudent={(s) => setSelectedStudentId(s.id)}
-                selectedStudent={selectedStudent}
-                isDarkMode={isDarkMode}
-                activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
-                onBatchSyncStudents={handleBatchSyncStudents}
-              />
+            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
+              {/* Quick Switcher between Spinning Wheel (Image 1 - Default) and Student List (Image 3) */}
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                    {quizLeftView === 'wheel' ? 'កងបង្វិលសិស្ស' : 'បញ្ជីឈ្មោះសិស្ស'}
+                  </span>
+                  <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
+                    {currentClassStudents.length} នាក់
+                  </span>
+                </div>
+
+                <div className="flex items-center gap-1 bg-slate-100 dark:bg-slate-800 p-0.5 rounded-xl border border-slate-200 dark:border-slate-700">
+                  <button
+                    type="button"
+                    onClick={() => setQuizLeftView('wheel')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      quizLeftView === 'wheel'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                    title="បង្ហាញកងបង្វិល"
+                  >
+                    <Compass className="w-3.5 h-3.5" />
+                    <span>កងបង្វិល</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setQuizLeftView('list')}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-bold transition-all cursor-pointer flex items-center gap-1.5 ${
+                      quizLeftView === 'list'
+                        ? 'bg-indigo-600 text-white shadow-xs'
+                        : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
+                    }`}
+                    title="បង្ហាញបញ្ជីឈ្មោះ"
+                  >
+                    <UsersIcon className="w-3.5 h-3.5" />
+                    <span>បញ្ជី</span>
+                  </button>
+                </div>
+              </div>
+
+              {quizLeftView === 'wheel' ? (
+                <div className="flex-1 overflow-y-auto flex flex-col items-center justify-center p-2">
+                  <SpinningWheel
+                    students={currentClassStudents}
+                    pickedIds={currentClassPickedIds}
+                    onSetPickedIds={handleSetPickedIds}
+                    onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                    selectedStudent={selectedStudent}
+                    onAddStudent={addStudent}
+                    onBulkAddStudents={handleBulkAddStudents}
+                    showBulkInput={showWheelBulk}
+                    setShowBulkInput={setShowWheelBulk}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
+              ) : (
+                <div className="flex-1 overflow-hidden">
+                  <StudentPanel
+                    students={currentClassStudents}
+                    pickedIds={currentClassPickedIds}
+                    onSetPickedIds={handleSetPickedIds}
+                    onAddStudent={addStudent}
+                    onRemoveStudent={removeStudent}
+                    onClearStudents={clearStudents}
+                    onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                    selectedStudent={selectedStudent}
+                    isDarkMode={isDarkMode}
+                    activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+                    onBatchSyncStudents={handleBatchSyncStudents}
+                  />
+                </div>
+              )}
             </aside>
 
             {/* Bright Orange line separator between student list and question board */}
@@ -2941,6 +3006,7 @@ export default function App() {
                 onAnswer={handleAnswer}
                 onReset={resetMatch}
                 activeCard={activeCard}
+                onCloseActiveCard={() => setActiveCardId(null)}
                 selectedStudent={selectedStudent}
                 chapters={chapters}
                 activeRoomId={activeRoomId}
@@ -2973,6 +3039,18 @@ export default function App() {
               teacher={teacher}
               isDarkMode={isDarkMode}
               onBatchSyncStudents={handleBatchSyncStudents}
+              onNavigateTab={(tab) => setActiveTab(tab as any)}
+            />
+          </div>
+        )}
+
+        {activeTab === 'stopwatch' && (
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+            <StopwatchPanel
+              isDarkMode={isDarkMode}
+              activeClassId={activeClassId || ''}
+              className={activeClass?.name || 'ថ្នាក់រៀន'}
+              onNavigateTab={(tab) => setActiveTab(tab as any)}
             />
           </div>
         )}

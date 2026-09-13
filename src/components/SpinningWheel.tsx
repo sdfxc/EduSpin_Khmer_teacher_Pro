@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, useAnimation } from 'motion/react';
-import { RotateCcw, Shuffle, Plus, Play, UserPlus } from 'lucide-react';
+import { motion, useAnimation, AnimatePresence } from 'motion/react';
+import { RotateCcw, Shuffle, Plus, Play, UserPlus, X, Sparkles } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { Student } from '../types';
 
@@ -18,6 +18,7 @@ interface SpinningWheelProps {
 }
 
 const PALETTE = ['#06b6d4', '#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444'];
+const WINNER_EMOJIS = ['🎉', '🥳', '🌟', '🏆', '👑', '😎', '🚀', '🤩', '🎯', '✨', '👏', '🔥', '🌈', '💯', '🎖️', '🦸‍♂️', '🦸‍♀️'];
 
 // Custom warm, pleasant, medium-low frequency synthetic tick sound that won't hurt the ears (សំឡេង "តិកៗ" បន្ធូរប្រេកង់ និងឮល្មមមិនឈឺត្រចៀក)
 const playHighPitchTick = () => {
@@ -79,6 +80,9 @@ export default function SpinningWheel({
   const [rotationDegrees, setRotationDegrees] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [needleColor, setNeedleColor] = useState('#ff4949');
+  const [winnerStudent, setWinnerStudent] = useState<Student | null>(null);
+  const [showWinnerModal, setShowWinnerModal] = useState(false);
+  const [randomEmoji, setRandomEmoji] = useState('🎉');
   const controls = useAnimation();
   const [bulkText, setBulkText] = useState('');
   const wheelRef = useRef<HTMLDivElement>(null);
@@ -173,8 +177,28 @@ export default function SpinningWheel({
     };
   }, [isSpinning, students.length]);
 
-  const handleSpin = async () => {
+  const triggerFireworks = () => {
+    const duration = 2.5 * 1000;
+    const animationEnd = Date.now() + duration;
+    const defaults = { startVelocity: 35, spread: 360, ticks: 75, zIndex: 9999 };
+
+    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
+
+    const intervalId = setInterval(() => {
+      const timeLeft = animationEnd - Date.now();
+      if (timeLeft <= 0) {
+        return clearInterval(intervalId);
+      }
+      const particleCount = 60 * (timeLeft / duration);
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.12, 0.35), y: Math.random() - 0.2 } });
+      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.65, 0.88), y: Math.random() - 0.2 } });
+    }, 250);
+  };
+
+  const executeSpin = async (excludeId?: string) => {
     if (students.length === 0 || isSpinning) return;
+
+    setShowWinnerModal(false);
 
     // Soft-trigger warm up of audio contexts on user touch/click gesture to stop autoplay blocks
     if (tickAudio.current) {
@@ -196,7 +220,15 @@ export default function SpinningWheel({
     setIsSpinning(true);
 
     // Filter available pool
-    let pool = [...availableStudents];
+    let activePicked = pickedIds;
+    if (excludeId) {
+      activePicked = activePicked.filter(id => id !== excludeId);
+      onSetPickedIds(prev => prev.filter(id => id !== excludeId));
+    }
+    let pool = students.filter(s => !activePicked.includes(s.id));
+    if (excludeId && pool.length > 1) {
+      pool = pool.filter(s => s.id !== excludeId);
+    }
     if (pool.length === 0) {
       pool = [...students];
       onSetPickedIds([]);
@@ -245,34 +277,44 @@ export default function SpinningWheel({
       applauseAudio.current.play().catch(() => {});
     }
 
-    // Fire continuous high-intensity fireworks confetti sequence (lasts for 2.5 seconds)
-    const duration = 2.5 * 1000;
-    const animationEnd = Date.now() + duration;
-    const defaults = { startVelocity: 35, spread: 360, ticks: 75, zIndex: 100 };
+    // Fire continuous fireworks confetti
+    triggerFireworks();
 
-    const randomInRange = (min: number, max: number) => Math.random() * (max - min) + min;
-
-    const intervalId = setInterval(() => {
-      const timeLeft = animationEnd - Date.now();
-      if (timeLeft <= 0) {
-        return clearInterval(intervalId);
-      }
-      const particleCount = 60 * (timeLeft / duration);
-      // Shoot multi-angle beautiful color firecracker explosions
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.12, 0.3), y: Math.random() - 0.25 } });
-      confetti({ ...defaults, particleCount, origin: { x: randomInRange(0.7, 0.88), y: Math.random() - 0.25 } });
-    }, 250);
+    // Set winner and show popup
+    const pickedEmoji = chosenStudent.emoji || WINNER_EMOJIS[Math.floor(Math.random() * WINNER_EMOJIS.length)];
+    setRandomEmoji(pickedEmoji);
+    setWinnerStudent(chosenStudent);
+    setShowWinnerModal(true);
   };
+
+  const handleSpin = () => executeSpin();
 
   const handleResetPicked = () => {
-    onSetPickedIds([]);
-  };
-
-  const handleShuffle = () => {
     onSetPickedIds([]);
     controls.set({ rotate: 0 });
     setRotationDegrees(0);
     setNeedleColor('#ff4949');
+    setShowWinnerModal(false);
+    setWinnerStudent(null);
+  };
+
+  const handleRepick = () => {
+    const exclude = winnerStudent?.id;
+    setShowWinnerModal(false);
+    setTimeout(() => {
+      executeSpin(exclude);
+    }, 120);
+  };
+
+  const handleCallNext = () => {
+    setShowWinnerModal(false);
+    setTimeout(() => {
+      executeSpin();
+    }, 120);
+  };
+
+  const handleShuffle = () => {
+    handleResetPicked();
   };
 
   const handleBulkSubmit = (e: React.FormEvent) => {
@@ -384,9 +426,9 @@ export default function SpinningWheel({
   };
 
   return (
-    <div className="flex flex-col items-center justify-center p-4">
+    <div className="flex flex-col items-center justify-center p-4 my-auto w-full">
       {/* Visual Canvas Wheel Area */}
-      <div className="relative w-[340px] h-[340px] sm:w-[380px] sm:h-[380px] md:w-[400px] md:h-[400px] flex items-center justify-center mb-6">
+      <div className="relative w-[280px] h-[280px] sm:w-[320px] sm:h-[320px] md:w-[340px] md:h-[340px] lg:w-[380px] lg:h-[380px] max-w-[95vw] aspect-square flex items-center justify-center mb-6">
         {/* Pointer Pointer (Static at 12 o'clock) with dynamic matched needle color */}
         <div className="absolute top-[-8px] scale-125 z-20 pointer-events-none drop-shadow-md transition-all duration-75 active:scale-110">
           <svg width="24" height="28" viewBox="0 0 24 28" fill="none" className="filter drop-shadow">
@@ -416,22 +458,38 @@ export default function SpinningWheel({
         </button>
       </div>
 
-      {/* Controller Controls (Reset / Shuffle) */}
-      <div className="flex items-center gap-3 w-full max-w-sm justify-center mb-6">
-        <button
-          onClick={handleShuffle}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-sm active:scale-95"
-        >
-          <Shuffle className="w-4 h-4 text-emerald-500" />
-          <span>Shuffle / Re-pick</span>
-        </button>
-
+      {/* របារបញ្ជា៖ Reset (ខាងឆ្វេង) | Re-pick (កណ្ដាល) | ហៅសិស្សបន្ត (ខាងស្ដាំ) */}
+      <div className="flex items-center gap-2 sm:gap-3 w-full max-w-sm justify-center mb-6">
+        {/* Reset - Left (ខាងឆ្វេង) */}
         <button
           onClick={handleResetPicked}
-          className="flex items-center gap-2 px-5 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-sm active:scale-95"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+          title="កំណត់ឡើងវិញ / Reset"
         >
-          <RotateCcw className="w-4 h-4 text-indigo-500" />
+          <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <span>Reset</span>
+        </button>
+
+        {/* Re-pick - Center (កណ្ដាល) */}
+        <button
+          onClick={handleRepick}
+          disabled={isSpinning || students.length === 0}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+          title="រើសម្តងទៀត / Re-pick"
+        >
+          <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+          <span>Re-pick</span>
+        </button>
+
+        {/* ហៅសិស្សបន្ត - Right (ខាងស្ដាំ) */}
+        <button
+          onClick={handleCallNext}
+          disabled={isSpinning || students.length === 0}
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-md shadow-indigo-500/25 active:scale-95 disabled:opacity-50 whitespace-nowrap"
+          title="ហៅសិស្សបន្ត"
+        >
+          <Play className="w-3.5 h-3.5 fill-white shrink-0" />
+          <span>ហៅសិស្សបន្ត</span>
         </button>
       </div>
 
@@ -473,6 +531,125 @@ export default function SpinningWheel({
           </form>
         )}
       </div>
+
+      {/* Animated Winner Popup Modal */}
+      <AnimatePresence>
+        {showWinnerModal && winnerStudent && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-md animate-in fade-in duration-200">
+            <motion.div
+              initial={{ scale: 0.6, opacity: 0, y: 30 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.7, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', damping: 22, stiffness: 300 }}
+              className="relative w-full max-w-sm sm:max-w-md bg-white dark:bg-slate-900 border border-indigo-500/30 dark:border-indigo-500/40 rounded-3xl p-6 sm:p-7 shadow-2xl overflow-hidden flex flex-col items-center text-center"
+            >
+              {/* Background ambient glows */}
+              <div className="absolute -top-14 -left-14 w-40 h-40 bg-indigo-500/20 rounded-full blur-3xl pointer-events-none" />
+              <div className="absolute -bottom-14 -right-14 w-40 h-40 bg-pink-500/20 rounded-full blur-3xl pointer-events-none" />
+
+              {/* Close Button */}
+              <button
+                onClick={() => setShowWinnerModal(false)}
+                className="absolute top-4 right-4 p-2 rounded-full text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer z-10"
+                title="បិទ"
+              >
+                <X className="w-5 h-5" />
+              </button>
+
+              {/* Header Badge */}
+              <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider mb-4 border border-indigo-500/20">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                <span>សិស្សដែលបានជ្រើសរើស</span>
+                <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+              </div>
+
+              {/* Profile Photo OR Animated Emoji */}
+              <div className="relative my-2">
+                {winnerStudent.avatarUrl ? (
+                  <div className="relative">
+                    <img
+                      src={winnerStudent.avatarUrl}
+                      alt={winnerStudent.name}
+                      className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl object-cover ring-4 ring-indigo-500 shadow-2xl mx-auto"
+                    />
+                    <div className="absolute -bottom-2 -right-2 bg-amber-400 text-slate-950 p-1.5 rounded-xl shadow-lg">
+                      <Sparkles className="w-4 h-4 fill-slate-950" />
+                    </div>
+                  </div>
+                ) : (
+                  <motion.div
+                    animate={{ scale: [1, 1.12, 1], rotate: [0, -6, 6, 0] }}
+                    transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
+                    className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-linear-to-tr from-indigo-500/15 via-purple-500/20 to-pink-500/15 dark:from-indigo-500/25 dark:to-purple-500/25 ring-4 ring-indigo-500/30 flex items-center justify-center text-6xl sm:text-7xl shadow-2xl select-none mx-auto"
+                  >
+                    {randomEmoji}
+                  </motion.div>
+                )}
+              </div>
+
+              {/* ឈ្មោះសិស្សធំៗ ច្បាស់ៗ */}
+              <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-4 tracking-tight">
+                {winnerStudent.name}
+              </h2>
+
+              {/* Badges / Sub info */}
+              <div className="flex items-center gap-2 mt-2">
+                {winnerStudent.gender && (
+                  <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold ${
+                    winnerStudent.gender === 'ស្រី'
+                      ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20'
+                      : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
+                  }`}>
+                    {winnerStudent.gender}
+                  </span>
+                )}
+                {winnerStudent.studentId && (
+                  <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300">
+                    ID: {winnerStudent.studentId}
+                  </span>
+                )}
+              </div>
+
+              <p className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mt-2">
+                🎉 បានជ្រើសរើសជាសិស្សឡើងឆ្លើយសំណួរ 🎉
+              </p>
+
+              {/* របារប៊ូតុងបញ្ជាខាងក្នុង Popup: Reset (ឆ្វេង) | Re-pick (កណ្ដាល) | ហៅសិស្សបន្ត (ស្ដាំ) */}
+              <div className="flex items-center gap-2 sm:gap-3 w-full mt-6 pt-4 border-t border-slate-100 dark:border-slate-800">
+                {/* Reset (ឆ្វេង) */}
+                <button
+                  onClick={handleResetPicked}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer active:scale-95"
+                  title="កំណត់ឡើងវិញ / Reset"
+                >
+                  <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                  <span>Reset</span>
+                </button>
+
+                {/* Re-pick (កណ្ដាល) */}
+                <button
+                  onClick={handleRepick}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+                  title="រើសម្តងទៀត / Re-pick"
+                >
+                  <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
+                  <span>Re-pick</span>
+                </button>
+
+                {/* ហៅសិស្សបន្ត (ស្ដាំ) */}
+                <button
+                  onClick={handleCallNext}
+                  className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-md shadow-indigo-500/25 active:scale-95 whitespace-nowrap"
+                  title="ហៅសិស្សបន្ត"
+                >
+                  <Play className="w-3.5 h-3.5 fill-white shrink-0" />
+                  <span>ហៅសិស្សបន្ត</span>
+                </button>
+              </div>
+            </motion.div>
+          </div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

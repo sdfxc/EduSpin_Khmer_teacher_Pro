@@ -1,6 +1,7 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
   getFirestore,
+  initializeFirestore,
   getDocFromServer,
   doc, 
   getDoc, 
@@ -26,15 +27,28 @@ if (typeof window !== 'undefined') {
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
 
-// Initialize Firestore with database ID specified in firebaseConfig as per Firebase skill
-export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId);
+// Configure Firestore with long-polling to prevent WebSocket connection stalls in iframe/sandboxed environments
+try {
+  initializeFirestore(app, {
+    experimentalForceLongPolling: true,
+  }, firebaseConfig.firestoreDatabaseId);
+} catch {
+  // Already initialized or fallback
+}
 
-// Validate connection on boot as recommended in skill guidelines
+// Initialize Firestore with database ID specified in firebaseConfig as per Firebase skill
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
+
+// Validate connection on boot as recommended in skill guidelines with non-blocking timeout
 export async function testConnection() {
   try {
-    await getDocFromServer(doc(db, 'test', 'connection'));
+    const testPromise = getDocFromServer(doc(db, 'test', 'connection'));
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error('the client is offline or request timed out')), 3500)
+    );
+    await Promise.race([testPromise, timeoutPromise]);
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
+    if (error instanceof Error && (error.message.includes('the client is offline') || error.message.includes('timed out') || error.message.includes("didn't respond"))) {
       console.warn('[Firestore] Notice: Operating in offline mode. Client will synchronize when online.');
     }
   }
@@ -74,17 +88,23 @@ export const cleanFirestoreData = (obj: any): any => {
 
 export const safeGetDoc = async (docRef: any): Promise<{ exists: () => boolean; data: () => any; id: string } | DocumentSnapshot> => {
   try {
-    return await getDoc(docRef);
+    const fetchPromise = getDoc(docRef);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 5000)
+    );
+    return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error: any) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errCode = error?.code || '';
     if (
       errMsg.includes('client is offline') ||
-      errMsg.includes("Backend didn't respond within 10 seconds") ||
+      errMsg.includes("Backend didn't respond") ||
+      errMsg.includes('timeout') ||
       errCode === 'unavailable' ||
-      errCode === 'failed-precondition'
+      errCode === 'failed-precondition' ||
+      errCode === 'deadline-exceeded'
     ) {
-      console.warn(`[Firestore] Notice: Offline mode active for ${docRef?.path || 'doc'}. Utilizing local state.`);
+      console.warn(`[Firestore] Notice: Offline mode or timeout active for ${docRef?.path || 'doc'}. Utilizing local state.`);
     } else {
       handleFirestoreError(error, OperationType.GET, docRef?.path || null);
     }
@@ -98,17 +118,23 @@ export const safeGetDoc = async (docRef: any): Promise<{ exists: () => boolean; 
 
 export const safeGetDocs = async (collOrQuery: any): Promise<QuerySnapshot | { empty: boolean; size: number; docs: any[]; forEach: (cb: (doc: any) => void) => void }> => {
   try {
-    return await getDocs(collOrQuery);
+    const fetchPromise = getDocs(collOrQuery);
+    const timeoutPromise = new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 5000)
+    );
+    return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error: any) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errCode = error?.code || '';
     if (
       errMsg.includes('client is offline') ||
-      errMsg.includes("Backend didn't respond within 10 seconds") ||
+      errMsg.includes("Backend didn't respond") ||
+      errMsg.includes('timeout') ||
       errCode === 'unavailable' ||
-      errCode === 'failed-precondition'
+      errCode === 'failed-precondition' ||
+      errCode === 'deadline-exceeded'
     ) {
-      console.warn(`[Firestore] Notice: Offline mode active for query. Continuing with local data.`);
+      console.warn(`[Firestore] Notice: Offline mode or timeout active for query. Continuing with local data.`);
     } else {
       handleFirestoreError(error, OperationType.LIST, collOrQuery?.path || null);
     }

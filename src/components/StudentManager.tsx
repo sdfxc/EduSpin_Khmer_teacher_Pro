@@ -4,7 +4,7 @@ import {
   Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, 
   Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil, ClipboardList,
   UserCheck, Trophy, Medal, Star, Flame, ArrowUpDown, RotateCcw, CheckCircle2, ChevronUp, ChevronDown,
-  Camera, ArrowUpAZ, Hash
+  Camera, ArrowUpAZ, Hash, UserX, Clock, FileText, Share2
 } from 'lucide-react';
 import { Student, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
@@ -12,6 +12,7 @@ import { StudentQuickEditModal } from './StudentQuickEditModal';
 import { StudentScoreTable, SortMode } from './StudentScoreTable';
 import { StudentProfileModal } from './StudentProfileModal';
 import { GenderBadgePicker } from './GenderBadgePicker';
+import { AttendanceCategoryViews } from './AttendanceCategoryViews';
 
 interface StudentManagerProps {
   students: Student[];
@@ -51,18 +52,20 @@ export default function StudentManager({
       [`បញ្ជីវត្តមានសិស្ស - ថ្នាក់៖ ${className}`],
       [`កាលបរិច្ឆេទ៖ ${attendanceDate}`],
       [],
-      ['ល.រ', 'អត្តលេខ', 'ឈ្មោះសិស្ស', 'ភេទ', 'ស្ថានភាពវត្តមាន']
+      ['ល.រ', 'អត្តលេខ', 'ឈ្មោះសិស្ស', 'ភេទ', 'ស្ថានភាពវត្តមាន', 'មូលហេតុ / កំណត់សម្គាល់ (Reason)']
     ];
 
     filteredStudents.forEach((student, index) => {
       const status = currentClassAttendance[student.id] || 'present';
       const statusKh = status === 'present' ? 'វត្តមាន' : status === 'permission' ? 'មានច្បាប់' : status === 'late' ? 'យឺតយ៉ាវ' : 'អវត្តមាន';
+      const reason = (status === 'permission' || status === 'late') ? (currentClassReasons[student.id] || '') : '';
       worksheetData.push([
         index + 1,
         student.studentId || '',
         student.name,
         student.gender || 'ប្រុស',
-        statusKh
+        statusKh,
+        reason
       ]);
     });
 
@@ -79,7 +82,7 @@ export default function StudentManager({
   // Persistent student sort mode shared across Attendance and Score tabs ('id' | 'name')
   const [studentSortMode, setStudentSortMode] = useState<SortMode>(() => {
     const saved = localStorage.getItem('edu_spin_student_sort_mode');
-    return (saved as SortMode) || 'id';
+    return saved === 'id' || saved === 'name' ? saved : 'name';
   });
 
   const handleSortModeChange = (mode: SortMode) => {
@@ -91,12 +94,25 @@ export default function StudentManager({
   const todayStr = new Date().toISOString().split('T')[0];
   const [attendanceDate, setAttendanceDate] = useState<string>(todayStr);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, 'present' | 'absent' | 'permission' | 'late'>>>({});
+  // Optional reasons for 'permission' or 'late' students
+  const [attendanceReasonMap, setAttendanceReasonMap] = useState<Record<string, Record<string, string>>>({});
+  // Sub-tab within Attendance: 'all' | 'permission_absent' | 'absent' | 'late' | 'permission' | 'summary'
+  const [attendanceViewTab, setAttendanceViewTab] = useState<'all' | 'permission_absent' | 'absent' | 'late' | 'permission' | 'summary'>('all');
+  const [droppedUpdateTick, setDroppedUpdateTick] = useState<number>(0);
 
   useEffect(() => {
     const saved = localStorage.getItem('edu_spin_attendance_records');
     if (saved) {
       try {
         setAttendanceMap(JSON.parse(saved));
+      } catch (e) {
+        console.error(e);
+      }
+    }
+    const savedReasons = localStorage.getItem('edu_spin_attendance_reasons');
+    if (savedReasons) {
+      try {
+        setAttendanceReasonMap(JSON.parse(savedReasons));
       } catch (e) {
         console.error(e);
       }
@@ -108,9 +124,15 @@ export default function StudentManager({
     localStorage.setItem('edu_spin_attendance_records', JSON.stringify(newMap));
   };
 
+  const saveAttendanceReasonMap = (newMap: typeof attendanceReasonMap) => {
+    setAttendanceReasonMap(newMap);
+    localStorage.setItem('edu_spin_attendance_reasons', JSON.stringify(newMap));
+  };
+
   const currentClassIdForAttendance = filterClassId !== 'all' ? filterClassId : (classes[0]?.id || 'default');
   const classAttendanceKey = `${currentClassIdForAttendance}_${attendanceDate}`;
   const currentClassAttendance = attendanceMap[classAttendanceKey] || {};
+  const currentClassReasons = attendanceReasonMap[classAttendanceKey] || {};
 
   const handleSetStudentAttendance = (studentId: string, status: 'present' | 'absent' | 'permission' | 'late') => {
     const updatedClassAttendance = {
@@ -122,6 +144,18 @@ export default function StudentManager({
       [classAttendanceKey]: updatedClassAttendance
     };
     saveAttendanceMap(newMap);
+  };
+
+  const handleSetStudentReason = (studentId: string, reason: string) => {
+    const updatedClassReasons = {
+      ...currentClassReasons,
+      [studentId]: reason
+    };
+    const newReasonMap = {
+      ...attendanceReasonMap,
+      [classAttendanceKey]: updatedClassReasons
+    };
+    saveAttendanceReasonMap(newReasonMap);
   };
 
   const handleMarkAllAttendance = (status: 'present' | 'absent' | 'permission' | 'late') => {
@@ -682,7 +716,20 @@ export default function StudentManager({
               </button>
             </div>
 
-            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end">
+            <div className="flex items-center gap-2.5 w-full sm:w-auto justify-end flex-wrap">
+              {/* Khmer Alphabet Sort Indicator */}
+              <div 
+                className={`px-3 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 border shadow-2xs ${
+                  isDarkMode 
+                    ? 'bg-slate-900/80 border-slate-800 text-indigo-400' 
+                    : 'bg-indigo-50/70 border-indigo-100 text-indigo-700'
+                }`}
+                title="តម្រៀបឈ្មោះសិស្សតាមលំដាប់អក្សរ ក-អ ដេញពីជួរខាងឆ្វេង រួចទៅជួរខាងស្ដាំ"
+              >
+                <ArrowUpAZ className="w-4 h-4 text-indigo-500 shrink-0" />
+                <span>តម្រៀប៖ ក-អ (ជួរឆ្វេង រួច ស្ដាំ)</span>
+              </div>
+
               {onClearStudents && students.length > 0 && (
                 <button
                   onClick={onClearStudents}
@@ -884,139 +931,169 @@ export default function StudentManager({
             </form>
           )}
 
-          {/* Student Cards Listing Directory Grid */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredStudents.length > 0 ? (
-              filteredStudents.map((student) => {
-                const studentClass = classes.find(c => c.id === (student.classId || activeClassId))?.name || 'ថ្នាក់ទី៧ក';
-                
-                let statusPillColor = 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40';
-                const statusKey = student.status || 'សកម្ម';
-                if (statusKey === 'ឆ្នើម') statusPillColor = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40';
-                else if (statusKey === 'កំពុងរីកចម្រើន') statusPillColor = 'bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/40';
-                else if (statusKey === 'គួរឲ្យបារម្ភ') statusPillColor = 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/40';
+          {/* Student Cards Listing Directory Grid (Sorted ក-អ, left column then right column) */}
+          {(() => {
+            // Strictly sort by Khmer alphabet (ក-អ)
+            const sortedAlphabetical = [...filteredStudents].sort((a, b) => 
+              a.name.trim().localeCompare(b.name.trim(), 'km')
+            );
 
-                const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-blue-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
-                const badgeBg = colors[student.name.charCodeAt(0) % colors.length];
-
-                return (
-                  <div
-                    key={student.id}
-                    className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex items-center justify-between group ${
-                      isDarkMode 
-                        ? 'bg-[#1e293b] border-slate-800 hover:border-slate-700' 
-                        : 'bg-white border-slate-200/80 hover:border-slate-300'
-                    }`}
+            if (sortedAlphabetical.length === 0) {
+              return (
+                <div className="py-14 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6">
+                  <Users className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-2 opacity-50" />
+                  <p className="text-slate-400 dark:text-slate-500 text-sm font-bold">គ្មានលទ្ធផលសិស្សស្របតាមការស្វែងរករបស់អ្នកឡើយ!</p>
+                  <button
+                    type="button"
+                    onClick={() => setShowQuickEditModal(true)}
+                    className="mt-3 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer mx-auto active:scale-95"
                   >
-                    <div className="flex items-center gap-3.5 min-w-0">
-                      {/* Avatar with image display and camera hover to edit profile */}
-                      <div 
-                        onClick={() => setProfileStudent(student)}
-                        className="relative group/avatar cursor-pointer shrink-0"
-                        title="ចុចដើម្បីដាក់រូបភាព & កែប្រែព័ត៌មាន Profile"
-                      >
-                        {student.avatarUrl ? (
-                          <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-900/60 shadow-xs">
-                            <img
-                              src={student.avatarUrl}
-                              alt={student.name}
-                              className="w-full h-full object-cover select-none"
-                            />
-                          </div>
-                        ) : (
-                          <div className={`w-12 h-12 rounded-2xl ${badgeBg} flex items-center justify-center text-white text-base font-black select-none shadow-xs`}>
-                            {getKhmerInitial(student.name)}
-                          </div>
-                        )}
-                        <div className="absolute inset-0 rounded-2xl bg-black/45 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white shadow-xs">
-                          <Camera className="w-4 h-4" />
-                        </div>
-                      </div>
+                    <ClipboardList className="w-4 h-4" />
+                    <span>មើល / បិទភ្ជាប់ឈ្មោះសិស្សទាំងអស់</span>
+                  </button>
+                </div>
+              );
+            }
 
-                      <div className="min-w-0">
-                        <div className="flex items-center gap-1.5 flex-wrap">
-                          <h3 
-                            onClick={() => setProfileStudent(student)}
-                            className={`font-extrabold text-sm leading-snug cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate ${
-                              isDarkMode ? 'text-white' : 'text-slate-800'
-                            }`}
-                            title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
-                          >
-                            {student.name}
-                          </h3>
-                          {student.studentId && (
-                            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">
-                              #{student.studentId}
-                            </span>
-                          )}
-                        </div>
+            // Split into two balanced columns: ជួរខាងឆ្វេង (1 ដល់ ពាក់កណ្ដាល), ជួរខាងស្ដាំ (ពាក់កណ្ដាល+1 ដល់ ចប់)
+            const halfCount = Math.ceil(sortedAlphabetical.length / 2);
+            const leftColStudents = sortedAlphabetical.slice(0, halfCount);
+            const rightColStudents = sortedAlphabetical.slice(halfCount);
 
-                        <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
-                          <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md ${
-                            isDarkMode ? 'text-slate-400 bg-slate-900 border-slate-800' : 'text-slate-500 bg-slate-50 border-slate-100'
-                          }`}>
-                            {studentClass}
-                          </span>
-                          <GenderBadgePicker
-                            gender={student.gender || 'ប្រុស'}
-                            compact={true}
-                            onChange={(newGender) => {
-                              if (onUpdateStudentDetail) {
-                                onUpdateStudentDetail(student.id, { gender: newGender });
-                              }
-                            }}
-                            isDarkMode={isDarkMode}
+            const renderStudentCard = (student: Student, displayIdx: number) => {
+              const studentClass = classes.find(c => c.id === (student.classId || activeClassId))?.name || 'ថ្នាក់ទី៧ក';
+              
+              let statusPillColor = 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40';
+              const statusKey = student.status || 'សកម្ម';
+              if (statusKey === 'ឆ្នើម') statusPillColor = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40';
+              else if (statusKey === 'កំពុងរីកចម្រើន') statusPillColor = 'bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/40';
+              else if (statusKey === 'គួរឲ្យបារម្ភ') statusPillColor = 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/40';
+
+              const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-blue-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
+              const badgeBg = colors[student.name.charCodeAt(0) % colors.length];
+
+              return (
+                <div
+                  key={student.id}
+                  className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex items-center justify-between group ${
+                    isDarkMode 
+                      ? 'bg-[#1e293b] border-slate-800 hover:border-slate-700' 
+                      : 'bg-white border-slate-200/80 hover:border-slate-300'
+                  }`}
+                >
+                  <div className="flex items-center gap-3.5 min-w-0">
+                    {/* Avatar with image display and camera hover to edit profile */}
+                    <div 
+                      onClick={() => setProfileStudent(student)}
+                      className="relative group/avatar cursor-pointer shrink-0"
+                      title="ចុចដើម្បីដាក់រូបភាព & កែប្រែព័ត៌មាន Profile"
+                    >
+                      {student.avatarUrl ? (
+                        <div className="w-12 h-12 rounded-2xl overflow-hidden border-2 border-indigo-200 dark:border-indigo-900/60 shadow-xs">
+                          <img
+                            src={student.avatarUrl}
+                            alt={student.name}
+                            className="w-full h-full object-cover select-none"
                           />
-                          <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${statusPillColor}`}>
-                            {statusKey}
-                          </span>
-                          {student.phoneNumber && (
-                            <span className="text-[10px] font-medium text-slate-400 hidden sm:inline-block">
-                              📞 {student.phoneNumber}
-                            </span>
-                          )}
                         </div>
+                      ) : (
+                        <div className={`w-12 h-12 rounded-2xl ${badgeBg} flex items-center justify-center text-white text-base font-black select-none shadow-xs`}>
+                          {getKhmerInitial(student.name)}
+                        </div>
+                      )}
+                      <div className="absolute inset-0 rounded-2xl bg-black/45 opacity-0 group-hover/avatar:opacity-100 transition-opacity flex items-center justify-center text-white shadow-xs">
+                        <Camera className="w-4 h-4" />
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 shrink-0 ml-2">
-                      <button
-                        onClick={() => setProfileStudent(student)}
-                        className={`p-2 rounded-xl cursor-pointer transition-all ${
-                          isDarkMode ? 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
-                        }`}
-                        title="កែប្រែព័ត៌មាន & រូបភាព Profile"
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => onRemoveStudent(student.id)}
-                        className={`p-2 rounded-xl cursor-pointer transition-all ${
-                          isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
-                        }`}
-                        title="លុបឈ្មោះសិស្ស"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-1.5 flex-wrap">
+                        {/* Numerical Order Badge */}
+                        <span className="text-[11px] font-black text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/70 px-2 py-0.5 rounded-lg border border-indigo-200/60 dark:border-indigo-800/50 shrink-0">
+                          {displayIdx}
+                        </span>
+                        <h3 
+                          onClick={() => setProfileStudent(student)}
+                          className={`font-extrabold text-sm leading-snug cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors truncate ${
+                            isDarkMode ? 'text-white' : 'text-slate-800'
+                          }`}
+                          title="ចុចដើម្បីមើលព័ត៌មានលម្អិត"
+                        >
+                          {student.name}
+                        </h3>
+                        {student.studentId && (
+                          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-slate-100 dark:bg-slate-800 text-slate-500 shrink-0">
+                            #{student.studentId}
+                          </span>
+                        )}
+                      </div>
+
+                      <div className="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                        <span className={`text-[10px] font-bold border px-2 py-0.5 rounded-md ${
+                          isDarkMode ? 'text-slate-400 bg-slate-900 border-slate-800' : 'text-slate-500 bg-slate-50 border-slate-100'
+                        }`}>
+                          {studentClass}
+                        </span>
+                        <GenderBadgePicker
+                          gender={student.gender || 'ប្រុស'}
+                          compact={true}
+                          onChange={(newGender) => {
+                            if (onUpdateStudentDetail) {
+                              onUpdateStudentDetail(student.id, { gender: newGender });
+                            }
+                          }}
+                          isDarkMode={isDarkMode}
+                        />
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${statusPillColor}`}>
+                          {statusKey}
+                        </span>
+                        {student.phoneNumber && (
+                          <span className="text-[10px] font-medium text-slate-400 hidden sm:inline-block">
+                            📞 {student.phoneNumber}
+                          </span>
+                        )}
+                      </div>
                     </div>
                   </div>
-                );
-              })
-            ) : (
-              <div className="col-span-full py-14 text-center border-2 border-dashed border-slate-200 dark:border-slate-800 rounded-3xl p-6">
-                <Users className="w-12 h-12 text-slate-300 dark:text-slate-700 mx-auto mb-2 opacity-50" />
-                <p className="text-slate-400 dark:text-slate-500 text-sm font-bold">គ្មានលទ្ធផលសិស្សស្របតាមការស្វែងរករបស់អ្នកឡើយ!</p>
-                <button
-                  type="button"
-                  onClick={() => setShowQuickEditModal(true)}
-                  className="mt-3 px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl text-xs font-bold transition-all flex items-center gap-2 shadow-md cursor-pointer mx-auto active:scale-95"
-                >
-                  <ClipboardList className="w-4 h-4" />
-                  <span>មើល / បិទភ្ជាប់ឈ្មោះសិស្សទាំងអស់</span>
-                </button>
+
+                  <div className="flex items-center gap-1 shrink-0 ml-2">
+                    <button
+                      onClick={() => setProfileStudent(student)}
+                      className={`p-2 rounded-xl cursor-pointer transition-all ${
+                        isDarkMode ? 'text-slate-400 hover:text-indigo-400 hover:bg-slate-800' : 'text-slate-400 hover:text-indigo-600 hover:bg-indigo-50'
+                      }`}
+                      title="កែប្រែព័ត៌មាន & រូបភាព Profile"
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </button>
+                    <button
+                      onClick={() => onRemoveStudent(student.id)}
+                      className={`p-2 rounded-xl cursor-pointer transition-all ${
+                        isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-400 hover:text-red-500 hover:bg-red-50'
+                      }`}
+                      title="លុបឈ្មោះសិស្ស"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              );
+            };
+
+            return (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start">
+                {/* ជួរខាងឆ្វេង (Left column: 1 ដល់ halfCount) */}
+                <div className="flex flex-col gap-4">
+                  {leftColStudents.map((student, idx) => renderStudentCard(student, idx + 1))}
+                </div>
+
+                {/* ជួរខាងស្ដាំ (Right column: halfCount+1 ដល់ ចប់) */}
+                <div className="flex flex-col gap-4">
+                  {rightColStudents.map((student, idx) => renderStudentCard(student, halfCount + idx + 1))}
+                </div>
               </div>
-            )}
-          </div>
+            );
+          })()}
 
           {/* Bottom Status Statistics Cards Grid Bar */}
           <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t ${
@@ -1200,36 +1277,245 @@ export default function StudentManager({
               else if (status === 'late') lateCount++;
             });
 
+            // Auto-detect dropped count from notes (e.g. "ឈប់" or "បោះបង់")
+            const autoDetectedDropped = classStudents.filter(
+              s => s.notes && (s.notes.includes('ឈប់') || s.notes.includes('បោះបង់') || s.notes.includes('ឈប់រៀន'))
+            ).length;
+
+            const activeClassObj = classes.find(c => c.id === filterClassId);
+            const classCountKey = `attendance_class_counts_${activeClassObj?.name?.trim() || activeClassObj?.id || 'default'}`;
+            let storedDropped: number | undefined;
+            try {
+              const saved = localStorage.getItem(classCountKey);
+              if (saved) {
+                const parsed = JSON.parse(saved);
+                if (typeof parsed.dropped === 'number') storedDropped = parsed.dropped;
+              }
+            } catch {}
+
+            const effectiveDropped = typeof storedDropped === 'number' ? storedDropped : autoDetectedDropped;
+            // សិស្សមករៀន៖ ដោយយកតាមលទ្ធផលបន្ទាប់ពីដកសិស្សច្បាប់ និងអវត្តមានចេញ (និងសិស្សឈប់)
+            const combinedAbsentee = permCount + absentCount;
+            const attendingCount = Math.max(0, total - effectiveDropped - combinedAbsentee);
+
+            const handleDroppedChange = (newVal: number) => {
+              const val = Math.max(0, isNaN(newVal) ? 0 : newVal);
+              try {
+                const existing = JSON.parse(localStorage.getItem(classCountKey) || '{}');
+                existing.dropped = val;
+                localStorage.setItem(classCountKey, JSON.stringify(existing));
+                setDroppedUpdateTick(prev => prev + 1);
+              } catch {}
+            };
+
             return (
-              <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase">សិស្សសរុប</span>
-                  <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{total} នាក់</div>
+              <div className="space-y-4">
+                {/* Clickable Attendance Stats Summary Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                  {/* 1. សិស្សសរុប */}
+                  <div 
+                    onClick={() => setAttendanceViewTab('all')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      attendanceViewTab === 'all' 
+                        ? 'ring-2 ring-indigo-500 shadow-md' 
+                        : 'hover:border-slate-400'
+                    } ${isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200 shadow-xs'}`}
+                    title="ចុចដើម្បីមើលតារាងវត្តមានទាំងអស់"
+                  >
+                    <span className="text-[10px] font-bold text-slate-400 uppercase">សិស្សសរុប</span>
+                    <div className="text-2xl font-black mt-1 text-slate-900 dark:text-white">{total} <span className="text-xs font-normal text-slate-400">នាក់</span></div>
+                  </div>
+
+                  {/* 2. សិស្សឈប់ (មានរបារកំណត់ចំនួនឈប់) */}
+                  <div 
+                    className={`p-3.5 rounded-2xl border transition-all ${
+                      isDarkMode ? 'bg-rose-950/20 border-rose-900/40' : 'bg-rose-50/70 border-rose-200 shadow-xs'
+                    }`}
+                    title="របារកំណត់ចំនួនសិស្សឈប់រៀន"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-rose-600 dark:text-rose-400 uppercase">សិស្សឈប់</span>
+                      <span className="text-[9px] font-bold text-rose-500 bg-rose-100 dark:bg-rose-950/60 px-1.5 py-0.5 rounded-md">កំណត់</span>
+                    </div>
+                    <div className="flex items-center gap-1.5 mt-1">
+                      <input
+                        type="number"
+                        min="0"
+                        max={total}
+                        value={effectiveDropped}
+                        onChange={(e) => handleDroppedChange(parseInt(e.target.value, 10))}
+                        className="w-14 px-1.5 py-0.5 rounded-lg border border-rose-300 dark:border-rose-800 font-black text-xl text-rose-600 dark:text-rose-400 bg-white dark:bg-slate-900 text-center focus:outline-none focus:ring-2 focus:ring-rose-500/30"
+                        title="កំណត់ចំនួនសិស្សឈប់"
+                      />
+                      <span className="text-xs font-bold text-rose-500">នាក់</span>
+                    </div>
+                  </div>
+
+                  {/* 3. សិស្សមករៀន (ដកសិស្សច្បាប់ និងអវត្តមានចេញ) */}
+                  <div 
+                    onClick={() => setAttendanceViewTab('all')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      isDarkMode ? 'bg-emerald-950/25 border-emerald-800/60 hover:border-emerald-600' : 'bg-emerald-50 border-emerald-300 hover:border-emerald-400 shadow-xs'
+                    }`}
+                    title="សិស្សមករៀន៖ ដោយយកតាមលទ្ធផលបន្ទាប់ពីដកសិស្សច្បាប់និងអវត្តមានចេញ"
+                  >
+                    <div className="flex items-center justify-between">
+                      <span className="text-[10px] font-bold text-emerald-700 dark:text-emerald-300 uppercase">សិស្សមករៀន</span>
+                      <span className="text-[8px] font-black text-emerald-700 dark:text-emerald-300 bg-emerald-200/70 dark:bg-emerald-900/60 px-1 py-0.5 rounded">ស្វ័យប្រវត្ត</span>
+                    </div>
+                    <div className="text-2xl font-black mt-1 text-emerald-600 dark:text-emerald-400">
+                      {attendingCount} <span className="text-xs font-normal text-emerald-600/70">នាក់</span>
+                    </div>
+                  </div>
+
+                  {/* 4. អវត្តមាន (Absent) */}
+                  <div 
+                    onClick={() => setAttendanceViewTab('permission_absent')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      attendanceViewTab === 'permission_absent' || attendanceViewTab === 'absent' 
+                        ? 'ring-2 ring-red-500 shadow-md' 
+                        : 'hover:border-red-400'
+                    } ${isDarkMode ? 'bg-red-950/20 border-red-900/40' : 'bg-red-50 border-red-200'}`}
+                    title="ចុចដើម្បីបើក Tap ច្បាប់ & អវត្តមាន"
+                  >
+                    <span className="text-[10px] font-bold text-red-600 uppercase">អវត្តមាន (Absent)</span>
+                    <div className="text-2xl font-black mt-1 text-red-600">{absentCount} <span className="text-xs font-normal text-red-400">នាក់</span></div>
+                  </div>
+
+                  {/* 5. មានច្បាប់ (Permission) */}
+                  <div 
+                    onClick={() => setAttendanceViewTab('permission_absent')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      attendanceViewTab === 'permission_absent' || attendanceViewTab === 'permission' 
+                        ? 'ring-2 ring-blue-500 shadow-md' 
+                        : 'hover:border-blue-400'
+                    } ${isDarkMode ? 'bg-blue-950/20 border-blue-900/40' : 'bg-blue-50 border-blue-200'}`}
+                    title="ចុចដើម្បីបើក Tap ច្បាប់ & អវត្តមាន"
+                  >
+                    <span className="text-[10px] font-bold text-blue-600 uppercase">មានច្បាប់</span>
+                    <div className="text-2xl font-black mt-1 text-blue-600">{permCount} <span className="text-xs font-normal text-blue-400">នាក់</span></div>
+                  </div>
+
+                  {/* 6. យឺតយ៉ាវ (Late) */}
+                  <div 
+                    onClick={() => setAttendanceViewTab('late')}
+                    className={`p-3.5 rounded-2xl border cursor-pointer transition-all ${
+                      attendanceViewTab === 'late' 
+                        ? 'ring-2 ring-amber-500 shadow-md' 
+                        : 'hover:border-amber-400'
+                    } ${isDarkMode ? 'bg-amber-950/20 border-amber-900/40' : 'bg-amber-50 border-amber-200'}`}
+                    title="ចុចដើម្បីបើក Tap យឺត"
+                  >
+                    <span className="text-[10px] font-bold text-amber-600 uppercase">យឺតយ៉ាវ (Late)</span>
+                    <div className="text-2xl font-black mt-1 text-amber-600">{lateCount} <span className="text-xs font-normal text-amber-400">នាក់</span></div>
+                  </div>
                 </div>
-                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-emerald-950/20 border-emerald-900/40' : 'bg-emerald-50 border-emerald-200'}`}>
-                  <span className="text-[10px] font-bold text-emerald-600 uppercase">វត្តមាន (Present)</span>
-                  <div className="text-2xl font-black mt-1 text-emerald-600">{presentCount} នាក់</div>
-                </div>
-                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-red-950/20 border-red-900/40' : 'bg-red-50 border-red-200'}`}>
-                  <span className="text-[10px] font-bold text-red-600 uppercase">អវត្តមាន (Absent)</span>
-                  <div className="text-2xl font-black mt-1 text-red-600">{absentCount} នាក់</div>
-                </div>
-                <div className={`p-4 rounded-2xl border ${isDarkMode ? 'bg-blue-950/20 border-blue-900/40' : 'bg-blue-50 border-blue-200'}`}>
-                  <span className="text-[10px] font-bold text-blue-600 uppercase">មានច្បាប់ (Permission)</span>
-                  <div className="text-2xl font-black mt-1 text-blue-600">{permCount} នាក់</div>
-                </div>
-                <div className={`p-4 rounded-2xl border col-span-2 sm:col-span-1 ${isDarkMode ? 'bg-amber-950/20 border-amber-900/40' : 'bg-amber-50 border-amber-200'}`}>
-                  <span className="text-[10px] font-bold text-amber-600 uppercase">យឺតយ៉ាវ (Late)</span>
-                  <div className="text-2xl font-black mt-1 text-amber-600">{lateCount} នាក់</div>
+
+                {/* Sub-Tabs Bar: តារាងទាំងអស់ | Tap ច្បាប់ & អវត្តមាន | Tap យឺត | សង្ខេបរបាយការណ៍រួម */}
+                <div className={`p-1.5 rounded-2xl border flex items-center gap-1.5 flex-wrap ${
+                  isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-slate-100 border-slate-200'
+                }`}>
+                  {/* Tab 1: All */}
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceViewTab('all')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border ${
+                      attendanceViewTab === 'all'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/25'
+                        : 'border-transparent text-slate-600 dark:text-slate-400 hover:bg-white/60 dark:hover:bg-slate-800'
+                    }`}
+                  >
+                    <ClipboardList className="w-4 h-4" />
+                    <span>តារាងវត្តមានទាំងអស់</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      attendanceViewTab === 'all' ? 'bg-white/20 text-white' : 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300'
+                    }`}>
+                      {total}
+                    </span>
+                  </button>
+
+                  {/* Tab 2: Combined Tap ច្បាប់ & អវត្តមាន (ច្បាប់លើ, អវត្តមានក្រោម, តាម ក-អ) */}
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceViewTab('permission_absent')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border ${
+                      attendanceViewTab === 'permission_absent' || attendanceViewTab === 'absent' || attendanceViewTab === 'permission'
+                        ? 'bg-gradient-to-r from-blue-600 to-red-600 text-white border-transparent shadow-md shadow-blue-600/25'
+                        : 'border-transparent text-slate-700 dark:text-slate-300 hover:bg-white/80 dark:hover:bg-slate-800'
+                    }`}
+                    title="មើលបញ្ជីសិស្សសុំច្បាប់ (ខាងលើ) និងអវត្តមាន (ខាងក្រោម) តម្រៀបតាម ក-អ"
+                  >
+                    <div className="flex items-center -space-x-1">
+                      <FileText className="w-4 h-4 shrink-0 text-blue-300" />
+                      <UserX className="w-4 h-4 shrink-0 text-red-300" />
+                    </div>
+                    <span>Tap ច្បាប់ & អវត្តមាន</span>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                        attendanceViewTab === 'permission_absent' || attendanceViewTab === 'absent' || attendanceViewTab === 'permission'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-blue-100 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                      }`}>
+                        ច្បាប់ {permCount}
+                      </span>
+                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                        attendanceViewTab === 'permission_absent' || attendanceViewTab === 'absent' || attendanceViewTab === 'permission'
+                          ? 'bg-white/20 text-white'
+                          : 'bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300'
+                      }`}>
+                        អវត្ត {absentCount}
+                      </span>
+                    </div>
+                  </button>
+
+                  {/* Tab 3: Late */}
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceViewTab('late')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border ${
+                      attendanceViewTab === 'late'
+                        ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-600/25'
+                        : 'border-transparent text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/30'
+                    }`}
+                  >
+                    <Clock className="w-4 h-4" />
+                    <span>Tap យឺត</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      attendanceViewTab === 'late' ? 'bg-white/20 text-white' : 'bg-amber-100 dark:bg-amber-950/50 text-amber-700 dark:text-amber-300'
+                    }`}>
+                      {lateCount}
+                    </span>
+                  </button>
+
+                  {/* Tab 4: Combined Summary Report */}
+                  <button
+                    type="button"
+                    onClick={() => setAttendanceViewTab('summary')}
+                    className={`px-3.5 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer border sm:ml-auto ${
+                      attendanceViewTab === 'summary'
+                        ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/25'
+                        : 'border-transparent text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/30'
+                    }`}
+                    title="ចម្លងរបាយការណ៍សង្ខេប អវត្តមាន ច្បាប់ និងយឺត រួមគ្នាផ្ញើ Telegram"
+                  >
+                    <Share2 className="w-4 h-4" />
+                    <span>សង្ខេបរបាយការណ៍រួម</span>
+                    <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+                      attendanceViewTab === 'summary' ? 'bg-white/20 text-white' : 'bg-indigo-100 dark:bg-indigo-950/50 text-indigo-700 dark:text-indigo-300'
+                    }`}>
+                      {absentCount + lateCount + permCount}
+                    </span>
+                  </button>
                 </div>
               </div>
             );
           })()}
 
-          {/* Attendance Table */}
-          <div className={`border rounded-3xl overflow-hidden shadow-sm ${
-            isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
-          }`}>
+          {/* Attendance Table or Category Views */}
+          {attendanceViewTab === 'all' ? (
+            <div className={`border rounded-3xl overflow-hidden shadow-sm ${
+              isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
+            }`}>
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse">
                 <thead>
@@ -1277,6 +1563,7 @@ export default function StudentManager({
                   ) : (
                     filteredStudents.map((student, index) => {
                       const currentStatus = currentClassAttendance[student.id] || 'present';
+                      const currentReason = currentClassReasons[student.id] || '';
                       return (
                         <tr key={student.id} className={`transition-colors ${
                           isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'
@@ -1325,36 +1612,64 @@ export default function StudentManager({
                           </td>
                           <td className="p-4">
                             <div className="flex items-center justify-center gap-2">
-                              {[
-                                { id: 'present', label: 'វត្តមាន', color: 'emerald' },
-                                { id: 'permission', label: 'ច្បាប់', color: 'blue' },
-                                { id: 'late', label: 'យឺត', color: 'amber' },
-                                { id: 'absent', label: 'អវត្តមាន', color: 'red' },
-                              ].map(st => {
-                                const isSelected = currentStatus === st.id;
-                                return (
+                              {/* រូបទី៣៖ ប៊ូតុងវត្តមានទាំង ៤ */}
+                              <div className="flex items-center justify-center gap-1.5 shrink-0">
+                                {[
+                                  { id: 'present', label: 'វត្តមាន', color: 'emerald' },
+                                  { id: 'permission', label: 'ច្បាប់', color: 'blue' },
+                                  { id: 'late', label: 'យឺត', color: 'amber' },
+                                  { id: 'absent', label: 'អវត្តមាន', color: 'red' },
+                                ].map(st => {
+                                  const isSelected = currentStatus === st.id;
+                                  return (
+                                    <button
+                                      key={st.id}
+                                      type="button"
+                                      onClick={() => handleSetStudentAttendance(student.id, st.id as any)}
+                                      className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1 ${
+                                        isSelected
+                                          ? st.id === 'present'
+                                            ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
+                                            : st.id === 'permission'
+                                              ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
+                                              : st.id === 'late'
+                                                ? 'bg-amber-600 text-white shadow-md shadow-amber-600/25'
+                                                : 'bg-red-600 text-white shadow-md shadow-red-600/25'
+                                          : isDarkMode
+                                            ? 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                                      }`}
+                                    >
+                                      <span>{st.label}</span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* រូបទី១៖ ប្រអប់បញ្ចូលមូលហេតុ ដាក់នៅបន្ទាប់ពីរូបទី៣ */}
+                              <div className="relative shrink-0">
+                                <input
+                                  type="text"
+                                  value={currentReason}
+                                  onChange={(e) => handleSetStudentReason(student.id, e.target.value)}
+                                  placeholder="មូលហេតុ"
+                                  className={`w-36 sm:w-44 py-1.5 pl-3 pr-7 rounded-xl text-xs font-semibold focus:outline-none transition-all border ${
+                                    isDarkMode
+                                      ? 'bg-slate-900/90 border-slate-700 text-slate-100 placeholder-slate-500 focus:border-indigo-500'
+                                      : 'bg-white border-slate-300 text-slate-800 placeholder-slate-400 focus:border-indigo-500 shadow-2xs'
+                                  }`}
+                                />
+                                {currentReason && (
                                   <button
-                                    key={st.id}
                                     type="button"
-                                    onClick={() => handleSetStudentAttendance(student.id, st.id as any)}
-                                    className={`px-3 py-1.5 rounded-xl font-bold text-xs transition-all cursor-pointer flex items-center gap-1 ${
-                                      isSelected
-                                        ? st.id === 'present'
-                                          ? 'bg-emerald-600 text-white shadow-md shadow-emerald-600/25'
-                                          : st.id === 'permission'
-                                            ? 'bg-blue-600 text-white shadow-md shadow-blue-600/25'
-                                            : st.id === 'late'
-                                              ? 'bg-amber-600 text-white shadow-md shadow-amber-600/25'
-                                              : 'bg-red-600 text-white shadow-md shadow-red-600/25'
-                                        : isDarkMode
-                                          ? 'bg-slate-800 text-slate-400 hover:bg-slate-700'
-                                          : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                                    }`}
+                                    onClick={() => handleSetStudentReason(student.id, '')}
+                                    className="absolute right-2 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-xs cursor-pointer p-0.5"
+                                    title="លុបហេតុផល"
                                   >
-                                    <span>{st.label}</span>
+                                    ✕
                                   </button>
-                                );
-                              })}
+                                )}
+                              </div>
                             </div>
                           </td>
                         </tr>
@@ -1365,8 +1680,22 @@ export default function StudentManager({
               </table>
             </div>
           </div>
-        </div>
-      )}
+        ) : (
+          <AttendanceCategoryViews
+            students={filteredStudents}
+            currentClassAttendance={currentClassAttendance}
+            currentClassReasons={currentClassReasons}
+            attendanceDate={attendanceDate}
+            className={classes.find(c => c.id === (filterClassId === 'all' ? activeClassId : filterClassId))?.name || 'ថ្នាក់រៀន'}
+            activeCategory={attendanceViewTab}
+            onBackToAll={() => setAttendanceViewTab('all')}
+            onSetAttendance={handleSetStudentAttendance}
+            onSetReason={handleSetStudentReason}
+            isDarkMode={isDarkMode}
+          />
+        )}
+      </div>
+    )}
 
       {/* Edit Student Modal Overlay (Common for both tabs) */}
       {editingStudent && (

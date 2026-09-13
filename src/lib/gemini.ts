@@ -268,32 +268,44 @@ You MUST generate exactly:
 For each question, "category" field MUST be "choice", "matching", "fill_blank", "theory", or "exercise".`;
       }
 
-      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${totalRequestedCount} multiple-choice questions for students. 
+      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${totalRequestedCount} high-quality, concise multiple-choice questions for students. 
 Each question should be high-quality and have exactly 4 options.
 
 ${languagePrompt}
 
 ${categoryRatiosPrompt}
 
-${!isPisa && !categoryCounts ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. However, mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions (e.g. if count is 10, around 2 of them should apply the formulas/theories to daily life scenarios, while the other 8 focus directly on the core lesson contents).` : ''}
+========================================================================
+CRITICAL MANDATORY REQUIREMENT: SHORT, CONCISE, EASY TO UNDERSTAND & QUICK TO READ
+(លក្ខខណ្ឌដាច់ខាត៖ សំណួរខ្លី ច្បាស់ ងាយយល់ និងជម្រើសចម្លើយខ្លីៗ រហ័សសម្រាប់សិស្ស)
+========================================================================
+The questions will be displayed on a big classroom screen and spinning wheel with a 15-20 second countdown timer.
+Students must be able to read and understand the question and all 4 options IN SECONDS.
+DO NOT generate wordy, convoluted, or lengthy sentences! Keep everything clean, punchy, and accessible.
 
-${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format. Act as an expert educational system developer and design the evaluation based on these gold standard PISA guidelines:
+1. QUESTION TEXT (សំណួរខ្លី ខ្លឹម ចំគោលដៅ ងាយយល់):
+   - MUST be short, direct, and concise: Strictly 1 to 2 lines (ideally 8 to 15 Khmer words, maximum 75-80 characters).
+   - Get straight to the key concept. DO NOT add unnecessary preambles, long winding descriptive clauses, or repetitive phrases.
+   - ❌ FORBIDDEN (Too long, slow to read): "តើមួយណាជាបរិមាណវ៉ិចទ័រដែលបង្ហាញពីការផ្លាស់ប្តូរទីតាំងរបស់វត្ថុពីចំណុចចាប់ផ្តើមទៅចំណុចបញ្ចប់?"
+   - ✅ REQUIRED (Short, crisp, instantly understood): "តើបម្លាស់ទីជាអ្វី?" ឬ "តើបរិមាណណាជាបម្លាស់ទី?" ឬ "តើឯកតា SI នៃកម្លាំងគឺអ្វី?" ឬ "តើរូបមន្តល្បឿនគឺអ្វី?"
+   - ❌ FORBIDDEN: "ប្រសិនបើសិស្សម្នាក់ធ្វើការសង្កេតលើចលនារបស់រថយន្តមួយដែលធ្វើដំណើរលើផ្លូវត្រង់ស្មើ... តើចម្ងាយចរគិតយ៉ាងដូចម្តេច?"
+   - ✅ REQUIRED: "តើចលនាត្រង់ស្មើមានរូបមន្តចម្ងាយអ្វី?" ឬ "តើ $v = \\frac{s}{t}$ ជារូបមន្តអ្វី?"
 
-=== គំរូ Prompt 01 (PISA Structure & Context) ===
-- តម្រូវឱ្យបង្កើតសំណួរបែប PISA សមស្របទៅតាមមុខវិជ្ជា (គណិតវិទ្យា/វិទ្យាសាស្រ្ដ/អំណាន) និងកម្រិតថ្នាក់របស់សិស្ស។
-- សំណួរត្រូវតែផ្អែកលើស្ថានភាពជីវិតពិតជាក់ស្ដែង (Real-life situation) ហើយតម្រូវឱ្យមានការវិភាគវែកញែករកហេតុផល (Reasoning) មិនមែនគ្រាន់តែរំលឹកទ្រឹស្ដី ឬរូបមន្តមេរៀនឡើងវិញនោះទេ។
-- ក្នុងសំណួរនីមួយៗត្រូវរួមបញ្ចូល៖
-  * បរិបទ ឬ សេណារីយ៉ូខ្លីមួយ (Context/Scenario) សម្រាប់ឱ្យសិស្សអាននិងយល់។
-  * សំណួរពហុជ្រើសរើស មានជម្រើសចម្លើយ ៤ ជម្រើស មានចម្លើយត្រឹមត្រូវ ១ និងចម្លើយបន្លំជាលក្ខណៈគិតថ្លឹងថ្លែងចំនួន ៣។
-  * ចម្លើយត្រឹមត្រូវជាមួយនឹងការពន្យល់ល្អិតល្អន់ និងខ្លីៗអំពីមូលហេតុ។
+2. OPTIONS / CHOICES (ចម្លើយ A, B, C, D ខ្លីៗ ច្បាស់ៗ):
+   - Each option MUST be very short and concise: Strictly 1 to 3 words, a single term, a number with unit, or a short formula.
+   - NEVER write full sentences or explanatory paragraphs inside options.
+   - ❌ FORBIDDEN: "ជាបម្លាស់ទីដែលកើតឡើងនៅពេលវត្ថុផ្លាស់ប្តូរទីតាំងពីចំណុចមួយទៅចំណុចមួយទៀត"
+   - ✅ REQUIRED: "បម្លាស់ទី", "ល្បឿន", "សំទុះ", "ចម្ងាយចរ"
+   - ✅ REQUIRED: "10 m/s", "5 N", "v = s/t", "H_2O", "100°C"
 
-=== គំរូ Prompt 02 (Problem-Solving Level - PISA Level 3) ===
-- បង្កើតសំណួរបែប PISA ក្នុងកម្រិត៣ (Level 3) ដោយប្រើបរិបទពិភពលោកពិតពីជីវិតប្រចាំថ្ងៃទាក់ទងនឹងមេរៀន និងកម្រិតថ្នាក់។
-- ភារកិច្ចរបស់សំណួរគួរតែវាយតម្លៃលើសមត្ថភាពដោះស្រាយបញ្ហា (Problem-solving) និងការគិតត្រិះរិះស៊ីជម្រៅ (Critical Thinking)។
-- ត្រូវតែរួមបញ្ចូល៖
-  * អត្ថបទខ្លី ទិន្នន័យ តារាង ឬស្ថានភាពជាក់ស្ដែងមួយ។
-  * សំណួរផ្ទាល់ដែលតម្រូវឱ្យមានការបកស្រាយ (Interpretation) ការវិភាគ ឬការគណនាដោយប្រើការគិត។
-  * ចម្លើយច្បាស់លាស់ និងការបង្ហាញពីការដោះស្រាយជាជំហានៗ។` : ''}
+3. EXPLANATION (ការពន្យល់):
+   - Keep the explanation also brief, concise, and clear (1 to 2 short sentences).
+
+${!isPisa && !categoryCounts ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. Keep questions and options crisp and short. Mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions.` : ''}
+
+${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format.
+Keep the question prompt scenario brief and concise so students can read and grasp the problem quickly without reading lengthy paragraphs.
+Options must be short, clear, and distinct.` : ''}
 
 CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
 If the questions involve math, physics, or chemistry:
@@ -363,15 +375,18 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
                   items: {
                     type: "OBJECT",
                     properties: {
-                      text: { type: "STRING", description: "The question text, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" },
+                      text: { 
+                        type: "STRING", 
+                        description: "Short, direct, concise question text (strictly under 15 words). Easy for students to read and understand at a glance in under 3-5 seconds. NEVER write long convoluted sentences or long paragraphs." 
+                      },
                       options: { 
                         type: "ARRAY", 
                         items: { type: "STRING" },
-                        description: "Exactly 4 multiple choice options, written in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)"
+                        description: "Exactly 4 very short, concise options (strictly 1 to 3 words, single key term, or short formula/number each). NEVER write full sentences."
                       },
                       correctIndex: { type: "INTEGER", description: "The 0-based index of the correct option" },
                       category: { type: "STRING", description: "The precise category of the question: choice, matching, fill_blank, theory, or exercise" },
-                      explanation: { type: "STRING", description: "Detailed explanation of why the correct option is right in the selected language scheme (Khmer, English, or bilingual Khmer/English in parentheses)" }
+                      explanation: { type: "STRING", description: "Short, concise explanation (1-2 sentences only)" }
                     },
                     required: ["text", "options", "correctIndex", "category"]
                   }

@@ -905,7 +905,7 @@ Output the response in JSON format.`;
     setIsAiGenerating(true);
     try {
       const subjectName = activeExam?.subjects.find(s => s.id === activeSubjectId)?.name || 'រូបវិទ្យា';
-      const promptText = `សូមបង្កើតសំណួរជ្រើសរើសចម្លើយ (Multiple choice questions in Khmer) ចំនួន ៥ សំណួរ អំពី ${subjectName} ជំនាញវិទ្យាល័យ សម្រាប់ថ្នាក់ទី ${activeClassName}។ មុខវិជ្ជា៖ ${subjectName}។ ព័ត៌មានបន្ថែម៖ ${aiPrompt}`;
+      const promptText = `សូមបង្កើតសំណួរជ្រើសរើសចម្លើយ (Multiple choice questions in Khmer) ចំនួន ៥ សំណួរ អំពី ${subjectName} ជំនាញវិទ្យាល័យ សម្រាប់ថ្នាក់ទី ${activeClassName}។ មុខវិជ្ជា៖ ${subjectName}។ ព័ត៌មានបន្ថែម៖ ${aiPrompt}។ លក្ខខណ្ឌចាំបាច់៖ សំណួរ និងជម្រើសចម្លើយត្រូវតែខ្លី ខ្លឹម ច្បាស់ ងាយយល់រហ័ស មិនវែងអន្លាយឡើយ។`;
       
       const generated = await generateQuestions(promptText, 5, [], [], [], 'general', 'khmer');
       
