@@ -97,17 +97,6 @@ export interface TeacherAccount {
   avatarUrl?: string;
 }
 
-export interface GroupMember extends Student {
-  assignedRole?: 'ប្រធាន' | 'អនុប្រធាន' | 'សមាជិក';
-  groupScore?: number;
-}
-
-export interface Group {
-  id: number;
-  name: string;
-  members: GroupMember[];
-}
-
 export function isStudentInClass(
   student: Student | null | undefined,
   targetClassId: string,
