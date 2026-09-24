@@ -1,14 +1,5 @@
 import { initializeApp, getApps, getApp } from 'firebase/app';
 import { 
-  getAuth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  FacebookAuthProvider,
-  signInWithEmailAndPassword,
-  createUserWithEmailAndPassword,
-  signOut
-} from 'firebase/auth';
-import { 
   getFirestore,
   initializeFirestore,
   getDocFromServer,
@@ -22,9 +13,7 @@ import {
   where,
   onSnapshot,
   DocumentSnapshot,
-  QuerySnapshot,
-  getDocFromCache,
-  getDocsFromCache
+  QuerySnapshot
 } from 'firebase/firestore';
 export { doc, setDoc, getDoc, getDocs, collection, deleteDoc, query, where, onSnapshot };
 import firebaseConfig from '../../firebase-applet-config.json';
@@ -37,17 +26,6 @@ if (typeof window !== 'undefined') {
 }
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
-
-// Initialize Firebase Auth
-export const auth = getAuth(app);
-export { 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  FacebookAuthProvider, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword, 
-  signOut 
-};
 
 // Configure Firestore with long-polling to prevent WebSocket connection stalls in iframe/sandboxed environments
 try {
@@ -108,23 +86,14 @@ export const cleanFirestoreData = (obj: any): any => {
   return cleaned;
 };
 
-export const safeGetDoc = async (docRef: any): Promise<any> => {
+export const safeGetDoc = async (docRef: any): Promise<{ exists: () => boolean; data: () => any; id: string } | DocumentSnapshot> => {
   try {
     const fetchPromise = getDoc(docRef);
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 4000)
+      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 5000)
     );
     return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error: any) {
-    try {
-      const cached = await getDocFromCache(docRef);
-      if (cached.exists()) {
-        console.log(`[Firestore] Loaded document ${docRef?.path} from offline cache fallback.`);
-        return cached;
-      }
-    } catch {
-      // Ignore cache failure
-    }
     const errMsg = error instanceof Error ? error.message : String(error);
     const errCode = error?.code || '';
     if (
@@ -135,7 +104,7 @@ export const safeGetDoc = async (docRef: any): Promise<any> => {
       errCode === 'failed-precondition' ||
       errCode === 'deadline-exceeded'
     ) {
-      console.warn(`[Firestore] Notice: Offline mode or timeout active for ${docRef?.path || 'doc'}. Utilizing empty state.`);
+      console.warn(`[Firestore] Notice: Offline mode or timeout active for ${docRef?.path || 'doc'}. Utilizing local state.`);
     } else {
       handleFirestoreError(error, OperationType.GET, docRef?.path || null);
     }
@@ -147,23 +116,14 @@ export const safeGetDoc = async (docRef: any): Promise<any> => {
   }
 };
 
-export const safeGetDocs = async (collOrQuery: any): Promise<any> => {
+export const safeGetDocs = async (collOrQuery: any): Promise<QuerySnapshot | { empty: boolean; size: number; docs: any[]; forEach: (cb: (doc: any) => void) => void }> => {
   try {
     const fetchPromise = getDocs(collOrQuery);
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 4000)
+      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 5000)
     );
     return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error: any) {
-    try {
-      const cached = await getDocsFromCache(collOrQuery);
-      if (!cached.empty) {
-        console.log(`[Firestore] Loaded query from offline cache fallback.`);
-        return cached;
-      }
-    } catch {
-      // Ignore cache failure
-    }
     const errMsg = error instanceof Error ? error.message : String(error);
     const errCode = error?.code || '';
     if (
@@ -174,7 +134,7 @@ export const safeGetDocs = async (collOrQuery: any): Promise<any> => {
       errCode === 'failed-precondition' ||
       errCode === 'deadline-exceeded'
     ) {
-      console.warn(`[Firestore] Notice: Offline mode or timeout active for query. Continuing with empty state.`);
+      console.warn(`[Firestore] Notice: Offline mode or timeout active for query. Continuing with local data.`);
     } else {
       handleFirestoreError(error, OperationType.LIST, collOrQuery?.path || null);
     }
