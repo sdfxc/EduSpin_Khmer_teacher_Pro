@@ -98,115 +98,92 @@ export const SpinWheelGroupModal: React.FC<SpinWheelGroupModalProps> = ({
   const [dealingGroupTarget, setDealingGroupTarget] = useState<string | null>(null);
   const [hasSpun, setHasSpun] = useState(false);
 
+  const wheelRef = useRef<HTMLDivElement>(null);
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const animationFrameRef = useRef<number | null>(null);
+
   // Filter valid students
   const activeStudents = students && students.length > 0 ? students : [];
   const sliceCount = Math.max(activeStudents.length, 1);
   const sliceAngle = 360 / sliceCount;
 
-  // Dynamic font size and spoke positioning based on student count
-  const getSliceFontSize = (count: number) => {
-    if (count <= 8) return 15;
-    if (count <= 14) return 13.5;
-    if (count <= 22) return 12;
-    if (count <= 32) return 10.5;
-    return 9.5;
-  };
+  // Draw Canvas Wheel
+  useEffect(() => {
+    if (!isOpen) return;
 
-  const sliceFontSize = getSliceFontSize(sliceCount);
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
 
-  // Render ultra-sharp vector SVG slices
-  const renderWheelSlices = () => {
-    const N = activeStudents.length;
-    const center = 200;
-    const radius = 185;
+    const size = canvas.width;
+    const center = size / 2;
+    const radius = center - 12;
 
-    if (N === 0) return null;
+    ctx.clearRect(0, 0, size, size);
 
-    if (N === 1) {
-      return (
-        <g>
-          <circle cx={center} cy={center} r={radius} fill={WHEEL_COLORS[0]} stroke="#ffffff" strokeWidth="4" />
-          <text
-            x={center}
-            y={center}
-            fill="#ffffff"
-            textAnchor="middle"
-            dominantBaseline="central"
-            style={{
-              fontFamily: '"Kantumruy Pro", "Battambang", "Noto Sans Khmer", sans-serif',
-              fontSize: '18px',
-              fontWeight: 800,
-              paintOrder: 'stroke fill',
-              stroke: 'rgba(0,0,0,0.5)',
-              strokeWidth: '3px',
-              strokeLinejoin: 'round'
-            }}
-          >
-            {activeStudents[0].name}
-          </text>
-        </g>
-      );
-    }
+    // Draw outer shadow / ring
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center, center, radius + 8, 0, 2 * Math.PI);
+    ctx.fillStyle = isDarkMode ? '#1e1b4b' : '#f1f5f9';
+    ctx.fill();
+    ctx.lineWidth = 6;
+    ctx.strokeStyle = '#ffffff';
+    ctx.stroke();
+    ctx.restore();
 
-    const sectorAngle = 360 / N;
-    return activeStudents.map((student, idx) => {
-      const startAngle = idx * sectorAngle;
-      const endAngle = (idx + 1) * sectorAngle;
+    // Draw Slices
+    activeStudents.forEach((student, index) => {
+      const startAngle = (index * sliceAngle * Math.PI) / 180;
+      const endAngle = ((index + 1) * sliceAngle * Math.PI) / 180;
+      const color = WHEEL_COLORS[index % WHEEL_COLORS.length];
 
-      const startRad = (startAngle * Math.PI) / 180;
-      const endRad = (endAngle * Math.PI) / 180;
+      // Draw Sector
+      ctx.save();
+      ctx.beginPath();
+      ctx.moveTo(center, center);
+      ctx.arc(center, center, radius, startAngle, endAngle);
+      ctx.closePath();
+      ctx.fillStyle = color;
+      ctx.fill();
+      ctx.lineWidth = 2.5;
+      ctx.strokeStyle = '#ffffff';
+      ctx.stroke();
+      ctx.restore();
 
-      const x1 = center + radius * Math.cos(startRad);
-      const y1 = center + radius * Math.sin(startRad);
-      const x2 = center + radius * Math.cos(endRad);
-      const y2 = center + radius * Math.sin(endRad);
+      // Draw Text along radius
+      ctx.save();
+      ctx.translate(center, center);
+      ctx.rotate(startAngle + (sliceAngle * Math.PI) / 360);
+      ctx.textAlign = 'right';
+      ctx.fillStyle = '#ffffff';
+      ctx.font = 'bold 13px "Kantumruy Pro", "Battambang", sans-serif';
+      ctx.shadowColor = 'rgba(0, 0, 0, 0.4)';
+      ctx.shadowBlur = 4;
+      ctx.shadowOffsetX = 1;
+      ctx.shadowOffsetY = 1;
 
-      const color = WHEEL_COLORS[idx % WHEEL_COLORS.length];
-      const midAngle = startAngle + sectorAngle / 2;
-
-      // Clean display name truncation if slice has space limits
+      // Truncate long names if slice is small
       let displayName = student.name;
-      const maxChars = N <= 10 ? 18 : N <= 18 ? 14 : 11;
-      if (displayName.length > maxChars) {
-        displayName = displayName.substring(0, maxChars - 1) + '…';
+      if (displayName.length > 15) {
+        displayName = displayName.substring(0, 14) + '...';
       }
-
-      return (
-        <g key={student.id}>
-          {/* Slice Sector */}
-          <path
-            d={`M ${center} ${center} L ${x1} ${y1} A ${radius} ${radius} 0 0 1 ${x2} ${y2} Z`}
-            fill={color}
-            stroke="#ffffff"
-            strokeWidth="2.5"
-          />
-          {/* Spoke Name Label: Razor sharp with clean outline for maximum legibility on all colors */}
-          <g transform={`rotate(${midAngle} ${center} ${center})`}>
-            <text
-              x={center + radius - 16}
-              y={center}
-              fill="#ffffff"
-              textAnchor="end"
-              dominantBaseline="central"
-              style={{
-                fontFamily: '"Kantumruy Pro", "Battambang", "Noto Sans Khmer", sans-serif',
-                fontSize: `${sliceFontSize}px`,
-                fontWeight: 800,
-                paintOrder: 'stroke fill',
-                stroke: 'rgba(0, 0, 0, 0.45)',
-                strokeWidth: '2.5px',
-                strokeLinejoin: 'round',
-                letterSpacing: '0.2px',
-                userSelect: 'none'
-              }}
-            >
-              {displayName}
-            </text>
-          </g>
-        </g>
-      );
+      ctx.fillText(displayName, radius - 20, 5);
+      ctx.restore();
     });
-  };
+
+    // Draw Inner Center Hub Border
+    ctx.save();
+    ctx.beginPath();
+    ctx.arc(center, center, 42, 0, 2 * Math.PI);
+    ctx.fillStyle = '#ffffff';
+    ctx.fill();
+    ctx.lineWidth = 3;
+    ctx.strokeStyle = '#6366f1';
+    ctx.stroke();
+    ctx.restore();
+  }, [isOpen, activeStudents, sliceAngle, isDarkMode]);
 
   // Reset state on open
   useEffect(() => {
@@ -369,41 +346,21 @@ export const SpinWheelGroupModal: React.FC<SpinWheelGroupModalProps> = ({
             <div className="w-0 h-0 border-l-[15px] border-l-transparent border-r-[15px] border-r-transparent border-t-[26px] border-t-rose-500 rounded-xs" />
           </div>
 
-          {/* Rotating Vector SVG Wheel wrapper */}
+          {/* Rotating Wheel canvas wrapper */}
           <div
-            className="relative w-[300px] h-[300px] sm:w-[360px] sm:h-[360px] rounded-full shadow-2xl transition-transform duration-[3600ms] flex items-center justify-center"
+            ref={wheelRef}
+            className="relative rounded-full shadow-2xl transition-transform duration-[3600ms]"
             style={{
               transform: `rotate(${rotation}deg)`,
               transitionTimingFunction: 'cubic-bezier(0.15, 0.9, 0.25, 1.0)',
             }}
           >
-            <svg
-              viewBox="0 0 400 400"
-              className="w-full h-full drop-shadow-xl select-none"
-            >
-              {/* Outer decorative ring */}
-              <circle
-                cx="200"
-                cy="200"
-                r="194"
-                fill={isDarkMode ? '#1e1b4b' : '#f8fafc'}
-                stroke="#ffffff"
-                strokeWidth="6"
-              />
-
-              {/* Slices & Names */}
-              {renderWheelSlices()}
-
-              {/* Inner Center Hub Border */}
-              <circle
-                cx="200"
-                cy="200"
-                r="40"
-                fill="#ffffff"
-                stroke="#6366f1"
-                strokeWidth="3.5"
-              />
-            </svg>
+            <canvas
+              ref={canvasRef}
+              width={340}
+              height={340}
+              className="rounded-full max-w-[290px] max-h-[290px] sm:max-w-[340px] sm:max-h-[340px]"
+            />
           </div>
 
           {/* Center Play Button Overlay */}

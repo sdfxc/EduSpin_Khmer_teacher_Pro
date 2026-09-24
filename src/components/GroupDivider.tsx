@@ -560,7 +560,7 @@ export default function GroupDivider({
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Sub-Tabs Switcher */}
       <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-fit shadow-xs ${
-        isDarkMode ? 'bg-[#222222] border-[#333333] shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
+        isDarkMode ? 'bg-slate-900/90 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
       }`}>
         <button
           type="button"
@@ -634,7 +634,7 @@ export default function GroupDivider({
         <>
           {/* Set Number of Teams Panel */}
           <div className={`p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 border transition-all duration-300 ${
-            isDarkMode ? 'bg-[#222222] border-[#333333] shadow-md' : 'bg-white border-slate-200 shadow-sm'
+            isDarkMode ? 'bg-[#121829] border-slate-805 border-indigo-950/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
           }`}>
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-305 duration-300 ${
@@ -714,7 +714,7 @@ export default function GroupDivider({
               )}
 
               <div className={`flex items-center rounded-2xl p-1 shadow-inner select-none border transition-all duration-300 ${
-                isDarkMode ? 'bg-[#1a1a1a] border-[#333333]' : 'bg-slate-100 border-slate-200'
+                isDarkMode ? 'bg-slate-950 border-slate-850 border-indigo-950/80' : 'bg-slate-100 border-slate-200'
               }`}>
                 <button
                   onClick={handleDecrement}
@@ -817,7 +817,7 @@ export default function GroupDivider({
             <div
               key={group.id}
               className={`rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col border ${
-                isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200'
+                isDarkMode ? 'bg-[#121829] border-indigo-950/80' : 'bg-white border-slate-200'
               }`}
             >
               {/* Group Title and Info */}

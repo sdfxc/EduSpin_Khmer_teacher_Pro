@@ -2804,10 +2804,10 @@ export default function App() {
   const activeCard = cards.find(c => c.id === activeCardId) || null;
 
   return (
-    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#222222] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
+    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
       {/* Header */}
       <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
-        isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200 shadow-xs'
+        isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
       }`}>
         <div 
           onClick={() => setActiveTab('wheel')}
@@ -2835,7 +2835,7 @@ export default function App() {
         {/* Dynamic Telegram iOS Liquid Glass Water Droplet Navigation Tabs */}
         <nav className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
           isDarkMode 
-            ? 'bg-[#1c1c20]/90 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.6)]' 
+            ? 'bg-slate-900/80 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4),0_8px_30px_rgba(0,0,0,0.4)]' 
             : 'bg-slate-200/60 border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(0,0,0,0.04)]'
         }`}>
           {[
@@ -3065,7 +3065,7 @@ export default function App() {
 
       {/* Class Switcher & Workspace Sub-Bar */}
       <div className={`py-2.5 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b transition-colors gap-4 overflow-x-auto ${
-        isDarkMode ? 'bg-[#222222]/95 border-[#333333]' : 'bg-slate-50/90 border-slate-200'
+        isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50/90 border-slate-200'
       }`}>
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5 mr-1 text-slate-500 dark:text-slate-400 font-bold text-xs">
@@ -3343,7 +3343,7 @@ export default function App() {
       <main className="flex-1 flex overflow-hidden">
         {activeTab === 'wheel' && (
           <>
-            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#222222]">
+            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
               <SpinningWheel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
@@ -3364,7 +3364,7 @@ export default function App() {
               />
             </section>
             
-            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-[#333333]">
+            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-slate-800">
               <StudentPanel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
@@ -3388,9 +3388,9 @@ export default function App() {
 
         {activeTab === 'quiz' && (
           <>
-            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#222222]">
+            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
               {/* Quick Switcher between Spinning Wheel (Image 1 - Default) and Student List (Image 3) */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] shrink-0">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-700 dark:text-slate-200">
                     {quizLeftView === 'wheel' ? 'កងបង្វិលសិស្ស' : 'បញ្ជីឈ្មោះសិស្ស'}
