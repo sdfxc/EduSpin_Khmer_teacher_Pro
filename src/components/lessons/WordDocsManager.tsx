@@ -59,7 +59,7 @@ export default function WordDocsManager({
   // Form states for creating / editing
   const [editingId, setEditingId] = useState<string | null>(null);
   const [formTitle, setFormTitle] = useState('');
-  const [formSubject, setFormSubject] = useState('រូបវិទ្យា');
+  const [formSubject, setFormSubject] = useState('ភាសាខ្មែរ');
   const [formChapter, setFormChapter] = useState('');
   const [formGrade, setFormGrade] = useState(activeClassName || 'ថ្នាក់ទី ៩');
   const [formCategory, setFormCategory] = useState<'worksheet' | 'summary' | 'exercise' | 'general'>('worksheet');
@@ -82,14 +82,14 @@ export default function WordDocsManager({
   const handleOpenCreate = () => {
     setEditingId(null);
     setFormTitle('');
-    setFormSubject('រូបវិទ្យា');
+    setFormSubject('ភាសាខ្មែរ');
     setFormChapter('');
     setFormGrade(activeClassName || 'ថ្នាក់ទី ៩');
     setFormCategory('worksheet');
     setFormDescription('');
     setFormContent(`# សន្លឹកកិច្ចការអនុវត្ត៖ មេរៀនថ្មី
 
-**មុខវិជ្ជា៖** រូបវិទ្យា | **ថ្នាក់ទី៖** ${activeClassName || '៩'}
+**មុខវិជ្ជា៖** ${formSubject || 'ភាសាខ្មែរ'} | **ថ្នាក់ទី៖** ${activeClassName || '៩'}
 
 ### I. ទ្រឹស្តីបទ និងរូបមន្តសំខាន់ៗ
 - ចំណុចទី១...
@@ -107,7 +107,7 @@ export default function WordDocsManager({
   const handleOpenEdit = (d: WordDocItem) => {
     setEditingId(d.id);
     setFormTitle(d.title);
-    setFormSubject(d.subject || 'រូបវិទ្យា');
+    setFormSubject(d.subject || 'ភាសាខ្មែរ');
     setFormChapter(d.chapter || '');
     setFormGrade(d.grade || activeClassName || 'ថ្នាក់ទី ៩');
     setFormCategory(d.category);

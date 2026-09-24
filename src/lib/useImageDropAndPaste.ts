@@ -22,7 +22,7 @@ export function useImageDropAndPaste({
     setIsProcessing(true);
     setStatusMsg(null);
     try {
-      const compressed = await compressAndResizeImage(file as File, 512, 0.85);
+      const compressed = await compressAndResizeImage(file as File, 240, 0.75);
       onImageReady(compressed);
       setStatusMsg({
         type: 'success',

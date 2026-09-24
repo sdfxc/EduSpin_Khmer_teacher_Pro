@@ -53,10 +53,10 @@ export default function LessonPlansManager({
   const [activeViewingPlan, setActiveViewingPlan] = useState<LessonPlanItem | null>(null);
 
   // AI Generation State
-  const [aiSubject, setAiSubject] = useState('រូបវិទ្យា');
+  const [aiSubject, setAiSubject] = useState('ភាសាខ្មែរ');
   const [aiGrade, setAiGrade] = useState(activeClassName || 'ថ្នាក់ទី ៩');
-  const [aiChapter, setAiChapter] = useState('ជំពូកទី ៣៖ អគ្គិសនី');
-  const [aiLessonTitle, setAiLessonTitle] = useState('ច្បាប់អូម (Ohm\'s Law)');
+  const [aiChapter, setAiChapter] = useState('ជំពូកទី ១');
+  const [aiLessonTitle, setAiLessonTitle] = useState('អំណាន និងសំណេរ');
   const [aiDuration, setAiDuration] = useState('៥០ នាទី');
   const [aiExtraInstructions, setAiExtraInstructions] = useState('');
   const [isGeneratingAi, setIsGeneratingAi] = useState(false);
@@ -67,7 +67,7 @@ export default function LessonPlansManager({
   const [formTitle, setFormTitle] = useState('');
   const [formSchoolName, setFormSchoolName] = useState(schoolName);
   const [formTeacherName, setFormTeacherName] = useState(teacherName);
-  const [formSubject, setFormSubject] = useState('រូបវិទ្យា');
+  const [formSubject, setFormSubject] = useState('ភាសាខ្មែរ');
   const [formGrade, setFormGrade] = useState(activeClassName || 'ថ្នាក់ទី ៩');
   const [formChapter, setFormChapter] = useState('');
   const [formDuration, setFormDuration] = useState('៥០ នាទី');
@@ -117,10 +117,10 @@ export default function LessonPlansManager({
   });
 
   const handleOpenAiModal = () => {
-    setAiSubject('រូបវិទ្យា');
+    setAiSubject('ភាសាខ្មែរ');
     setAiGrade(activeClassName || 'ថ្នាក់ទី ៩');
-    setAiChapter('ជំពូកទី ៣៖ អគ្គិសនី');
-    setAiLessonTitle('ច្បាប់អូម (Ohm\'s Law)');
+    setAiChapter('ជំពូកទី ១');
+    setAiLessonTitle('អំណាន និងសំណេរ');
     setAiDuration('៥០ នាទី');
     setAiExtraInstructions('');
     setAiError(null);
@@ -282,7 +282,7 @@ export default function LessonPlansManager({
     setFormTitle('កិច្ចតែងការបង្រៀនថ្មី');
     setFormSchoolName(schoolName);
     setFormTeacherName(teacherName);
-    setFormSubject('រូបវិទ្យា');
+    setFormSubject('ភាសាខ្មែរ');
     setFormGrade(activeClassName || 'ថ្នាក់ទី ៩');
     setFormChapter('ជំពូកទី ៣');
     setFormDuration('៥០ នាទី');

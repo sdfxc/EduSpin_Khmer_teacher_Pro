@@ -1,15 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, X, BookOpen, Loader2, Info, Upload, FileText, Trash2, FileSpreadsheet, Presentation } from 'lucide-react';
+import { Sparkles, X, BookOpen, Loader2, Info, Upload, FileText, Trash2, FileSpreadsheet, Presentation, Key, Languages, HelpCircle } from 'lucide-react';
 import { generateQuestions, getSavedApiKey, saveApiKey, FileData } from '../lib/gemini';
 import { Question } from '../types';
-import { PREBUILT_LESSONS } from '../lib/templates';
 import { useConfirm } from '../context/ConfirmContext.tsx';
+import { GlassLiquidOverlay } from './GlassLiquidCapsule';
 
 interface LessonModalProps {
   isOpen: boolean;
   onClose: () => void;
   onQuestionsGenerated: (questions: Question[]) => void;
+  isDarkMode?: boolean;
 }
 
 const getMimeTypeFromExtension = (filename: string): string => {
@@ -21,7 +22,7 @@ const getMimeTypeFromExtension = (filename: string): string => {
     case 'pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
     case 'ppt': return 'application/vnd.ms-powerpoint';
     case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
-    case 'xls': return 'application/vnd.ms-excel';
+    case 'xls': return 'text/csv';
     case 'csv': return 'text/csv';
     case 'txt': return 'text/plain';
     case 'png': return 'image/png';
@@ -32,7 +33,7 @@ const getMimeTypeFromExtension = (filename: string): string => {
   }
 };
 
-export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: LessonModalProps) {
+export default function LessonModal({ isOpen, onClose, onQuestionsGenerated, isDarkMode = false }: LessonModalProps) {
   const { confirmAction } = useConfirm();
   const [text, setText] = useState('');
   const [loading, setLoading] = useState(false);
@@ -231,59 +232,84 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
+          {/* Backdrop with 3D Glass Liquid blur */}
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm"
+            className="absolute inset-0 bg-slate-950/70 backdrop-blur-2xl"
             onClick={onClose}
           />
+
+          {/* Modal Container: 3D Glass Liquid Card */}
           <motion.div
-            initial={{ scale: 0.9, y: 20, opacity: 0 }}
-            animate={{ scale: 1, y: 0, opacity: 1 }}
-            exit={{ scale: 0.9, y: 20, opacity: 0 }}
-            className="bg-white rounded-3xl shadow-2xl w-full max-w-2xl overflow-hidden relative z-10"
+            initial={{ scale: 0.95, opacity: 0, y: 15 }}
+            animate={{ scale: 1, opacity: 1, y: 0 }}
+            exit={{ scale: 0.95, opacity: 0, y: 15 }}
+            className="relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl text-slate-900 dark:text-slate-100 w-full max-w-2xl max-h-[92dvh] sm:max-h-[88vh] rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/80 dark:border-white/10 z-10 flex flex-col my-auto"
           >
-            <div className="p-6 border-b border-slate-100 flex items-center justify-between bg-indigo-50/50">
-              <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white">
-                  <Sparkles className="w-5 h-5" />
+            {/* Liquid Gloss Header with 3D Specular Arc & Continuous Liquid Wave */}
+            <div className="p-4 sm:p-6 bg-gradient-to-r from-orange-500 via-amber-500 to-orange-600 dark:from-orange-600 dark:via-amber-600 dark:to-orange-700 relative overflow-hidden text-white flex items-center justify-between shrink-0 before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/30 before:via-white/10 before:to-transparent before:pointer-events-none">
+              {/* Continuous Liquid Light Wave across header */}
+              <motion.div
+                className="absolute inset-y-0 w-1/3 -skew-x-20 bg-gradient-to-r from-transparent via-white/30 to-transparent pointer-events-none"
+                animate={{ x: ['-120%', '400%'] }}
+                transition={{
+                  repeat: Infinity,
+                  duration: 3.2,
+                  ease: [0.4, 0, 0.2, 1],
+                  repeatDelay: 1.2,
+                }}
+              />
+
+              <div className="flex items-center gap-3 relative z-10">
+                <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white/20 backdrop-blur-xl rounded-2xl border border-white/40 shadow-[inset_0_1px_2px_rgba(255,255,255,0.6)] flex items-center justify-center text-white shrink-0">
+                  <Sparkles className="w-5 h-5 drop-shadow" />
                 </div>
                 <div>
-                  <h2 className="text-xl font-bold text-slate-800">បង្កើតសន្លឹកប័ណ្ណសំណួរ</h2>
+                  <h2 className="text-base sm:text-lg font-black tracking-tight drop-shadow-sm">
+                    បង្កើតសន្លឹកប័ណ្ណសំណួរ AI
+                  </h2>
                   <div className="flex items-center gap-1.5 mt-0.5">
-                    <p className="text-xs text-slate-500 font-medium uppercase tracking-wider">បញ្ជាដោយបច្ចេកវិទ្យា Gemini AI</p>
-                    <span className="text-[10px] text-slate-300">|</span>
+                    <p className="text-[10px] text-amber-100 uppercase tracking-widest font-bold">
+                      Powered by Gemini AI
+                    </p>
+                    <span className="text-[10px] text-amber-200/60">•</span>
                     <button 
                       onClick={() => setShowKeyInput(!showKeyInput)}
-                      className="text-[10px] text-indigo-600 hover:text-indigo-800 hover:underline font-bold flex items-center gap-0.5"
+                      className="text-[10px] text-white hover:text-amber-100 font-extrabold underline flex items-center gap-0.5 cursor-pointer"
                     >
-                      🔐 កំណត់ API Key
+                      <Key className="w-2.5 h-2.5" />
+                      <span>{showKeyInput ? 'លាក់ API Key' : '🔐 កំណត់ API Key'}</span>
                     </button>
                   </div>
                 </div>
               </div>
+
               <button 
                 onClick={onClose}
-                className="p-2 hover:bg-white rounded-full transition-colors"
+                className="p-1.5 sm:p-2 hover:bg-white/15 rounded-xl text-amber-100 hover:text-white transition-colors cursor-pointer relative z-10"
               >
-                <X className="w-6 h-6 text-slate-400" />
+                <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="p-8 max-h-[80vh] overflow-y-auto">
+            {/* Scrollable Form Body */}
+            <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain space-y-5">
+              {/* Optional Gemini API Key Banner */}
               {showKeyInput && (
-                <div className="mb-6 p-4 bg-amber-50 border border-amber-200 rounded-2xl">
+                <div className="p-4 bg-amber-500/10 dark:bg-amber-950/40 border border-amber-500/30 rounded-2xl backdrop-blur-md">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-bold text-amber-800 flex items-center gap-2">
-                      🔐 កូនសោ API Gemini (Gemini API Key)
+                    <label className="text-xs font-bold text-amber-900 dark:text-amber-300 flex items-center gap-1.5">
+                      <Key className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400" />
+                      កូនសោ API Gemini (Gemini API Key)
                     </label>
                     <a 
                       href="https://aistudio.google.com/" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-xs text-indigo-600 hover:underline font-bold"
+                      className="text-[11px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold"
                     >
                       បង្កើត API Key ឥតគិតថ្លៃ ↗
                     </a>
@@ -297,31 +323,29 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                         saveApiKey(e.target.value);
                       }}
                       placeholder="បញ្ចូលកូនសោ API Gemini (ឧទាហរណ៍៖ AIzaSy...)"
-                      className="flex-1 p-3 text-xs bg-white text-slate-900 border border-slate-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-amber-500"
+                      className="flex-1 px-4 py-2 text-xs bg-white dark:bg-slate-800 text-slate-900 dark:text-white border border-slate-200 dark:border-white/10 rounded-full shadow-[inset_0_2px_4px_rgba(0,0,0,0.04)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:outline-none focus:ring-2 focus:ring-amber-500 font-semibold"
                     />
                     <button
                       type="button"
                       onClick={() => setShowKeyInput(false)}
-                      className="px-4 py-2 bg-slate-900 text-white rounded-xl text-xs font-bold hover:bg-slate-800"
+                      className="px-4 py-2 bg-slate-900 dark:bg-slate-800 text-white rounded-full text-xs font-bold hover:bg-slate-800 cursor-pointer"
                     >
                       រក្សាទុក
                     </button>
                   </div>
-                  <p className="text-[11px] text-amber-700/80 mt-2 leading-relaxed">
-                    ព្រោះតែកម្មវិធីនេះត្រូវបានបង្ហោះជាលក្ខណៈ static (ឧទាហរណ៍ Vercel, Github Pages) គ្មានម៉ាស៊ីនបម្រើផ្ទាល់ខ្លួន, អ្នកត្រូវការបញ្ចូលកូនសោ API ផ្ទាល់ខ្លួនដើម្បីប្រើប្រាស់មុខងារ AI នេះ។ កូនសោនឹងត្រូវបានរក្សាទុកក្នុងឧបករណ៍របស់អ្នកដោយមានសុវត្ថិភាពខ្ពស់។
-                  </p>
                 </div>
               )}
 
+              {/* Error Message */}
               {errorMsg && (
-                <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-2xl flex items-start gap-2.5 animate-fadeIn">
+                <div className="p-3.5 bg-red-50/90 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 text-red-800 dark:text-red-300 rounded-2xl text-xs font-semibold flex items-start gap-2.5 backdrop-blur-md">
                   <span className="text-red-500 font-bold shrink-0">⚠️</span>
                   <div className="flex-1">
-                    <p className="text-xs text-red-800 font-semibold leading-relaxed">{errorMsg}</p>
-                    {(errorMsg.includes("API Key") || errorMsg.includes("កូនសោ") || errorMsg.includes("NEED_API_KEY") || errorMsg.includes("403") || errorMsg.includes("400")) && (
+                    <p className="leading-relaxed">{errorMsg}</p>
+                    {(errorMsg.includes("API Key") || errorMsg.includes("កូនសោ") || errorMsg.includes("NEED_API_KEY")) && (
                       <button
                         onClick={() => setShowKeyInput(true)}
-                        className="text-xs text-indigo-600 hover:underline font-bold mt-1.5 block"
+                        className="text-xs text-indigo-600 dark:text-indigo-400 hover:underline font-bold mt-1.5 block cursor-pointer"
                       >
                         កំណត់ ឬប្ដូរ API Key ឡើងវិញ ↗
                       </button>
@@ -330,314 +354,259 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
                 </div>
               )}
 
-
-
-              {/* Question category selector */}
-              <div className="mb-6 p-5 bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-800 rounded-3xl">
-                <label className="flex items-center gap-2 text-xs font-black uppercase text-slate-700 dark:text-slate-405 mb-3 tracking-wide">
-                  🧬 ទម្រង់សំណួរលទ្ធផល (Resulting Question Format)៖
+              {/* 💧 Question Category Selector: 3D Glass Liquid Segmented Capsule */}
+              <div className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl">
+                <label className="flex items-center gap-1.5 text-xs font-black uppercase text-slate-700 dark:text-slate-300 mb-3 tracking-wide">
+                  <Sparkles className="w-3.5 h-3.5 text-orange-500" />
+                  <span>ទម្រង់សំណួរលទ្ធផល (Resulting Question Format) ៖</span>
                 </label>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5">
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
                   <button
                     type="button"
                     onClick={() => setGenerationType('general')}
-                    className={`p-4 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1.5 text-center justify-center ${
+                    className={`relative p-3.5 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center overflow-hidden isolate ${
                       generationType === 'general'
-                        ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
-                        : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        ? 'text-white shadow-[0_8px_25px_rgba(249,115,22,0.45)]'
+                        : 'bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    <span className="text-[13.5px] flex items-center gap-1.5">📚 សំណួរបែបទូទៅនៃមេរៀន</span>
-                    <span className="text-[10px] opacity-75 font-semibold">General Lesson Questions</span>
+                    {generationType === 'general' && (
+                      <GlassLiquidOverlay isDarkMode={isDarkMode} variant="orange-glass" />
+                    )}
+                    <span className="relative z-10 text-[13px] font-bold">📚 សំណួរបែបទូទៅនៃមេរៀន</span>
+                    <span className="relative z-10 text-[10px] opacity-85 font-medium">General Lesson Questions</span>
                   </button>
+
                   <button
                     type="button"
                     onClick={() => setGenerationType('pisa')}
-                    className={`p-4 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1.5 text-center justify-center ${
+                    className={`relative p-3.5 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center overflow-hidden isolate ${
                       generationType === 'pisa'
-                        ? 'bg-indigo-500/10 border-indigo-505 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
-                        : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                        ? 'text-white shadow-[0_8px_25px_rgba(99,102,241,0.45)]'
+                        : 'bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    <span className="text-[13.5px] flex items-center gap-1.5">🎯 សំណួរបែបតេស្ត PISA</span>
-                    <span className="text-[10px] opacity-75 font-semibold">PISA Evaluation Standards</span>
+                    {generationType === 'pisa' && (
+                      <GlassLiquidOverlay isDarkMode={isDarkMode} variant="indigo-glass" />
+                    )}
+                    <span className="relative z-10 text-[13px] font-bold">🎯 សំណួរបែបតេស្ត PISA</span>
+                    <span className="relative z-10 text-[10px] opacity-85 font-medium">PISA Evaluation Standards</span>
                   </button>
                 </div>
-                <div className="mt-4 pt-4 border-t border-slate-200/60 dark:border-slate-800/60">
-                  <label className="flex items-center gap-2 text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 mb-2 tracking-wide">
-                    🌐 ជម្រើសភាសានៃសំណួរ (Question Language Option)៖
+
+                {/* Question Language Options */}
+                <div className="mt-3.5 pt-3.5 border-t border-slate-200/60 dark:border-slate-700/60">
+                  <label className="flex items-center gap-1.5 text-[11px] font-black uppercase text-slate-600 dark:text-slate-400 mb-2 tracking-wide">
+                    <Languages className="w-3 h-3 text-indigo-500" />
+                    <span>ជម្រើសភាសានៃសំណួរ (Question Language Option) ៖</span>
                   </label>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     <button
                       type="button"
                       onClick={() => setPisaLanguage('khmer')}
-                      className={`p-3 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center min-h-[72px] ${
+                      className={`relative p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-0.5 text-center justify-center min-h-[58px] overflow-hidden isolate ${
                         pisaLanguage === 'khmer'
-                          ? generationType === 'general'
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
-                            : 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
-                          : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                          ? 'text-white shadow-md'
+                          : 'bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
-                      <span className="text-[12px] font-bold">🇰🇭 ភាសាខ្មែរ (Khmer Only)</span>
-                      <span className="text-[9px] opacity-75 font-semibold">1. សំណួរចម្លើយជាភាសាខ្មែរ</span>
+                      {pisaLanguage === 'khmer' && (
+                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant={generationType === 'pisa' ? 'indigo-glass' : 'orange-glass'} />
+                      )}
+                      <span className="relative z-10 text-[11.5px] font-bold">🇰🇭 ភាសាខ្មែរ (Khmer Only)</span>
+                      <span className="relative z-10 text-[9px] opacity-80">1. សំណួរចម្លើយជាភាសាខ្មែរ</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setPisaLanguage('english')}
-                      className={`p-3 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center min-h-[72px] ${
+                      className={`relative p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-0.5 text-center justify-center min-h-[58px] overflow-hidden isolate ${
                         pisaLanguage === 'english'
-                          ? generationType === 'general'
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
-                            : 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
-                          : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                          ? 'text-white shadow-md'
+                          : 'bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
-                      <span className="text-[12px] font-bold">🇬🇧 ភាសាអង់គ្លេស (English Only)</span>
-                      <span className="text-[9px] opacity-75 font-semibold">2. សំណួរចម្លើយជាភាសាអង់គ្លេស</span>
+                      {pisaLanguage === 'english' && (
+                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant={generationType === 'pisa' ? 'indigo-glass' : 'orange-glass'} />
+                      )}
+                      <span className="relative z-10 text-[11.5px] font-bold">🇬🇧 ភាសាអង់គ្លេស (English)</span>
+                      <span className="relative z-10 text-[9px] opacity-80">2. English Questions</span>
                     </button>
+
                     <button
                       type="button"
                       onClick={() => setPisaLanguage('bilingual')}
-                      className={`p-3 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center min-h-[72px] ${
+                      className={`relative p-2.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex flex-col items-center gap-0.5 text-center justify-center min-h-[58px] overflow-hidden isolate ${
                         pisaLanguage === 'bilingual'
-                          ? generationType === 'general'
-                            ? 'bg-amber-500/10 border-amber-500 text-amber-900 dark:text-amber-300 font-extrabold shadow-sm'
-                            : 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-extrabold shadow-sm'
-                          : 'bg-white hover:bg-slate-50 dark:bg-slate-800 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-500 dark:text-slate-400'
+                          ? 'text-white shadow-md'
+                          : 'bg-white/80 dark:bg-slate-900/80 hover:bg-white dark:hover:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                       }`}
                     >
-                      <span className="text-[12px] font-bold">🇬🇧+🇰🇭 មានភាសាអង់គ្លេសអម</span>
-                      <span className="text-[9px] opacity-75 font-semibold">3. With English Support</span>
+                      {pisaLanguage === 'bilingual' && (
+                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant={generationType === 'pisa' ? 'indigo-glass' : 'orange-glass'} />
+                      )}
+                      <span className="relative z-10 text-[11.5px] font-bold">🇬🇧+🇰🇭 អមភាសាអង់គ្លេស</span>
+                      <span className="relative z-10 text-[9px] opacity-80">3. With English Support</span>
                     </button>
                   </div>
                 </div>
-                <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-3 leading-relaxed font-semibold">
-                  {generationType === 'pisa' 
-                    ? '🎯 សំណួរបែបតេស្ត PISA៖ ផ្ដោតទៅលើការដោះស្រាយបញ្ហាក្នុងជីវភាពរស់នៅជាក់ស្ដែង ការវិភាគវែកញែកស៊ីជម្រៅ និងការប្រើប្រាស់ការគិតបែបស៊ីជម្រៅ (Critical Thinking) ស្របតាមស្ដង់ដាអន្តរជាតិ។'
-                    : '📚 សំណួរបែបទូទៅនៃមេរៀន៖ បង្កើតសំណួរដែលសួរទាក់ទងនឹងនិយមន័យ រូបមន្ត ទ្រឹស្ដី ឬចំណុចសំខាន់ៗដែលមានចែងផ្ទាល់នៅក្នុងមេរៀន លាយខ្លះៗអំពីជីវភាពរស់នៅប្រចាំថ្ងៃ 20% នៃសំណួរសរុប100%។'}
-                </p>
               </div>
 
-              <div className="mb-6">
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
-                  <BookOpen className="w-4 h-4 text-indigo-500" />
-                  ខ្លឹមសារមេរៀន
+              {/* Lesson Text Input */}
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1.5">
+                  <BookOpen className="w-3.5 h-3.5 text-orange-500" />
+                  <span>ខ្លឹមសារមេរៀន (Lesson Content) *</span>
                 </label>
                 <textarea
                   value={text}
                   onChange={(e) => setText(e.target.value)}
                   placeholder="សូមចម្លងខ្លឹមសារមេរៀន ឬកំណត់ចំណាំរបស់អ្នកដាក់ទីនេះ... AI នឹងបង្កើតសំណួរចេញពីមេរៀននេះ។"
-                  className="w-full h-40 p-4 bg-white text-slate-900 border border-slate-300 rounded-2xl focus:outline-none focus:ring-4 focus:ring-indigo-100 focus:border-indigo-500 transition-all text-sm leading-relaxed font-semibold placeholder-slate-400 shadow-sm"
+                  className="w-full h-32 sm:h-36 p-4 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-2xl text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-orange-500/40 focus:border-orange-500 transition-all resize-none"
                 />
               </div>
 
-              <div className="mb-6">
-                <label className="flex items-center gap-2 text-sm font-bold text-slate-700 mb-2">
-                  📎 បញ្ចូលឯកសារ ឬរូបភាពបន្ថែម
+              {/* File / Image Attachment Drag-Drop */}
+              <div>
+                <label className="flex items-center gap-2 text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1.5">
+                  <Upload className="w-3.5 h-3.5 text-indigo-500" />
+                  <span>បញ្ចូលឯកសារ ឬរូបភាពបន្ថែម (Images / PDF / Word / Excel / PowerPoint)</span>
                 </label>
+                
                 <div
                   onDragOver={handleDragOver}
                   onDragLeave={handleDragLeave}
                   onDrop={handleDrop}
                   onClick={() => fileInputRef.current?.click()}
-                  className={`border-2 border-dashed rounded-2xl p-6 transition-all duration-200 flex flex-col items-center justify-center text-center cursor-pointer ${
+                  className={`border-2 border-dashed rounded-2xl p-4 sm:p-5 transition-all flex flex-col items-center justify-center text-center cursor-pointer backdrop-blur-xl ${
                     isDragging 
-                      ? "border-indigo-600 bg-indigo-50/50 scale-[0.99] text-indigo-600" 
-                      : "border-slate-200 hover:border-indigo-400 hover:bg-slate-50 bg-slate-50/20 text-slate-500"
+                      ? "border-orange-500 bg-orange-500/10 scale-[0.99] text-orange-600" 
+                      : "border-slate-300/80 dark:border-slate-700/80 hover:border-orange-400 dark:hover:border-orange-500 bg-slate-100/50 dark:bg-slate-800/40 text-slate-500 dark:text-slate-400 shadow-[inset_0_1px_3px_rgba(0,0,0,0.02)]"
                   }`}
                 >
                   <input 
                     type="file" 
-                    ref={fileInputRef}
-                    onChange={handleFileChange}
+                    ref={fileInputRef} 
+                    onChange={handleFileChange} 
                     multiple 
-                    accept="image/*,application/pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt" 
+                    accept="image/*,.pdf,.docx,.doc,.pptx,.ppt,.xlsx,.xls,.csv,.txt" 
                     className="hidden" 
                   />
-                  <div className="w-10 h-10 bg-indigo-50 text-indigo-600 rounded-lg flex items-center justify-center mb-2.5">
-                    <Upload className="w-5 h-5" />
+                  <div className="w-9 h-9 rounded-full bg-orange-500/10 dark:bg-orange-500/20 text-orange-600 dark:text-orange-400 flex items-center justify-center mb-1.5 shadow-inner">
+                    <Upload className="w-4 h-4" />
                   </div>
-                  <p className="text-xs font-bold text-slate-700">អូស និងទម្លាក់ រូបភាព, PDF, Word, Excel, PowerPoint ទីនេះ</p>
-                  <p className="text-[10px] text-slate-400 mt-1 font-semibold leading-relaxed">
-                    ឬចុចដើម្បីជ្រើសរើសឯកសារ (ឬ ចុច <kbd className="bg-slate-100 px-1 py-0.5 rounded border text-slate-600 font-mono text-[9px]">Ctrl + V</kbd> ដើម្បីចម្លងរូបភាពពី Clipboard)
+                  <p className="text-xs font-bold text-slate-700 dark:text-slate-300">
+                    ចុចទីនេះ ឬអូសទម្លាក់ឯកសារ ឬរូបភាព (Ctrl+V ដើម្បីបិទភ្ជាប់រូបភាព)
+                  </p>
+                  <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                    គាំទ្រ PDF, Word (.docx), Excel (.xlsx), PowerPoint (.pptx) និងរូបភាព JPEG/PNG
                   </p>
                 </div>
 
-                {/* Uploaded Files list */}
+                {/* Uploaded Files Pills */}
                 {(uploadedImages.length > 0 || uploadedPdfs.length > 0 || uploadedOfficeFiles.length > 0) && (
-                  <div className="mt-4 space-y-2">
-                    <h4 className="text-[11px] font-bold text-slate-500 uppercase tracking-wider mb-1.5">ឯកសារភ្ជាប់ដែលបានផ្ទុកឡើង ({uploadedImages.length + uploadedPdfs.length + uploadedOfficeFiles.length})៖</h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
-                      {uploadedImages.map((img, idx) => (
-                        <div key={`img-${idx}`} className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-200 rounded-xl relative group">
-                          <img 
-                            src={img.data} 
-                            alt="uploaded preview" 
-                            className="w-10 h-10 object-cover rounded-lg border border-slate-200 bg-white"
-                            referrerPolicy="no-referrer"
-                          />
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-bold text-slate-700 truncate">{img.name || `រូបភាព ${idx + 1}`}</p>
-                            <p className="text-[9.5px] text-green-600 font-semibold flex items-center gap-1">
-                              <span className="inline-block w-1.5 h-1.5 bg-green-500 rounded-full animate-bounce" /> រូបភាពរួចរាល់
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemoveImage(idx);
-                            }}
-                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {uploadedImages.map((img, idx) => (
+                      <div key={`img-${idx}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-white/10 rounded-full text-xs font-semibold text-slate-700 dark:text-slate-200 shadow-xs">
+                        <span>🖼️</span>
+                        <span className="max-w-[120px] truncate">{img.name || `រូបភាព ${idx + 1}`}</span>
+                        <button 
+                          type="button" 
+                          onClick={(e) => { e.stopPropagation(); handleRemoveImage(idx); }}
+                          className="text-slate-400 hover:text-red-500 ml-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
 
-                      {uploadedPdfs.map((pdf, idx) => (
-                        <div key={`pdf-${idx}`} className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-200 rounded-xl relative group">
-                          <div className="w-10 h-10 bg-rose-50 border border-rose-100 text-rose-600 rounded-lg flex items-center justify-center shrink-0">
-                            <FileText className="w-5 h-5 animate-pulse" />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <p className="text-[11px] font-bold text-slate-700 truncate">{pdf.name || `ឯកសារ PDF ${idx + 1}`}</p>
-                            <p className="text-[9.5px] text-rose-600 font-semibold flex items-center gap-1">
-                              <span className="inline-block w-1.5 h-1.5 bg-rose-500 rounded-full animate-bounce" /> ឯកសារ PDF រួចរាល់
-                            </p>
-                          </div>
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleRemovePdf(idx);
-                            }}
-                            className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                          >
-                            <Trash2 className="w-3.5 h-3.5" />
-                          </button>
-                        </div>
-                      ))}
+                    {uploadedPdfs.map((pdf, idx) => (
+                      <div key={`pdf-${idx}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-red-500/10 border border-red-500/30 rounded-full text-xs font-semibold text-red-700 dark:text-red-300 shadow-xs">
+                        <span>📄</span>
+                        <span className="max-w-[120px] truncate">{pdf.name || `PDF ${idx + 1}`}</span>
+                        <button 
+                          type="button" 
+                          onClick={(e) => { e.stopPropagation(); handleRemovePdf(idx); }}
+                          className="text-red-400 hover:text-red-600 ml-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
 
-                      {uploadedOfficeFiles.map((of, idx) => {
-                        const isWord = of.name?.toLowerCase().endsWith('.docx') || of.name?.toLowerCase().endsWith('.doc') || of.mimeType?.includes('word');
-                        const isSlide = of.name?.toLowerCase().endsWith('.pptx') || of.name?.toLowerCase().endsWith('.ppt') || of.mimeType?.includes('presentation') || of.mimeType?.includes('powerpoint');
-                        const isExcel = of.name?.toLowerCase().endsWith('.xlsx') || of.name?.toLowerCase().endsWith('.xls') || of.name?.toLowerCase().endsWith('.csv') || of.mimeType?.includes('spreadsheet') || of.mimeType?.includes('excel') || of.mimeType?.includes('csv');
-
-                        let iconComponent = <FileText className="w-5 h-5" />;
-                        let bgClass = "bg-slate-50 border-slate-100 text-slate-600";
-                        let bannerText = "ឯកសាររួចរាល់";
-                        let statusColor = "text-slate-600";
-
-                        if (isWord) {
-                          iconComponent = <FileText className="w-5 h-5" />;
-                          bgClass = "bg-blue-50 border-blue-100 text-blue-600";
-                          bannerText = "ឯកសារ Word រួចរាល់";
-                          statusColor = "text-blue-600";
-                        } else if (isSlide) {
-                          iconComponent = <Presentation className="w-5 h-5" />;
-                          bgClass = "bg-orange-50 border-orange-100 text-orange-600";
-                          bannerText = "ឯកសារ PowerPoint រួចរាល់";
-                          statusColor = "text-orange-600";
-                        } else if (isExcel) {
-                          iconComponent = <FileSpreadsheet className="w-5 h-5" />;
-                          bgClass = "bg-emerald-50 border-emerald-100 text-emerald-600";
-                          bannerText = "សន្លឹកការងារ Excel រួចរាល់";
-                          statusColor = "text-emerald-600";
-                        }
-
-                        return (
-                          <div key={`of-${idx}`} className="flex items-center gap-2.5 p-2 bg-slate-50 border border-slate-200 rounded-xl relative group">
-                            <div className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 border ${bgClass}`}>
-                              {iconComponent}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="text-[11px] font-bold text-slate-700 truncate">{of.name || `ឯកសារការិយាល័យ ${idx + 1}`}</p>
-                              <p className={`text-[9.5px] font-semibold flex items-center gap-1 ${statusColor}`}>
-                                <span className={`inline-block w-1.5 h-1.5 rounded-full animate-bounce ${isExcel ? 'bg-emerald-500' : isWord ? 'bg-blue-500' : isSlide ? 'bg-orange-500' : 'bg-slate-500'}`} /> {bannerText}
-                              </p>
-                            </div>
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                handleRemoveOfficeFile(idx);
-                              }}
-                              className="p-1.5 hover:bg-rose-50 text-slate-400 hover:text-rose-600 rounded-lg transition-colors cursor-pointer"
-                            >
-                              <Trash2 className="w-3.5 h-3.5" />
-                            </button>
-                          </div>
-                        );
-                      })}
-                    </div>
+                    {uploadedOfficeFiles.map((of, idx) => (
+                      <div key={`of-${idx}`} className="flex items-center gap-1.5 px-3 py-1.5 bg-indigo-500/10 border border-indigo-500/30 rounded-full text-xs font-semibold text-indigo-700 dark:text-indigo-300 shadow-xs">
+                        <span>📑</span>
+                        <span className="max-w-[120px] truncate">{of.name || `ឯកសារ ${idx + 1}`}</span>
+                        <button 
+                          type="button" 
+                          onClick={(e) => { e.stopPropagation(); handleRemoveOfficeFile(idx); }}
+                          className="text-indigo-400 hover:text-red-500 ml-1 cursor-pointer"
+                        >
+                          <Trash2 className="w-3 h-3" />
+                        </button>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
 
-              {/* Concise Questions Badge */}
-              <div className="mb-6 p-3.5 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl flex items-center gap-3 text-emerald-900">
-                <div className="w-8 h-8 rounded-xl bg-emerald-500/15 border border-emerald-400/30 flex items-center justify-center shrink-0 text-emerald-600 font-black text-base">
-                  ⚡
+              {/* Number of Cards Slider & Action */}
+              <div className="p-4 rounded-2xl bg-slate-100/70 dark:bg-slate-800/50 border border-slate-200/80 dark:border-white/10 backdrop-blur-2xl space-y-2">
+                <div className="flex justify-between items-center">
+                  <label className="text-xs font-bold text-slate-700 dark:text-slate-300 uppercase">
+                    ចំនួនសន្លឹកប័ណ្ណសំណួរ (Cards Count)
+                  </label>
+                  <span className="px-3 py-0.5 rounded-full text-xs font-black bg-orange-500/15 text-orange-600 dark:text-orange-400 border border-orange-500/30">
+                    {count} សំណួរ
+                  </span>
                 </div>
-                <div className="flex-1 min-w-0">
-                  <p className="text-xs font-black text-emerald-900">
-                    សំណួរ និងចម្លើយខ្លី ងាយយល់ (Short & Concise Format)
-                  </p>
-                  <p className="text-[11px] text-emerald-800 font-medium leading-relaxed">
-                    សំណួរត្រូវបានកំណត់ឱ្យបង្កើតខ្លី ខ្លឹម ចំគោលដៅ និងជម្រើសចម្លើយខ្លីៗ ងាយស្រួលសិស្សអានយល់រហ័ស មិនមានអក្សរច្រើនពិបាកយល់ ឬចំណាយពេលអានយូរឡើយ។
-                  </p>
+                <input 
+                  type="range" 
+                  min="5" 
+                  max="100" 
+                  step="5"
+                  value={count} 
+                  onChange={(e) => setCount(parseInt(e.target.value))}
+                  className="w-full h-2 bg-slate-200 dark:bg-slate-700 rounded-full appearance-none cursor-pointer accent-orange-500 shadow-inner"
+                />
+                <div className="flex justify-between text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase">
+                  <span>៥ សន្លឹក</span>
+                  <span>១០០ សន្លឹក</span>
                 </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
-                <div className="w-full sm:flex-1">
-                  <div className="flex justify-between items-center mb-1">
-                    <label className="block text-sm font-bold text-slate-700">ចំនួនសន្លឹកប័ណ្ណ</label>
-                    <span className="text-indigo-600 font-black bg-indigo-50 px-2 py-0.5 rounded-lg text-sm">{count}</span>
-                  </div>
-                  <input 
-                    type="range" 
-                    min="5" 
-                    max="100" 
-                    step="5"
-                    value={count} 
-                    onChange={(e) => setCount(parseInt(e.target.value))}
-                    className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-indigo-600 shadow-inner"
-                  />
-                  <div className="flex justify-between mt-1 text-[10px] font-bold text-slate-400 uppercase">
-                    <span>៥</span>
-                    <span>១០០ សន្លឹក</span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={handleGenerate}
-                  disabled={loading || (!text.trim() && uploadedImages.length === 0 && uploadedPdfs.length === 0 && uploadedOfficeFiles.length === 0)}
-                  className="w-full sm:w-auto px-8 py-4 bg-slate-900 text-white rounded-2xl font-bold flex items-center justify-center gap-3 hover:bg-slate-800 transition-all disabled:opacity-50 shadow-xl active:scale-95 group"
-                >
+              {/* 💧 3D Glass Liquid Capsule Submit Button: "បង្កើតសំណួរ" */}
+              <motion.button
+                type="button"
+                onClick={handleGenerate}
+                disabled={loading || (!text.trim() && uploadedImages.length === 0 && uploadedPdfs.length === 0 && uploadedOfficeFiles.length === 0)}
+                whileHover={{ scale: 1.02 }}
+                whileTap={{ scale: 0.96 }}
+                className="relative w-full py-3.5 px-6 rounded-full font-black text-sm text-white flex items-center justify-center gap-2.5 shadow-[0_12px_28px_-6px_rgba(249,115,22,0.65),0_0_24px_rgba(251,146,60,0.45)] disabled:opacity-50 cursor-pointer overflow-hidden isolate"
+              >
+                <GlassLiquidOverlay isDarkMode={isDarkMode} variant="orange-glass" />
+                <span className="relative z-10 flex items-center justify-center gap-2.5 drop-shadow-md">
                   {loading ? (
                     <>
                       <Loader2 className="w-5 h-5 animate-spin" />
-                      កំពុងបង្កើត...
+                      <span>កំពុងបង្កើតសំណួរតាមរយៈ Gemini AI...</span>
                     </>
                   ) : (
                     <>
-                      បង្កើតសំណួរ
-                      <Sparkles className="w-5 h-5 text-indigo-400 group-hover:animate-pulse" />
+                      <Sparkles className="w-5 h-5 drop-shadow animate-pulse" />
+                      <span className="drop-shadow-sm text-base">បង្កើតសំណួរ AI ឥឡូវនេះ ({count} សំណួរ)</span>
                     </>
                   )}
-                </button>
-              </div>
+                </span>
+              </motion.button>
+            </div>
 
-              <div className="mt-8 p-4 bg-indigo-50 border border-indigo-100 rounded-2xl flex items-start gap-3">
-                <Info className="w-5 h-5 text-indigo-600 shrink-0" />
-                <p className="text-xs text-indigo-800 leading-relaxed font-medium">
-                  AI នឹងធ្វើការវិភាគលើអត្ថបទមេរៀន រូបភាព ឯកសារ PDF ឬឯកសារការិយាល័យ (Word, Excel, PowerPoint) របស់អ្នកដើម្បីបង្កើតសំណួរពហុជ្រើសរើស។ 
-                  អ្នកអាចដាក់ឯកសារជាភាសាខ្មែរ ឬអង់គ្លេស។
-                </p>
-              </div>
+            {/* Modal Bottom Glass Footer */}
+            <div className="px-4 sm:px-6 py-2.5 sm:py-3 bg-slate-50/80 dark:bg-slate-950/70 border-t border-slate-100 dark:border-white/5 flex items-center justify-center text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium text-center shrink-0">
+              AI នឹងវិភាគខ្លឹមសារមេរៀន ឬឯកសារដែលបានបញ្ចូល រួចបង្កើតសំណួរ និងជម្រើសចម្លើយ 4 ស្វ័យប្រវត្តិ
             </div>
           </motion.div>
         </div>
@@ -645,4 +614,3 @@ export default function LessonModal({ isOpen, onClose, onQuestionsGenerated }: L
     </AnimatePresence>
   );
 }
-

@@ -1,4 +1,14 @@
+import 'firebase/auth';
 import { initializeApp, getApps, getApp } from 'firebase/app';
+import { 
+  getAuth, 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  FacebookAuthProvider,
+  signInWithEmailAndPassword,
+  createUserWithEmailAndPassword,
+  signOut
+} from 'firebase/auth';
 import { 
   getFirestore,
   initializeFirestore,
@@ -12,20 +22,76 @@ import {
   query, 
   where,
   onSnapshot,
+  disableNetwork,
+  enableNetwork,
   DocumentSnapshot,
   QuerySnapshot
 } from 'firebase/firestore';
-export { doc, setDoc, getDoc, getDocs, collection, deleteDoc, query, where, onSnapshot };
+export { doc, setDoc, getDoc, getDocs, collection, deleteDoc, query, where, onSnapshot, disableNetwork, enableNetwork };
 import firebaseConfig from '../../firebase-applet-config.json';
 
-// Clear any residual quota block key from past runs
-if (typeof window !== 'undefined') {
+const QUOTA_STORAGE_KEY = 'khmer_teacher_firestore_quota_until';
+const QUOTA_BLOCK_DURATION = 60 * 60 * 1000; // 1 hour cooldown before probing again
+
+export const isQuotaExceeded = (): boolean => {
+  if (typeof window === 'undefined') return false;
   try {
-    localStorage.removeItem('khmer_teacher_firestore_quota_exceeded');
+    const saved = localStorage.getItem(QUOTA_STORAGE_KEY);
+    if (saved) {
+      const until = Number(saved);
+      if (Date.now() < until) {
+        return true;
+      } else {
+        localStorage.removeItem(QUOTA_STORAGE_KEY);
+      }
+    }
   } catch {}
-}
+  return false;
+};
 
 const app = getApps().length > 0 ? getApp() : initializeApp(firebaseConfig);
+
+// Initialize Firebase Auth safely
+let _authInstance: any = null;
+export const getSafeAuth = () => {
+  if (!_authInstance) {
+    try {
+      _authInstance = getApps().length > 0 ? getAuth(getApp()) : getAuth(app);
+    } catch {
+      try {
+        _authInstance = getAuth();
+      } catch (e) {
+        console.warn('[Firebase] Auth registration deferred:', e);
+      }
+    }
+  }
+  return _authInstance;
+};
+
+// Safe exported auth instance that will never throw unhandled 'Component auth has not been registered yet' on boot
+let initialAuth: any = null;
+try {
+  initialAuth = getAuth(app);
+} catch {
+  // Defer initialization to accessor proxy
+}
+
+export const auth: any = initialAuth || new Proxy({}, {
+  get(_target, prop) {
+    const inst = getSafeAuth();
+    if (!inst) return undefined;
+    const val = inst[prop];
+    return typeof val === 'function' ? val.bind(inst) : val;
+  }
+});
+export { 
+  signInWithPopup, 
+  GoogleAuthProvider, 
+  FacebookAuthProvider, 
+  signInWithEmailAndPassword, 
+  createUserWithEmailAndPassword, 
+  signOut 
+};
 
 // Configure Firestore with long-polling to prevent WebSocket connection stalls in iframe/sandboxed environments
 try {
@@ -39,8 +105,16 @@ try {
 // Initialize Firestore with database ID specified in firebaseConfig as per Firebase skill
 export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 
+// If quota is already marked as exceeded from past session, disable network right away
+if (typeof window !== 'undefined' && isQuotaExceeded()) {
+  try {
+    disableNetwork(db).catch(() => {});
+  } catch {}
+}
+
 // Validate connection on boot as recommended in skill guidelines with non-blocking timeout
 export async function testConnection() {
+  if (isQuotaExceeded()) return;
   try {
     const testPromise = getDocFromServer(doc(db, 'test', 'connection'));
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -57,7 +131,34 @@ if (typeof window !== 'undefined') {
   testConnection();
 }
 
-export const isQuotaExceeded = () => false;
+export const markQuotaExceeded = () => {
+  const until = Date.now() + QUOTA_BLOCK_DURATION;
+  try {
+    localStorage.setItem(QUOTA_STORAGE_KEY, String(until));
+  } catch {}
+  try {
+    disableNetwork(db).catch(() => {});
+  } catch {}
+  console.warn('[Firestore] Quota limit detected. Pausing remote Firestore network calls and switching to local storage cache.');
+  notifyQuotaListeners(true);
+};
+
+const quotaListeners = new Set<(isExceeded: boolean) => void>();
+export const subscribeQuotaExceeded = (callback: (isExceeded: boolean) => void) => {
+  quotaListeners.add(callback);
+  callback(isQuotaExceeded());
+  return () => {
+    quotaListeners.delete(callback);
+  };
+};
+
+function notifyQuotaListeners(exceeded: boolean) {
+  for (const listener of quotaListeners) {
+    try {
+      listener(exceeded);
+    } catch {}
+  }
+}
 
 export const cleanFirestoreData = (obj: any): any => {
   if (obj === null || obj === undefined) {
@@ -86,17 +187,54 @@ export const cleanFirestoreData = (obj: any): any => {
   return cleaned;
 };
 
+export const saveTeacherToLocalRegistry = (teacher: any) => {
+  if (typeof window === 'undefined' || !teacher || !teacher.id) return;
+  try {
+    const raw = localStorage.getItem('registered_teachers_registry') || '{}';
+    const dict = JSON.parse(raw);
+    dict[teacher.id] = teacher;
+    if (teacher.username) {
+      dict[teacher.username.toLowerCase()] = teacher;
+    }
+    if (teacher.email) {
+      dict[teacher.email.toLowerCase()] = teacher;
+    }
+    localStorage.setItem('registered_teachers_registry', JSON.stringify(dict));
+  } catch {}
+};
+
+export const getTeacherFromLocalRegistry = (key: string): any | null => {
+  if (typeof window === 'undefined' || !key) return null;
+  try {
+    const raw = localStorage.getItem('registered_teachers_registry') || '{}';
+    const dict = JSON.parse(raw);
+    const cleanKey = key.trim().toLowerCase();
+    return dict[cleanKey] || dict[key] || null;
+  } catch {
+    return null;
+  }
+};
+
 export const safeGetDoc = async (docRef: any): Promise<{ exists: () => boolean; data: () => any; id: string } | DocumentSnapshot> => {
+  if (isQuotaExceeded()) {
+    return {
+      exists: () => false,
+      data: () => undefined,
+      id: docRef?.id || '',
+    };
+  }
   try {
     const fetchPromise = getDoc(docRef);
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 5000)
+      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 3000)
     );
     return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error: any) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errCode = error?.code || '';
-    if (
+    if (errCode === 'resource-exhausted' || errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded')) {
+      markQuotaExceeded();
+    } else if (
       errMsg.includes('client is offline') ||
       errMsg.includes("Backend didn't respond") ||
       errMsg.includes('timeout') ||
@@ -117,16 +255,26 @@ export const safeGetDoc = async (docRef: any): Promise<{ exists: () => boolean; 
 };
 
 export const safeGetDocs = async (collOrQuery: any): Promise<QuerySnapshot | { empty: boolean; size: number; docs: any[]; forEach: (cb: (doc: any) => void) => void }> => {
+  if (isQuotaExceeded()) {
+    return {
+      empty: true,
+      size: 0,
+      docs: [],
+      forEach: () => {},
+    };
+  }
   try {
     const fetchPromise = getDocs(collOrQuery);
     const timeoutPromise = new Promise<never>((_, reject) =>
-      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 5000)
+      setTimeout(() => reject(new Error("Backend didn't respond within timeout")), 3000)
     );
     return await Promise.race([fetchPromise, timeoutPromise]);
   } catch (error: any) {
     const errMsg = error instanceof Error ? error.message : String(error);
     const errCode = error?.code || '';
-    if (
+    if (errCode === 'resource-exhausted' || errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded')) {
+      markQuotaExceeded();
+    } else if (
       errMsg.includes('client is offline') ||
       errMsg.includes("Backend didn't respond") ||
       errMsg.includes('timeout') ||
@@ -148,26 +296,67 @@ export const safeGetDocs = async (collOrQuery: any): Promise<QuerySnapshot | { e
 };
 
 export const safeSetDoc = async (docRef: any, data: any, options?: any) => {
+  if (isQuotaExceeded()) {
+    return;
+  }
   try {
     const sanitized = cleanFirestoreData(data);
-    await setDoc(docRef, sanitized, options);
+    const writePromise = setDoc(docRef, sanitized, options);
+    const timeoutPromise = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[Firestore] Notice: safeSetDoc write timeout (3s) for ${docRef?.path || 'doc'}. Local write retained.`);
+        resolve();
+      }, 3000)
+    );
+    await Promise.race([writePromise, timeoutPromise]);
   } catch (e: any) {
+    const errCode = e?.code || '';
+    const errMsg = e instanceof Error ? e.message : String(e);
+    if (errCode === 'resource-exhausted' || errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded')) {
+      markQuotaExceeded();
+      return;
+    }
     handleFirestoreError(e, OperationType.WRITE, docRef?.path || null);
   }
 };
 
 export const safeDeleteDoc = async (docRef: any) => {
+  if (isQuotaExceeded()) {
+    return;
+  }
   try {
-    await deleteDoc(docRef);
+    const deletePromise = deleteDoc(docRef);
+    const timeoutPromise = new Promise<void>((resolve) =>
+      setTimeout(() => {
+        console.warn(`[Firestore] Notice: safeDeleteDoc write timeout (3s) for ${docRef?.path || 'doc'}.`);
+        resolve();
+      }, 3000)
+    );
+    await Promise.race([deletePromise, timeoutPromise]);
   } catch (e: any) {
+    const errCode = e?.code || '';
+    const errMsg = e instanceof Error ? e.message : String(e);
+    if (errCode === 'resource-exhausted' || errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded')) {
+      markQuotaExceeded();
+      return;
+    }
     handleFirestoreError(e, OperationType.DELETE, docRef?.path || null);
   }
 };
 
 export const safeOnSnapshot = (docRef: any, callback: any, errorCallback?: any) => {
+  if (isQuotaExceeded()) {
+    return () => {};
+  }
   try {
     return onSnapshot(docRef, callback, (error: any) => {
-      handleFirestoreError(error, OperationType.LIST, docRef?.path || null);
+      const errCode = error?.code || '';
+      const errMsg = error instanceof Error ? error.message : String(error);
+      if (errCode === 'resource-exhausted' || errMsg.includes('resource-exhausted') || errMsg.includes('Quota exceeded')) {
+        markQuotaExceeded();
+      } else {
+        handleFirestoreError(error, OperationType.LIST, docRef?.path || null);
+      }
       if (errorCallback) errorCallback(error);
     });
   } catch (err: any) {

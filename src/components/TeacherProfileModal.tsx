@@ -20,7 +20,7 @@ import {
 } from 'lucide-react';
 import { TeacherAccount } from '../types';
 import { doc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, saveTeacherToLocalRegistry } from '../lib/firebase';
 import { compressAndResizeImage } from '../lib/imageUtils';
 import { formatGoogleDriveImageUrl } from '../lib/driveUtils';
 import { useImageDropAndPaste } from '../lib/useImageDropAndPaste';
@@ -126,36 +126,37 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     };
 
     try {
-      // 1. Save to localStorage immediately
+      // 1. Save to local storage & local registry immediately
       localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
+      saveTeacherToLocalRegistry(updatedTeacher);
 
-      // 2. Sync to Firestore cloud
+      // 2. Immediately update parent state so UI reacts without delay
+      onUpdateTeacher(updatedTeacher);
+
+      // 3. Sync to Firestore in background (safeSetDoc now has a 3s timeout)
       const teacherDocRef = doc(db, 'teachers', teacher.id);
       await safeSetDoc(teacherDocRef, updatedTeacher, { merge: true });
 
-      // 3. Update parent React state
-      onUpdateTeacher(updatedTeacher);
-
       setStatusMsg({
         type: 'success',
-        text: 'បានរក្សាទុកព័ត៌មាន និងរូបភាព Profile ចូលទៅ Cloud ជោគជ័យ!'
+        text: 'បានរក្សាទុកព័ត៌មាន និងរូបភាព Profile ជោគជ័យ!'
       });
 
       setTimeout(() => {
+        setIsSaving(false);
         onClose();
-      }, 900);
+      }, 600);
     } catch (err) {
       console.warn('Notice: Teacher profile sync to Firestore queued/deferred:', err);
-      // Still update locally if Firestore encounters connection issues
       onUpdateTeacher(updatedTeacher);
-      handleFirestoreError(err, OperationType.UPDATE, `teachers/${teacher.id}`);
       setStatusMsg({
         type: 'success',
         text: 'បានរក្សាទុកក្នុងឧបករណ៍ជោគជ័យ (Offline Cache)!'
       });
       setTimeout(() => {
+        setIsSaving(false);
         onClose();
-      }, 1200);
+      }, 700);
     } finally {
       setIsSaving(false);
     }

@@ -24,6 +24,9 @@
         "name": { "type": "string" },
         "pickedIds": { "type": "array" },
         "cards": { "type": "array" },
+        "subjects": { "type": "array" },
+        "activeSubjectId": { "type": "string" },
+        "activeRoomId": { "type": "string" },
         "createdAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name"]
@@ -40,6 +43,8 @@
         "gender": { "type": "string", "enum": ["ប្រុស", "ស្រី"] },
         "status": { "type": "string", "enum": ["ឆ្នើម", "សកម្ម", "កំពុងរីកចម្រើន", "គួរឲ្យបារម្ភ"] },
         "classId": { "type": "string" },
+        "subjectScores": { "type": "object" },
+        "monthlyScores": { "type": "object" },
         "updatedAt": { "type": "string", "format": "date-time" }
       },
       "required": ["id", "name", "score"]
@@ -78,10 +83,13 @@
     },
     "AttendanceData": {
       "title": "AttendanceData",
-      "description": "Daily attendance status and reasons for students in a class",
+      "description": "Daily and monthly attendance status and reasons for students in a class per subject",
       "type": "object",
       "properties": {
         "classId": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "subjectName": { "type": "string" },
+        "month": { "type": "string" },
         "date": { "type": "string" },
         "records": { "type": "object" },
         "reasons": { "type": "object" },
@@ -105,7 +113,7 @@
     },
     "/teachers/{teacherId}/classes/{classId}/students/{studentId}": {
       "schema": "Student",
-      "description": "Collection of students inside a class."
+      "description": "Collection of students inside a class with scores per subject and month."
     },
     "/teachers/{teacherId}/classes/{classId}/groupsData/{docId}": {
       "schema": "GroupsData",
@@ -115,9 +123,9 @@
       "schema": "ExamsData",
       "description": "Exams papers data for a class."
     },
-    "/teachers/{teacherId}/classes/{classId}/attendance/{date}": {
+    "/teachers/{teacherId}/classes/{classId}/attendance/{subjectDateId}": {
       "schema": "AttendanceData",
-      "description": "Daily attendance records and notes for students in a class."
+      "description": "Daily and monthly attendance records and notes for students in a class per subject."
     }
   }
 }

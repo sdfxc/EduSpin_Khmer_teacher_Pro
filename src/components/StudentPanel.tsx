@@ -257,7 +257,7 @@ export default function StudentPanel({
   return (
     <div className={`flex flex-col h-full border-r p-6 overflow-hidden transition-colors duration-300 ${
       isDarkMode 
-        ? 'bg-slate-900 border-slate-800 text-white' 
+        ? 'bg-[#222222] border-[#333333] text-white' 
         : 'bg-white border-[#e2e8f0] text-slate-800'
     }`}>
       <div className="flex flex-col mb-6 gap-2">
@@ -466,8 +466,8 @@ export default function StudentPanel({
                   : manualCalledIds.includes(student.id)
                     ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40 text-amber-900 dark:text-amber-200'
                     : pickedIds.includes(student.id)
-                      ? 'bg-slate-50 dark:bg-slate-800/45 border-slate-100 dark:border-slate-800 opacity-40 grayscale'
-                      : 'bg-white dark:bg-slate-900 border-[#e2e8f0] dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors text-slate-700 dark:text-slate-300'
+                      ? 'bg-slate-50 dark:bg-[#1f1f1f] border-slate-100 dark:border-[#333333] opacity-40 grayscale'
+                      : 'bg-white dark:bg-[#2a2a2a] border-[#e2e8f0] dark:border-[#383838] hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-slate-700 dark:text-slate-300'
               }`}
             >
               <div className="flex items-center gap-4">
@@ -535,14 +535,14 @@ export default function StudentPanel({
         )}
       </div>
 
-      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-[#333333]">
         <form onSubmit={handleAdd} className="flex gap-2">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="បញ្ចូលឈ្មោះសិស្ស..."
-            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-900 dark:text-slate-100"
+            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-[#333333] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-900 dark:text-slate-100"
           />
           <button
             type="submit"

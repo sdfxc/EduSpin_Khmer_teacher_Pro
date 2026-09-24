@@ -7,8 +7,8 @@
 
 export function compressAndResizeImage(
   file: File,
-  maxDimension: number = 512,
-  quality: number = 0.85
+  maxDimension: number = 240,
+  quality: number = 0.75
 ): Promise<string> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();

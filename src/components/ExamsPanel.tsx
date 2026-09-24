@@ -34,13 +34,14 @@ import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import { generateQuestions, getSavedApiKey, saveApiKey } from '../lib/gemini';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import { PREBUILT_LESSONS } from '../lib/templates';
-import { Question, ClassInfo } from '../types';
+import { Question, ClassInfo, QuizSubject } from '../types';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
 import ExamPaperView from './ExamPaperView';
 import LessonsPanel from './lessons/LessonsPanel';
 import ExternalDocumentsPanel from './external-docs/ExternalDocumentsPanel';
 import { db, safeSetDoc, safeGetDoc, safeOnSnapshot } from '../lib/firebase';
 import { doc } from 'firebase/firestore';
+import { safeSetItem, safeSetJSON } from '../lib/storageUtils';
 import { 
   Document, 
   Packer, 
@@ -122,6 +123,10 @@ interface ExamsPanelProps {
   teacher: any;
   classes?: ClassInfo[];
   onSwitchClass?: (classId: string) => void;
+  activeSubjectId?: string;
+  activeSubjectName?: string;
+  subjects?: QuizSubject[];
+  onSelectSubject?: (subjectId: string) => void;
 }
 
 const DEFAULT_PHYSICS_QUESTIONS: ExamQuestion[] = [];
@@ -177,7 +182,11 @@ export default function ExamsPanel({
   isDarkMode, 
   teacher,
   classes = [],
-  onSwitchClass
+  onSwitchClass,
+  activeSubjectId: propActiveSubjectId,
+  activeSubjectName: propActiveSubjectName,
+  subjects = [],
+  onSelectSubject
 }: ExamsPanelProps) {
   const { confirmAction } = useConfirm();
   const defaultSchool = teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ';
@@ -189,8 +198,14 @@ export default function ExamsPanel({
     return name;
   };
 
+  const currentSubjectId = propActiveSubjectId || 'general';
+  const examsStorageKey = propActiveSubjectId 
+    ? `khmer_exams_${activeClassId || 'general'}_${propActiveSubjectId}`
+    : `khmer_exams_${activeClassId || 'general'}`;
+  const fallbackExamsStorageKey = `khmer_exams_${activeClassId || 'general'}`;
+
   const [exams, setExams] = useState<ExamPaper[]>(() => {
-    const saved = localStorage.getItem(`khmer_exams_${activeClassId || 'general'}`);
+    const saved = localStorage.getItem(examsStorageKey) || localStorage.getItem(fallbackExamsStorageKey);
     if (saved) {
       try {
         const parsed: ExamPaper[] = JSON.parse(saved);
@@ -363,10 +378,10 @@ export default function ExamsPanel({
     }
   }, [activeExam?.id, activeSubject?.id, activeClassName, activeExam?.schoolName, defaultSchool]);
 
-  // Reload exams from localStorage and Firestore whenever activeClassId changes to keep each classroom separate
+  // Reload exams from localStorage and Firestore whenever activeClassId or propActiveSubjectId changes to keep each classroom and subject separate
   useEffect(() => {
-    const key = `khmer_exams_${activeClassId || 'general'}`;
-    const saved = localStorage.getItem(key);
+    const key = examsStorageKey;
+    const saved = localStorage.getItem(key) || localStorage.getItem(fallbackExamsStorageKey);
     let loadedExams: ExamPaper[] = [];
     if (saved) {
       try {
@@ -393,35 +408,59 @@ export default function ExamsPanel({
 
     // Real-time Cloud Synchronization for exams (across devices)
     if (teacher?.id && activeClassId) {
-      const papersRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers');
-      const unsubscribe = safeOnSnapshot(papersRef, (snap: any) => {
-        let cloudExams: any[] | null = null;
+      const subjectDocKey = propActiveSubjectId ? `papers_${propActiveSubjectId}` : 'papers';
+      const papersRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', subjectDocKey);
+      const legacyPapersRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers');
+      const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
+
+      const applyCloudExams = (rawExams: any[]) => {
+        if (!Array.isArray(rawExams)) return;
+        const formatted = sanitizeExams(rawExams, defaultSchool);
+        setExams(formatted);
+        safeSetJSON(key, formatted);
+        setSelectedExamId(prevId => {
+          if (prevId && formatted.some((e: any) => e.id === prevId)) return prevId;
+          const cloudMatched = formatted.filter((e: any) => e.type === activeType);
+          return cloudMatched[0]?.id || formatted[0]?.id || '';
+        });
+      };
+
+      const unsubPapers = safeOnSnapshot(papersRef, (snap: any) => {
         if (snap && snap.exists()) {
           const data = snap.data();
-          if (data && Array.isArray(data.exams) && data.exams.length > 0) {
-            cloudExams = data.exams;
+          if (data && Array.isArray(data.exams)) {
+            applyCloudExams(data.exams);
           }
-        }
-
-        if (cloudExams && cloudExams.length > 0) {
-          const formatted = sanitizeExams(cloudExams, defaultSchool);
-          setExams(formatted);
-          localStorage.setItem(key, JSON.stringify(formatted));
-          setSelectedExamId(prevId => {
-            if (prevId && formatted.some((e: any) => e.id === prevId)) return prevId;
-            const cloudMatched = formatted.filter((e: any) => e.type === activeType);
-            return cloudMatched[0]?.id || formatted[0]?.id || '';
-          });
         }
       }, (err: any) => {
         console.warn("Notice: Real-time cloud exams listener notice:", err);
       });
 
+      const unsubLegacyPapers = safeOnSnapshot(legacyPapersRef, (snap: any) => {
+        if (snap && snap.exists() && (!localStorage.getItem(key))) {
+          const data = snap.data();
+          if (data && Array.isArray(data.exams)) {
+            applyCloudExams(data.exams);
+          }
+        }
+      }, () => {});
+
+      const unsubClass = safeOnSnapshot(classDocRef, (snap: any) => {
+        if (snap && snap.exists() && (!localStorage.getItem(key))) {
+          const data = snap.data();
+          if (data && Array.isArray(data.exams) && data.exams.length > 0) {
+            applyCloudExams(data.exams);
+          }
+        }
+      }, () => {});
+
       return () => {
-        if (typeof unsubscribe === 'function') unsubscribe();
+        if (typeof unsubPapers === 'function') unsubPapers();
+        if (typeof unsubLegacyPapers === 'function') unsubLegacyPapers();
+        if (typeof unsubClass === 'function') unsubClass();
       };
     }
-  }, [activeClassId, teacher?.id]);
+  }, [activeClassId, propActiveSubjectId, teacher?.id]);
 
   // expert AI states
   const [isExpertAiModalOpen, setIsExpertAiModalOpen] = useState(false);
@@ -561,14 +600,21 @@ Output the response in JSON format.`;
   // Save state helper
   const saveState = (updatedExams: ExamPaper[]) => {
     setExams(updatedExams);
-    const key = `khmer_exams_${activeClassId || 'general'}`;
-    localStorage.setItem(key, JSON.stringify(updatedExams));
+    safeSetJSON(examsStorageKey, updatedExams);
 
     if (teacher?.id && activeClassId) {
+      const subjectDocKey = propActiveSubjectId ? `papers_${propActiveSubjectId}` : 'papers';
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', subjectDocKey), {
+        exams: updatedExams,
+        subjectId: propActiveSubjectId || null,
+        subjectName: propActiveSubjectName || null,
+        updatedAt: new Date().toISOString()
+      }, { merge: true }).catch(err => console.error("Cloud exams save error:", err));
+
       safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'examsData', 'papers'), {
         exams: updatedExams,
         updatedAt: new Date().toISOString()
-      }, { merge: true }).catch(err => console.error("Cloud exams save error:", err));
+      }, { merge: true }).catch(err => console.error("Cloud exams backup save error:", err));
 
       safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
         exams: updatedExams,
@@ -814,7 +860,7 @@ Output the response in JSON format.`;
     
     setIsAiGenerating(true);
     try {
-      const subjectName = activeExam?.subjects.find(s => s.id === activeSubjectId)?.name || 'រូបវិទ្យា';
+      const subjectName = activeExam?.subjects.find(s => s.id === activeSubjectId)?.name || 'ភាសាខ្មែរ';
       const promptText = `សូមបង្កើតសំណួរជ្រើសរើសចម្លើយ (Multiple choice questions in Khmer) ចំនួន ៥ សំណួរ អំពី ${subjectName} ជំនាញវិទ្យាល័យ សម្រាប់ថ្នាក់ទី ${activeClassName}។ មុខវិជ្ជា៖ ${subjectName}។ ព័ត៌មានបន្ថែម៖ ${aiPrompt}។ លក្ខខណ្ឌចាំបាច់៖ សំណួរ និងជម្រើសចម្លើយត្រូវតែខ្លី ខ្លឹម ច្បាស់ ងាយយល់រហ័ស មិនវែងអន្លាយឡើយ។`;
       
       const generated = await generateQuestions(promptText, 5, [], [], [], 'general', 'khmer');
@@ -2880,6 +2926,47 @@ Output the response in JSON format.`;
               <Copy className="w-3.5 h-3.5" />
               <span>ចម្លងវិញ្ញាសាពីថ្នាក់ផ្សេង...</span>
             </button>
+          )}
+        </div>
+      )}
+
+      {/* Subject Switcher Bar for Subject Scoping */}
+      {subjects && subjects.length > 0 && (
+        <div className={`p-3 rounded-2xl border flex flex-wrap items-center justify-between gap-3 transition-all ${
+          isDarkMode ? 'bg-[#111827] border-indigo-950/80' : 'bg-white border-slate-200'
+        }`}>
+          <div className="flex items-center gap-2 flex-wrap">
+            <span className="text-xs font-bold text-slate-500 dark:text-slate-400 flex items-center gap-1.5 shrink-0">
+              <BookOpen className="w-4 h-4 text-emerald-500" />
+              <span>មុខវិជ្ជា៖</span>
+            </span>
+            <div className="flex items-center gap-1.5 flex-wrap">
+              {subjects.map((subj) => {
+                const isActive = subj.id === propActiveSubjectId;
+                return (
+                  <button
+                    key={subj.id}
+                    type="button"
+                    onClick={() => onSelectSubject?.(subj.id)}
+                    className={`px-3 py-1.5 rounded-xl text-xs font-bold transition-all cursor-pointer border flex items-center gap-1.5 ${
+                      isActive
+                        ? 'bg-emerald-600 text-white border-emerald-600 shadow-sm shadow-emerald-600/20'
+                        : isDarkMode
+                        ? 'bg-slate-800/80 text-slate-300 border-slate-700 hover:bg-slate-700'
+                        : 'bg-slate-100 text-slate-700 border-slate-200 hover:bg-slate-200'
+                    }`}
+                  >
+                    <span>{subj.icon || '📚'}</span>
+                    <span>{subj.name}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+          {propActiveSubjectName && (
+            <span className="text-[11px] font-bold px-3 py-1 rounded-full bg-emerald-50 dark:bg-emerald-950/50 text-emerald-600 dark:text-emerald-400 border border-emerald-200 dark:border-emerald-800">
+              វិញ្ញាសាដាច់ដោយឡែកសម្រាប់៖ {propActiveSubjectName}
+            </span>
           )}
         </div>
       )}
@@ -4978,7 +5065,7 @@ Output the response in JSON format.`;
                                       const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
                                       const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
                                       setCustomLogo(transparentPng);
-                                      localStorage.setItem('teacher_custom_logo', transparentPng);
+                                      safeSetItem('teacher_custom_logo', transparentPng);
                                       setLogoUrlInput('');
                                     }
                                   }}
@@ -4992,7 +5079,7 @@ Output the response in JSON format.`;
                                     const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
                                     const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
                                     setCustomLogo(transparentPng);
-                                    localStorage.setItem('teacher_custom_logo', transparentPng);
+                                    safeSetItem('teacher_custom_logo', transparentPng);
                                     setLogoUrlInput('');
                                   }
                                 }}
@@ -5018,7 +5105,7 @@ Output the response in JSON format.`;
                                       const base64 = event.target?.result as string;
                                       const transparentPng = await removeWhiteBackgroundFromDataUrl(base64);
                                       setCustomLogo(transparentPng);
-                                      localStorage.setItem('teacher_custom_logo', transparentPng);
+                                      safeSetItem('teacher_custom_logo', transparentPng);
                                     };
                                     reader.readAsDataURL(file);
                                   }
