@@ -2,7 +2,7 @@
  * safeStorage.ts
  * 
  * Provides fail-safe LocalStorage and SessionStorage wrappers that prevent
- * QuotaExceededError from ever crashing the application.
+ * QuotaExceededError and stack overflow recursion from ever crashing the application.
  * 
  * When storage limits are hit:
  * 1. Automatically cleans up expendable cache keys (old quiz card caches, exam previews, etc.).
@@ -11,6 +11,13 @@
  */
 
 const memoryFallback = new Map<string, string>();
+
+// Capture native, unpatched Storage methods ONCE on module load
+const nativeStorage = typeof window !== 'undefined' && typeof Storage !== 'undefined' ? {
+  setItem: Storage.prototype.setItem,
+  getItem: Storage.prototype.getItem,
+  removeItem: Storage.prototype.removeItem,
+} : null;
 
 /**
  * Checks if a string looks like base64 or heavy media payload
@@ -42,7 +49,7 @@ function stripHeavyBase64FromStudentsJson(jsonStr: string): string {
  */
 export function evictExpendableStorage(): number {
   let freedCount = 0;
-  if (typeof window === 'undefined') return freedCount;
+  if (typeof window === 'undefined' || !nativeStorage) return freedCount;
 
   try {
     const keysToRemove: string[] = [];
@@ -51,6 +58,15 @@ export function evictExpendableStorage(): number {
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
+
+      // Protected keys that should never be evicted during auto-cleanup
+      if (
+        key === 'logged_in_teacher' ||
+        key.startsWith('khmer_teacher_classes') ||
+        key.startsWith('khmer_teacher_active_class_id')
+      ) {
+        continue;
+      }
 
       // Expendable temporary or derivative cache keys
       if (
@@ -70,7 +86,7 @@ export function evictExpendableStorage(): number {
     // Remove expendable caches first
     for (const key of keysToRemove) {
       try {
-        localStorage.removeItem(key);
+        nativeStorage.removeItem.call(localStorage, key);
         freedCount++;
       } catch {}
     }
@@ -78,10 +94,10 @@ export function evictExpendableStorage(): number {
     // If needed, compact students caches by stripping oversized base64 images
     for (const key of studentKeysToCompact) {
       try {
-        const val = localStorage.getItem(key);
+        const val = nativeStorage.getItem.call(localStorage, key);
         if (val && val.includes('data:image/')) {
           const compacted = stripHeavyBase64FromStudentsJson(val);
-          localStorage.setItem(key, compacted);
+          nativeStorage.setItem.call(localStorage, key, compacted);
           freedCount++;
         }
       } catch {}
@@ -94,16 +110,16 @@ export function evictExpendableStorage(): number {
 }
 
 /**
- * Safe setItem implementation that will NEVER throw QuotaExceededError
+ * Safe setItem implementation that will NEVER throw QuotaExceededError or RangeError
  */
 export function safeLocalStorageSet(key: string, value: string): void {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !nativeStorage) {
     memoryFallback.set(key, value);
     return;
   }
 
   try {
-    localStorage.setItem(key, value);
+    nativeStorage.setItem.call(localStorage, key, value);
     memoryFallback.set(key, value);
   } catch (err: any) {
     const isQuotaError = 
@@ -121,7 +137,7 @@ export function safeLocalStorageSet(key: string, value: string): void {
 
       try {
         // Step 2: Try again after eviction
-        localStorage.setItem(key, value);
+        nativeStorage.setItem.call(localStorage, key, value);
         memoryFallback.set(key, value);
         console.info(`[SafeStorage] Successfully saved "${key}" after storage cleanup.`);
         return;
@@ -130,7 +146,7 @@ export function safeLocalStorageSet(key: string, value: string): void {
         if (key.startsWith('students_class_')) {
           try {
             const compacted = stripHeavyBase64FromStudentsJson(value);
-            localStorage.setItem(key, compacted);
+            nativeStorage.setItem.call(localStorage, key, compacted);
             memoryFallback.set(key, value);
             console.info(`[SafeStorage] Successfully saved compacted student data for "${key}".`);
             return;
@@ -152,12 +168,12 @@ export function safeLocalStorageSet(key: string, value: string): void {
  * Safe getItem implementation checking memory fallback if not in localStorage
  */
 export function safeLocalStorageGet(key: string): string | null {
-  if (typeof window === 'undefined') {
+  if (typeof window === 'undefined' || !nativeStorage) {
     return memoryFallback.get(key) ?? null;
   }
 
   try {
-    const val = localStorage.getItem(key);
+    const val = nativeStorage.getItem.call(localStorage, key);
     if (val !== null) return val;
   } catch {}
 
@@ -169,31 +185,31 @@ export function safeLocalStorageGet(key: string): string | null {
  */
 export function safeLocalStorageRemove(key: string): void {
   memoryFallback.delete(key);
-  if (typeof window !== 'undefined') {
+  if (typeof window !== 'undefined' && nativeStorage) {
     try {
-      localStorage.removeItem(key);
+      nativeStorage.removeItem.call(localStorage, key);
     } catch {}
   }
 }
+
+let isPatched = false;
 
 /**
  * Install global monkey-patch on Storage.prototype so ANY code calling
  * localStorage.setItem or sessionStorage.setItem is automatically protected!
  */
 export function installSafeStoragePatch(): void {
-  if (typeof window === 'undefined') return;
+  if (typeof window === 'undefined' || !nativeStorage || isPatched) return;
 
   try {
-    const originalSetItem = Storage.prototype.setItem;
-    const originalGetItem = Storage.prototype.getItem;
-    const originalRemoveItem = Storage.prototype.removeItem;
+    isPatched = true;
 
     Storage.prototype.setItem = function (key: string, value: string) {
       if (this === window.localStorage) {
         safeLocalStorageSet(key, String(value));
       } else {
         try {
-          originalSetItem.call(this, key, String(value));
+          nativeStorage.setItem.call(this, key, String(value));
         } catch (err: any) {
           console.warn(`[SafeStorage] SessionStorage setItem quota exceeded for "${key}". Retaining in memory.`);
           memoryFallback.set(`session_${key}`, String(value));
@@ -206,7 +222,7 @@ export function installSafeStoragePatch(): void {
         return safeLocalStorageGet(key);
       } else {
         try {
-          const val = originalGetItem.call(this, key);
+          const val = nativeStorage.getItem.call(this, key);
           if (val !== null) return val;
         } catch {}
         return memoryFallback.get(`session_${key}`) ?? null;
@@ -219,7 +235,7 @@ export function installSafeStoragePatch(): void {
       } else {
         memoryFallback.delete(`session_${key}`);
         try {
-          originalRemoveItem.call(this, key);
+          nativeStorage.removeItem.call(this, key);
         } catch {}
       }
     };

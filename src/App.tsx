@@ -65,22 +65,6 @@ function cleanupLocalStorageQuota() {
   }
 }
 
-const originalSetItem = localStorage.setItem;
-localStorage.setItem = function (key, value) {
-  try {
-    originalSetItem.call(localStorage, key, value);
-  } catch (error: any) {
-    console.error(`[LocalStorage Overwrite] Error writing key "${key}":`, error);
-    if (error.name === 'QuotaExceededError' || error.code === 22) {
-      cleanupLocalStorageQuota();
-      try {
-        originalSetItem.call(localStorage, key, value);
-      } catch (retryError) {
-        console.error(`[LocalStorage Overwrite] Retry failed for key "${key}":`, retryError);
-      }
-    }
-  }
-};
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
