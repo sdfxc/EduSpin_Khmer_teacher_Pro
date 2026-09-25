@@ -18,6 +18,11 @@ export interface MonthlyDetailedScore {
   manualAverage?: number; // Teacher override average
 }
 
+export interface SubjectScoreData {
+  score?: number;
+  monthlyScores?: Record<string, MonthlyDetailedScore>;
+}
+
 export interface Student {
   id: string;
   studentId?: string; // អត្តលេខ / ID សិស្ស
@@ -33,6 +38,7 @@ export interface Student {
   status?: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ';
   classId?: string; // To keep track if queried overall
   monthlyScores?: Record<string, MonthlyDetailedScore>; // Key is month e.g. "កញ្ញា"
+  subjectScores?: Record<string, SubjectScoreData>; // Key is subjectId
   currentAnswerCardId?: string;
   currentAnswerIndex?: number;
   currentAnswerIsCorrect?: boolean;
@@ -76,6 +82,7 @@ export interface QuizChapter {
 export interface QuizSubject {
   id: string;
   name: string;
+  icon?: string;
   chapters: QuizChapter[];
   createdAt: number;
 }
@@ -95,6 +102,31 @@ export interface TeacherAccount {
   username: string;
   password?: string;
   avatarUrl?: string;
+  schoolLogoUrl?: string;
+  email?: string;
+  authProvider?: 'username' | 'email' | 'google' | 'facebook' | 'telegram';
+  telegramId?: string;
+  telegramUsername?: string;
+}
+
+export const DEFAULT_CLOUD_TEACHER: TeacherAccount = {
+  id: 'email_khengkhey835_gmail_com',
+  name: 'បង្កើតគណនីគ្រូ',
+  schoolName: 'សាលារៀនសុវណ្ណភូមិ',
+  username: 'khengkhey835',
+  email: 'khengkhey835@gmail.com',
+  authProvider: 'google'
+};
+
+export interface GroupMember extends Student {
+  assignedRole?: 'ប្រធាន' | 'អនុប្រធាន' | 'សមាជិក';
+  groupScore?: number;
+}
+
+export interface Group {
+  id: number;
+  name: string;
+  members: GroupMember[];
 }
 
 export function isStudentInClass(

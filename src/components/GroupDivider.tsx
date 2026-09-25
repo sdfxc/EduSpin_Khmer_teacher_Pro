@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList, Timer, Table, ChevronLeft } from 'lucide-react';
+import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList, Timer, Table, ChevronLeft, RotateCcw, Sparkles } from 'lucide-react';
 import { Student, TeacherAccount, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
 import { db, handleFirestoreError, OperationType, safeSetDoc, safeGetDoc, safeOnSnapshot } from '../lib/firebase';
@@ -7,6 +7,7 @@ import { doc } from 'firebase/firestore';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 import StopwatchPanel from './StopwatchPanel';
 import { StudentScoreTable } from './StudentScoreTable';
+import { SpinWheelGroupModal } from './SpinWheelGroupModal';
 
 interface GroupDividerProps {
   students: Student[];
@@ -48,6 +49,8 @@ export default function GroupDivider({
   const [numGroups, setNumGroups] = useState(4);
   const [groups, setGroups] = useState<Group[]>([]);
   const [groupScoreInputs, setGroupScoreInputs] = useState<Record<number, string>>({});
+  const [resetGroupTarget, setResetGroupTarget] = useState<Group | null>(null);
+  const [isSpinWheelOpen, setIsSpinWheelOpen] = useState(false);
   const [isCloudLoading, setIsCloudLoading] = useState(false);
   const [cloudSynced, setCloudSynced] = useState(false);
   const [showQuickEditModal, setShowQuickEditModal] = useState(false);
@@ -165,10 +168,10 @@ export default function GroupDivider({
     }
   };
 
-  const splitGroups = () => {
-    if (students.length === 0) return;
-
-    const G = Math.min(numGroups, students.length);
+  // Helper to generate balanced groups using smart distribution algorithm
+  const generateBalancedGroupsAlgorithm = (studentsList: Student[], numG: number) => {
+    const G = Math.min(numG, studentsList.length);
+    if (G <= 0) return { groups: [], stats: null };
 
     // 1. Group students by gender & academic status for highly diverse randomized distribution
     const getStatusWeight = (status?: string) => {
@@ -178,11 +181,11 @@ export default function GroupDivider({
       return 2; // កំពុងរីកចម្រើន
     };
 
-    const boysHigh = students.filter(s => s.gender === 'ប្រុស' && getStatusWeight(s.status) >= 3);
-    const boysLow = students.filter(s => s.gender === 'ប្រុស' && getStatusWeight(s.status) <= 2);
-    const girlsHigh = students.filter(s => s.gender === 'ស្រី' && getStatusWeight(s.status) >= 3);
-    const girlsLow = students.filter(s => s.gender === 'ស្រី' && getStatusWeight(s.status) <= 2);
-    const others = students.filter(s => s.gender !== 'ប្រុស' && s.gender !== 'ស្រី');
+    const boysHigh = studentsList.filter(s => s.gender === 'ប្រុស' && getStatusWeight(s.status) >= 3);
+    const boysLow = studentsList.filter(s => s.gender === 'ប្រុស' && getStatusWeight(s.status) <= 2);
+    const girlsHigh = studentsList.filter(s => s.gender === 'ស្រី' && getStatusWeight(s.status) >= 3);
+    const girlsLow = studentsList.filter(s => s.gender === 'ស្រី' && getStatusWeight(s.status) <= 2);
+    const others = studentsList.filter(s => s.gender !== 'ប្រុស' && s.gender !== 'ស្រី');
 
     // Shuffle helper
     const shuffleArray = <T,>(arr: T[]): T[] => {
@@ -195,17 +198,17 @@ export default function GroupDivider({
     };
 
     // Ideal bounds for sizes and genders
-    const idealSizeMin = Math.floor(students.length / G);
-    const idealSizeMax = Math.ceil(students.length / G);
+    const idealSizeMin = Math.floor(studentsList.length / G);
+    const idealSizeMax = Math.ceil(studentsList.length / G);
 
-    const totalBoys = students.filter(s => s.gender === 'ប្រុស').length;
-    const totalGirls = students.filter(s => s.gender === 'ស្រី').length;
+    const totalBoys = studentsList.filter(s => s.gender === 'ប្រុស').length;
+    const totalGirls = studentsList.filter(s => s.gender === 'ស្រី').length;
     const idealBoysMin = Math.floor(totalBoys / G);
     const idealBoysMax = Math.ceil(totalBoys / G);
     const idealGirlsMin = Math.floor(totalGirls / G);
     const idealGirlsMax = Math.ceil(totalGirls / G);
 
-    const totalAcademicWeight = students.reduce((sum, s) => sum + getStatusWeight(s.status), 0);
+    const totalAcademicWeight = studentsList.reduce((sum, s) => sum + getStatusWeight(s.status), 0);
     const targetAcademicPerGroup = totalAcademicWeight / G;
 
     // Generate candidates
@@ -315,7 +318,7 @@ export default function GroupDivider({
 
     // Pick one candidate from the best ones!
     const selectedIndex = Math.floor(Math.random() * bestCandidates.length);
-    const selectedCandidate = bestCandidates[selectedIndex];
+    const selectedCandidate = bestCandidates[selectedIndex] || candidates[0];
     const finalGroupsMembers = selectedCandidate.groups;
 
     // Create final mapped result groups
@@ -354,17 +357,40 @@ export default function GroupDivider({
       if (gCount < minG) minG = gCount;
     });
 
-    setShuffleStats({
+    const stats = {
       combinationsTested: CANDIDATES_COUNT,
       fairPermutationsCount: bestCandidates.length,
       boysRange: `${minB} - ${maxB}`,
       girlsRange: `${minG} - ${maxG}`,
       showNotification: true
-    });
+    };
 
+    return { groups: resultGroups, stats };
+  };
+
+  const splitGroups = () => {
+    if (students.length === 0) return;
+    const { groups: resultGroups, stats } = generateBalancedGroupsAlgorithm(students, numGroups);
+    setShuffleStats(stats);
     setGroups(resultGroups);
     saveGroupsState(resultGroups);
   };
+
+  // Reset / Clear all members across groups (so no names appear in any group card)
+  const handleClearAllGroups = () => {
+    const currentCount = groups.length > 0 ? groups.length : numGroups;
+    const clearedGroups: Group[] = Array.from({ length: currentCount }, (_, idx) => ({
+      id: idx + 1,
+      name: `ក្រុមទី${idx + 1}`,
+      members: []
+    }));
+    setGroups(clearedGroups);
+    saveGroupsState(clearedGroups, currentCount);
+    setShuffleStats(null);
+  };
+
+  // Whether there are any assigned student members in the current groups
+  const hasAssignedMembers = groups.length > 0 && groups.some(g => g.members && g.members.length > 0);
 
   // Add Points or Deduct Points for all members of a specific group
   const handleAddGroupScore = (groupId: number, customPoints?: number) => {
@@ -400,6 +426,33 @@ export default function GroupDivider({
 
     // Reset input for this group
     setGroupScoreInputs(prev => ({ ...prev, [groupId]: '' }));
+  };
+
+  // Reset points for all members of a specific group back to 0
+  const handleConfirmResetGroupScore = (targetGroup: Group) => {
+    // Deduct each member's current groupScore from monthly groupWork score
+    if (onAwardGroupWorkPoints) {
+      targetGroup.members.forEach(member => {
+        const currentGScore = member.groupScore || 0;
+        if (currentGScore !== 0) {
+          onAwardGroupWorkPoints([member.id], -currentGScore);
+        }
+      });
+    }
+
+    const updatedGroups = groups.map(g => {
+      if (g.id === targetGroup.id) {
+        return {
+          ...g,
+          members: g.members.map(m => ({ ...m, groupScore: 0 }))
+        };
+      }
+      return g;
+    });
+
+    setGroups(updatedGroups);
+    saveGroupsState(updatedGroups);
+    setResetGroupTarget(null);
   };
 
   // Update score of a single member inside a group (E.g. add representative points or deduct active warnings)
@@ -507,7 +560,7 @@ export default function GroupDivider({
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Sub-Tabs Switcher */}
       <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-fit shadow-xs ${
-        isDarkMode ? 'bg-slate-900/90 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
+        isDarkMode ? 'bg-[#222222] border-[#333333] shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
       }`}>
         <button
           type="button"
@@ -581,7 +634,7 @@ export default function GroupDivider({
         <>
           {/* Set Number of Teams Panel */}
           <div className={`p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 border transition-all duration-300 ${
-            isDarkMode ? 'bg-[#121829] border-slate-805 border-indigo-950/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
+            isDarkMode ? 'bg-[#222222] border-[#333333] shadow-md' : 'bg-white border-slate-200 shadow-sm'
           }`}>
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-305 duration-300 ${
@@ -661,7 +714,7 @@ export default function GroupDivider({
               )}
 
               <div className={`flex items-center rounded-2xl p-1 shadow-inner select-none border transition-all duration-300 ${
-                isDarkMode ? 'bg-slate-950 border-slate-850 border-indigo-950/80' : 'bg-slate-100 border-slate-200'
+                isDarkMode ? 'bg-[#1a1a1a] border-[#333333]' : 'bg-slate-100 border-slate-200'
               }`}>
                 <button
                   onClick={handleDecrement}
@@ -698,6 +751,35 @@ export default function GroupDivider({
                 <Shuffle className="w-4 h-4" />
                 <span>បែងចែកក្រុមឥឡូវនេះ</span>
               </button>
+
+              {/* Dynamic Delete / Redivide Button */}
+              {hasAssignedMembers ? (
+                <button
+                  type="button"
+                  onClick={handleClearAllGroups}
+                  disabled={students.length === 0}
+                  className={`px-5 py-3 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
+                    isDarkMode 
+                      ? 'bg-rose-950/40 border-rose-900/50 text-rose-300 hover:bg-rose-900/60 hover:text-white' 
+                      : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-800'
+                  }`}
+                  title="លុបឈ្មោះសិស្សចេញពីគ្រប់ក្រុមទាំងអស់"
+                >
+                  <RotateCcw className="w-4 h-4 text-rose-500" />
+                  <span>លុប/បែងចែកឡើងវិញ</span>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setIsSpinWheelOpen(true)}
+                  disabled={students.length === 0}
+                  className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-purple-600/20 cursor-pointer active:scale-95 transition-all text-xs"
+                  title="បើកផ្ទាំងបង្វិលកង់សំណាងដើម្បីបែងចែកក្រុមឡើងវិញ"
+                >
+                  <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>បែងចែកក្រុមឡើងវិញ</span>
+                </button>
+              )}
             </div>
           </div>
 
@@ -735,7 +817,7 @@ export default function GroupDivider({
             <div
               key={group.id}
               className={`rounded-3xl p-5 shadow-sm hover:shadow-md transition-all duration-300 flex flex-col border ${
-                isDarkMode ? 'bg-[#121829] border-indigo-950/80' : 'bg-white border-slate-200'
+                isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200'
               }`}
             >
               {/* Group Title and Info */}
@@ -752,11 +834,29 @@ export default function GroupDivider({
                     isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
                   }`}>{group.name}</h3>
                 </div>
-                <span className={`text-[11px] font-black px-2.5 py-0.5 rounded-full uppercase transition-all duration-300 ${
-                  isDarkMode ? 'bg-indigo-950/40 text-indigo-300' : 'bg-indigo-50 text-indigo-650'
-                }`}>
-                  {group.members.length} នាក់
-                </span>
+
+                <div className="flex items-center gap-2">
+                  {/* Reset Score button per group: ដាក់ពិន្ទុឡើងវិញ */}
+                  <button
+                    type="button"
+                    onClick={() => setResetGroupTarget(group)}
+                    className={`px-2.5 py-1 rounded-xl text-[11px] font-black flex items-center gap-1.5 transition-all cursor-pointer border active:scale-95 shadow-xs ${
+                      isDarkMode 
+                        ? 'bg-rose-950/40 border-rose-900/50 text-rose-300 hover:bg-rose-900/60 hover:text-white' 
+                        : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-800'
+                    }`}
+                    title="កំណត់ពិន្ទុឡើងវិញសម្រាប់ក្រុមនេះ"
+                  >
+                    <RotateCcw className="w-3 h-3 text-rose-500" />
+                    <span>ដាក់ពិន្ទុឡើងវិញ</span>
+                  </button>
+
+                  <span className={`text-[11px] font-black px-2.5 py-1 rounded-xl uppercase transition-all duration-300 ${
+                    isDarkMode ? 'bg-indigo-950/40 text-indigo-300' : 'bg-indigo-50 text-indigo-650'
+                  }`}>
+                    {group.members.length} នាក់
+                  </span>
+                </div>
               </div>
 
               {/* Group Metrics Bar (Genders Ratio) */}
@@ -834,91 +934,101 @@ export default function GroupDivider({
 
               {/* Members List */}
               <div className="flex-1 space-y-2">
-                {group.members.map((member) => {
-                  const liveStudent = students.find(s => s.id === member.id);
-                  const liveGroupScore = member.groupScore || 0;
+                {group.members.length === 0 ? (
+                  <div className={`py-8 px-4 rounded-2xl border border-dashed flex flex-col items-center justify-center text-center transition-all ${
+                    isDarkMode ? 'border-slate-800/80 bg-slate-950/20 text-slate-500' : 'border-slate-200 bg-slate-50/50 text-slate-400'
+                  }`}>
+                    <Users className="w-6 h-6 mb-1.5 opacity-40" />
+                    <p className="text-xs font-bold">គ្មានសមាជិកក្នុងក្រុម</p>
+                    <p className="text-[10px] mt-0.5 opacity-70">ចុច «បែងចែកក្រុមឡើងវិញ» ដើម្បីបង្វិលកង់</p>
+                  </div>
+                ) : (
+                  group.members.map((member) => {
+                    const liveStudent = students.find(s => s.id === member.id);
+                    const liveGroupScore = member.groupScore || 0;
 
-                  return (
-                    <div
-                      key={member.id}
-                      className={`flex items-center justify-between p-2.5 rounded-2xl transition-all border ${
-                        isDarkMode 
-                          ? 'bg-slate-950/20 border-indigo-950/30 text-slate-300 hover:border-slate-800' 
-                          : 'bg-slate-50 border-slate-100 text-slate-700 hover:border-slate-200'
-                      }`}
-                    >
-                      <div className="flex items-center gap-2 truncate">
-                        {liveStudent?.avatarUrl || member.avatarUrl ? (
-                          <img
-                            src={liveStudent?.avatarUrl || member.avatarUrl}
-                            alt={member.name}
-                            className="w-6 h-6 rounded-lg object-cover shrink-0 select-none border border-slate-200 dark:border-slate-700"
-                          />
-                        ) : (
-                          <span className="text-base shrink-0 select-none">
-                            {liveStudent?.emoji || member.emoji || (member.gender === 'ស្រី' ? '👧' : '👦')}
-                          </span>
-                        )}
-                        <div className="truncate text-left">
-                          <div className="truncate text-sm font-bold flex items-center gap-1.5">
-                            <span className={`truncate transition-all duration-300 ${
-                              isDarkMode ? 'text-slate-200' : 'text-slate-800'
-                            }`}>{member.name}</span>
-                            <span className={`text-[11px] font-extrabold shrink-0 transition-all duration-300 ${
-                              isDarkMode ? 'text-slate-400 text-indigo-300' : 'text-slate-500'
-                            }`}>
-                              ({member.assignedRole || 'សមាជិក'})
+                    return (
+                      <div
+                        key={member.id}
+                        className={`flex items-center justify-between p-2.5 rounded-2xl transition-all border ${
+                          isDarkMode 
+                            ? 'bg-slate-950/20 border-indigo-950/30 text-slate-300 hover:border-slate-800' 
+                            : 'bg-slate-50 border-slate-100 text-slate-700 hover:border-slate-200'
+                        }`}
+                      >
+                        <div className="flex items-center gap-2 truncate">
+                          {liveStudent?.avatarUrl || member.avatarUrl ? (
+                            <img
+                              src={liveStudent?.avatarUrl || member.avatarUrl}
+                              alt={member.name}
+                              className="w-6 h-6 rounded-lg object-cover shrink-0 select-none border border-slate-200 dark:border-slate-700"
+                            />
+                          ) : (
+                            <span className="text-base shrink-0 select-none">
+                              {liveStudent?.emoji || member.emoji || (member.gender === 'ស្រី' ? '👧' : '👦')}
                             </span>
-                            {member.gender && (
-                              <span className={`text-[10px] font-black shrink-0 ${member.gender === 'ប្រុស' ? 'text-blue-500' : 'text-pink-500'}`} title={member.gender}>
-                                {member.gender === 'ប្រុស' ? '♂' : '♀'}
+                          )}
+                          <div className="truncate text-left">
+                            <div className="truncate text-sm font-bold flex items-center gap-1.5">
+                              <span className={`truncate transition-all duration-300 ${
+                                isDarkMode ? 'text-slate-200' : 'text-slate-800'
+                              }`}>{member.name}</span>
+                              <span className={`text-[11px] font-extrabold shrink-0 transition-all duration-300 ${
+                                isDarkMode ? 'text-slate-400 text-indigo-300' : 'text-slate-500'
+                              }`}>
+                                ({member.assignedRole || 'សមាជិក'})
                               </span>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-
-                      {/* Score control actions for individual students */}
-                      <div className="flex items-center gap-1 shrink-0 ml-2">
-                        {/* Current Group Score */}
-                        <div className="flex flex-col items-center">
-                          <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black min-w-[42px] justify-center shadow-inner transition-all duration-300 ${
-                            isDarkMode ? 'bg-emerald-950/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
-                          }`} title="ពិន្ទុក្នុងក្រុម">
-                            <Trophy className="w-3 h-3 text-amber-500 shrink-0" />
-                            <span>{liveGroupScore}</span>
+                              {member.gender && (
+                                <span className={`text-[10px] font-black shrink-0 ${member.gender === 'ប្រុស' ? 'text-blue-500' : 'text-pink-500'}`} title={member.gender}>
+                                  {member.gender === 'ប្រុស' ? '♂' : '♀'}
+                                </span>
+                              )}
+                            </div>
                           </div>
                         </div>
 
-                        {/* Increment Student Group Score */}
-                        <button
-                          onClick={() => handleUpdateStudentScore(group.id, member.id, 1)}
-                          className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black transition-all shrink-0 cursor-pointer active:scale-90 ${
-                            isDarkMode 
-                              ? 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white' 
-                              : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-white'
-                          }`}
-                          title="បន្ថែម ១ ពិន្ទុក្រុម"
-                        >
-                          +
-                        </button>
+                        {/* Score control actions for individual students */}
+                        <div className="flex items-center gap-1 shrink-0 ml-2">
+                          {/* Current Group Score */}
+                          <div className="flex flex-col items-center">
+                            <div className={`flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-black min-w-[42px] justify-center shadow-inner transition-all duration-300 ${
+                              isDarkMode ? 'bg-emerald-950/20 text-emerald-400' : 'bg-emerald-50 text-emerald-600'
+                            }`} title="ពិន្ទុក្នុងក្រុម">
+                              <Trophy className="w-3 h-3 text-amber-500 shrink-0" />
+                              <span>{liveGroupScore}</span>
+                            </div>
+                          </div>
 
-                        {/* Decrement Student Group Score */}
-                        <button
-                          onClick={() => handleUpdateStudentScore(group.id, member.id, -1)}
-                          className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black transition-all shrink-0 cursor-pointer active:scale-90 ${
-                            isDarkMode 
-                              ? 'bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white' 
-                              : 'bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white'
-                          }`}
-                          title="ដក ១ ពិន្ទុក្រុម"
-                        >
-                          -
-                        </button>
+                          {/* Increment Student Group Score */}
+                          <button
+                            onClick={() => handleUpdateStudentScore(group.id, member.id, 1)}
+                            className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black transition-all shrink-0 cursor-pointer active:scale-90 ${
+                              isDarkMode 
+                                ? 'bg-emerald-500/20 hover:bg-emerald-500 text-emerald-400 hover:text-white' 
+                                : 'bg-emerald-500/10 hover:bg-emerald-500 text-emerald-600 hover:text-white'
+                            }`}
+                            title="បន្ថែម ១ ពិន្ទុក្រុម"
+                          >
+                            +
+                          </button>
+
+                          {/* Decrement Student Group Score */}
+                          <button
+                            onClick={() => handleUpdateStudentScore(group.id, member.id, -1)}
+                            className={`w-6 h-6 flex items-center justify-center rounded-lg text-xs font-black transition-all shrink-0 cursor-pointer active:scale-90 ${
+                              isDarkMode 
+                                ? 'bg-rose-500/20 hover:bg-rose-500 text-rose-400 hover:text-white' 
+                                : 'bg-rose-500/10 hover:bg-rose-500 text-rose-600 hover:text-white'
+                            }`}
+                            title="ដក ១ ពិន្ទុក្រុម"
+                          >
+                            -
+                          </button>
+                        </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </div>
           ))}
@@ -981,6 +1091,85 @@ export default function GroupDivider({
           if (onBatchSyncStudents) {
             await onBatchSyncStudents(names, mode);
           }
+        }}
+      />
+
+      {/* Confirmation Modal for Resetting Group Points: ដាក់ពិន្ទុឡើងវិញ */}
+      {resetGroupTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+          <div
+            className={`w-full max-w-md rounded-3xl p-6 shadow-2xl border transition-all duration-300 transform scale-100 animate-in zoom-in-95 duration-200 ${
+              isDarkMode ? 'bg-[#121829] border-slate-800 text-white' : 'bg-white border-slate-200 text-slate-900'
+            }`}
+          >
+            {/* Header / Icon */}
+            <div className="flex items-center gap-3 mb-4">
+              <div className="w-12 h-12 rounded-2xl bg-rose-500/15 border border-rose-500/20 text-rose-500 flex items-center justify-center shrink-0">
+                <RotateCcw className="w-6 h-6" />
+              </div>
+              <div>
+                <h3 className="text-lg font-black font-sans">
+                  ដាក់ពិន្ទុឡើងវិញ
+                </h3>
+                <p className={`text-xs font-semibold ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
+                  {resetGroupTarget.name}
+                </p>
+              </div>
+            </div>
+
+            {/* Content */}
+            <div className={`p-4 rounded-2xl mb-6 text-sm leading-relaxed border ${
+              isDarkMode ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-slate-50 border-slate-100 text-slate-700'
+            }`}>
+              <p className="font-bold mb-1.5">
+                តើអ្នកពិតជាចង់ដាក់ពិន្ទុឡើងវិញសម្រាប់ «{resetGroupTarget.name}» មែនទេ?
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                ពិន្ទុដែលបានផ្ដល់ដល់សមាជិកទាំងអស់ក្នុងក្រុមនេះនឹងត្រូវកំណត់ទៅ 0 ឡើងវិញ។
+              </p>
+            </div>
+
+            {/* Action Buttons: ទេ and ដាក់ពិន្ទុឡើងវិញ */}
+            <div className="flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={() => setResetGroupTarget(null)}
+                className={`px-5 py-2.5 rounded-2xl text-xs font-black transition-all cursor-pointer border ${
+                  isDarkMode 
+                    ? 'bg-slate-800 border-slate-700 text-slate-300 hover:bg-slate-750 hover:text-white' 
+                    : 'bg-slate-100 border-slate-200 text-slate-700 hover:bg-slate-200'
+                }`}
+              >
+                ទេ
+              </button>
+              <button
+                type="button"
+                onClick={() => handleConfirmResetGroupScore(resetGroupTarget)}
+                className="px-5 py-2.5 rounded-2xl text-xs font-black bg-rose-600 hover:bg-rose-700 text-white shadow-lg shadow-rose-600/20 transition-all cursor-pointer active:scale-95 flex items-center gap-1.5"
+              >
+                <RotateCcw className="w-3.5 h-3.5" />
+                <span>ដាក់ពិន្ទុឡើងវិញ</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Spin Wheel Group Division Modal */}
+      <SpinWheelGroupModal
+        isOpen={isSpinWheelOpen}
+        onClose={() => setIsSpinWheelOpen(false)}
+        students={students}
+        numGroups={numGroups}
+        isDarkMode={isDarkMode}
+        generateBalancedGroups={(studentList, numG) => generateBalancedGroupsAlgorithm(studentList, numG)}
+        onCompleteDivision={(dividedGroups, stats) => {
+          setGroups(dividedGroups);
+          if (stats) setShuffleStats(stats);
+          saveGroupsState(dividedGroups);
+        }}
+        onStepProgress={(progressGroups) => {
+          setGroups(progressGroups);
         }}
       />
     </div>

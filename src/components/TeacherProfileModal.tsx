@@ -16,11 +16,12 @@ import {
   Laptop, 
   AlertCircle,
   LogOut,
-  ClipboardPaste
+  ClipboardPaste,
+  Image as ImageIcon
 } from 'lucide-react';
 import { TeacherAccount } from '../types';
 import { doc } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc } from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, saveTeacherToLocalRegistry } from '../lib/firebase';
 import { compressAndResizeImage } from '../lib/imageUtils';
 import { formatGoogleDriveImageUrl } from '../lib/driveUtils';
 import { useImageDropAndPaste } from '../lib/useImageDropAndPaste';
@@ -42,7 +43,10 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   onLogout,
 }) => {
   const { confirmAction } = useConfirm();
+  const [imageTab, setImageTab] = useState<'avatar' | 'schoolLogo'>('avatar');
+  
   const [avatarUrl, setAvatarUrl] = useState<string>(teacher.avatarUrl || '');
+  const [schoolLogoUrl, setSchoolLogoUrl] = useState<string>(teacher.schoolLogoUrl || '');
   const [name, setName] = useState<string>(teacher.name || '');
   const [schoolName, setSchoolName] = useState<string>(teacher.schoolName || '');
   const [subjects, setSubjects] = useState<string>(teacher.subjects || '');
@@ -51,6 +55,10 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const [isSaving, setIsSaving] = useState<boolean>(false);
   const [statusMsg, setStatusMsg] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+
+  // Keep a ref to the active tab so the drop/paste callback always targets the current tab
+  const activeTabRef = useRef<'avatar' | 'schoolLogo'>('avatar');
+  activeTabRef.current = imageTab;
 
   // Separate file inputs for generic gallery/files and direct camera capture on mobile
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -64,7 +72,21 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
     processImageFile,
   } = useImageDropAndPaste({
     isOpen,
-    onImageReady: (newUrl) => setAvatarUrl(newUrl),
+    onImageReady: (newUrl) => {
+      if (activeTabRef.current === 'avatar') {
+        setAvatarUrl(newUrl);
+        setStatusMsg({
+          type: 'success',
+          text: 'បានបច្ចុប្បន្នភាពរូបភាព Profile! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+        });
+      } else {
+        setSchoolLogoUrl(newUrl);
+        setStatusMsg({
+          type: 'success',
+          text: 'បានបច្ចុប្បន្នភាពឡូហ្គោសាលារៀន! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+        });
+      }
+    },
     setIsProcessing,
     setStatusMsg,
   });
@@ -83,26 +105,45 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
   const handleApplyLink = () => {
     if (!linkInput.trim()) return;
     const formatted = formatGoogleDriveImageUrl(linkInput.trim());
-    setAvatarUrl(formatted);
+    if (imageTab === 'avatar') {
+      setAvatarUrl(formatted);
+      setStatusMsg({
+        type: 'success',
+        text: 'បានភ្ជាប់រូបភាព Profile ពី Link/Drive! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+      });
+    } else {
+      setSchoolLogoUrl(formatted);
+      setStatusMsg({
+        type: 'success',
+        text: 'បានភ្ជាប់ឡូហ្គោសាលាពី Link/Drive! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+      });
+    }
     setLinkInput('');
-    setStatusMsg({
-      type: 'success',
-      text: 'បានភ្ជាប់រូបភាពពី Link / Google Drive ជោគជ័យ! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
-    });
   };
 
   const handleRemovePhoto = () => {
+    const isAvatar = imageTab === 'avatar';
     confirmAction({
-      title: 'លុបរូបភាព Profile',
-      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបរូបភាព Profile នេះចេញមែនទេ?',
-      confirmText: 'បាទ/ចាស លុបរូប',
+      title: isAvatar ? 'លុបរូបភាព Profile' : 'លុបឡូហ្គោសាលារៀន',
+      message: isAvatar 
+        ? 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបរូបភាព Profile នេះចេញមែនទេ?' 
+        : 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបឡូហ្គោសាលារៀននេះចេញមែនទេ?',
+      confirmText: 'បាទ/ចាស លុបចេញ',
       variant: 'danger',
       onConfirm: () => {
-        setAvatarUrl('');
-        setStatusMsg({
-          type: 'success',
-          text: 'បានលុបរូបភាព Profile ចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
-        });
+        if (isAvatar) {
+          setAvatarUrl('');
+          setStatusMsg({
+            type: 'success',
+            text: 'បានលុបរូបភាព Profile ចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+          });
+        } else {
+          setSchoolLogoUrl('');
+          setStatusMsg({
+            type: 'success',
+            text: 'បានលុបឡូហ្គោសាលារៀនចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
+          });
+        }
       }
     });
   };
@@ -123,41 +164,40 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
       schoolName: schoolName.trim(),
       subjects: subjects.trim(),
       avatarUrl: avatarUrl.trim() || undefined,
+      schoolLogoUrl: schoolLogoUrl.trim() || undefined,
     };
 
     try {
-      // 1. Save to localStorage immediately
+      // 1. Save to local storage & local registry immediately
       localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
+      saveTeacherToLocalRegistry(updatedTeacher);
 
-      // 2. Sync to Firestore cloud
-      const teacherDocRef = doc(db, 'teachers', teacher.id);
-      await safeSetDoc(teacherDocRef, updatedTeacher, { merge: true });
-
-      // 3. Update parent React state
+      // 2. Immediately update parent state so UI reacts instantly
       onUpdateTeacher(updatedTeacher);
+
+      // 3. Sync to Firestore in background without blocking UI
+      if (teacher.id) {
+        const teacherDocRef = doc(db, 'teachers', teacher.id);
+        safeSetDoc(teacherDocRef, updatedTeacher, { merge: true }).catch(err => {
+          console.warn('Background teacher profile sync error:', err);
+        });
+      }
 
       setStatusMsg({
         type: 'success',
-        text: 'បានរក្សាទុកព័ត៌មាន និងរូបភាព Profile ចូលទៅ Cloud ជោគជ័យ!'
+        text: 'បានរក្សាទុកព័ត៌មាន និងឡូហ្គោសាលារៀនជោគជ័យ!'
       });
 
+      // Finish saving and close modal quickly (after 150ms)
       setTimeout(() => {
+        setIsSaving(false);
         onClose();
-      }, 900);
+      }, 150);
     } catch (err) {
-      console.warn('Notice: Teacher profile sync to Firestore queued/deferred:', err);
-      // Still update locally if Firestore encounters connection issues
+      console.error('Teacher profile save error:', err);
       onUpdateTeacher(updatedTeacher);
-      handleFirestoreError(err, OperationType.UPDATE, `teachers/${teacher.id}`);
-      setStatusMsg({
-        type: 'success',
-        text: 'បានរក្សាទុកក្នុងឧបករណ៍ជោគជ័យ (Offline Cache)!'
-      });
-      setTimeout(() => {
-        onClose();
-      }, 1200);
-    } finally {
       setIsSaving(false);
+      onClose();
     }
   };
 
@@ -176,7 +216,9 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
           {isDraggingOver && (
             <div className="absolute inset-0 z-50 rounded-3xl bg-indigo-600/90 backdrop-blur-xs flex flex-col items-center justify-center text-white font-black animate-pulse border-4 border-dashed border-white pointer-events-none p-6 text-center">
               <Upload className="w-14 h-14 mb-3 animate-bounce" />
-              <span className="text-lg font-black">ទម្លាក់រូបភាពនៅទីនេះ (Drop Image Anywhere Here)</span>
+              <span className="text-lg font-black">
+                ទម្លាក់{imageTab === 'avatar' ? 'រូបភាព Profile' : 'ឡូហ្គោសាលារៀន'}នៅទីនេះ (Drop Image Here)
+              </span>
               <span className="text-xs font-medium opacity-90 mt-1">
                 គាំទ្ររូបភាពពីកុំព្យូទ័រ (PNG, JPG, WebP) ឬរូបដែលទាញពីគេហទំព័រផ្សេងៗ
               </span>
@@ -194,7 +236,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                   ព័ត៌មាន & រូបភាព Profile គ្រូបង្រៀន
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  ផ្លាស់ប្ដូររូបថតពីទូរស័ព្ទ ឬកុំព្យូទ័របានយ៉ាងងាយស្រួល
+                  គ្រប់គ្រងរូបថត Profile និងឡូហ្គោសាលារៀនបានយ៉ាងងាយស្រួល
                 </p>
               </div>
             </div>
@@ -227,41 +269,97 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               </motion.div>
             )}
 
-            {/* Profile Avatar Showcase & Upload Action */}
+            {/* Sub-tabs for switching between Profile Photo & School Logo */}
+            <div className="p-1 bg-slate-100 dark:bg-slate-950 rounded-2xl border border-slate-200/80 dark:border-slate-800 flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setImageTab('avatar')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer select-none ${
+                  imageTab === 'avatar'
+                    ? 'bg-white dark:bg-slate-850 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <User className="w-4 h-4" />
+                <span>រូបថតតំណាង (Profile Photo)</span>
+                {avatarUrl && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="មានរូបភាព" />}
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setImageTab('schoolLogo')}
+                className={`flex-1 py-2 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer select-none ${
+                  imageTab === 'schoolLogo'
+                    ? 'bg-white dark:bg-slate-850 text-indigo-600 dark:text-indigo-400 shadow-sm border border-slate-200 dark:border-slate-700'
+                    : 'text-slate-500 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-200'
+                }`}
+              >
+                <School className="w-4 h-4 text-emerald-500" />
+                <span>ឡូហ្គោសាលារៀន (School Logo)</span>
+                {schoolLogoUrl && <span className="w-2 h-2 rounded-full bg-emerald-500 shrink-0" title="មានឡូហ្គោ" />}
+              </button>
+            </div>
+
+            {/* Profile Avatar or School Logo Showcase & Upload Action */}
             <div className={`flex flex-col sm:flex-row items-center gap-5 p-4 rounded-2xl border transition-all ${
               isDraggingOver
                 ? 'bg-indigo-500/10 dark:bg-indigo-950/40 border-indigo-500 ring-2 ring-indigo-500/30'
                 : 'bg-slate-50 dark:bg-slate-950/50 border-slate-200/80 dark:border-slate-800'
             }`}>
-              {/* Circular Avatar Preview */}
+              {/* Preview Box */}
               <div className="relative group shrink-0">
-                <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-slate-800 shadow-md bg-emerald-500 flex items-center justify-center text-white">
-                  {avatarUrl ? (
-                    <img 
-                      src={avatarUrl} 
-                      alt="Teacher Avatar Preview" 
-                      className="w-full h-full object-cover select-none"
-                    />
-                  ) : (
-                    <div className="flex flex-col items-center justify-center">
-                      <User className="w-12 h-12" />
-                      <span className="text-[9px] font-bold mt-0.5 opacity-80">គ្មានរូប</span>
-                    </div>
-                  )}
+                {imageTab === 'avatar' ? (
+                  // Circular Avatar Preview
+                  <div className="w-24 h-24 rounded-full overflow-hidden border-4 border-white dark:border-slate-800 shadow-md bg-emerald-500 flex items-center justify-center text-white relative">
+                    {avatarUrl ? (
+                      <img 
+                        src={avatarUrl} 
+                        alt="Teacher Avatar Preview" 
+                        className="w-full h-full object-cover select-none"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center">
+                        <User className="w-12 h-12" />
+                        <span className="text-[9px] font-bold mt-0.5 opacity-80">គ្មានរូប</span>
+                      </div>
+                    )}
 
-                  {isProcessing && (
-                    <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
-                      <Loader2 className="w-6 h-6 animate-spin" />
-                    </div>
-                  )}
-                </div>
+                    {isProcessing && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  // Square/Rounded School Logo Preview
+                  <div className="w-24 h-24 rounded-2xl overflow-hidden border-4 border-white dark:border-slate-800 shadow-md bg-white dark:bg-slate-900 border-indigo-100 flex flex-col items-center justify-center text-indigo-600 relative p-1.5">
+                    {schoolLogoUrl ? (
+                      <img 
+                        src={schoolLogoUrl} 
+                        alt="School Logo Preview" 
+                        className="w-full h-full object-contain select-none"
+                      />
+                    ) : (
+                      <div className="flex flex-col items-center justify-center text-slate-400">
+                        <School className="w-10 h-10 text-indigo-500" />
+                        <span className="text-[9px] font-bold mt-1 text-slate-500">គ្មានឡូហ្គោ</span>
+                      </div>
+                    )}
 
-                {/* Quick Camera Trigger overlay on avatar */}
+                    {isProcessing && (
+                      <div className="absolute inset-0 bg-black/60 flex items-center justify-center text-white">
+                        <Loader2 className="w-6 h-6 animate-spin" />
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Quick Camera/Upload Trigger overlay */}
                 <button
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="absolute bottom-0 right-0 p-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-full shadow-lg cursor-pointer transition-transform hover:scale-110"
-                  title="ជ្រើសរើសរូបភាព"
+                  title={imageTab === 'avatar' ? 'ជ្រើសរើសរូប Profile' : 'ជ្រើសរើសឡូហ្គោសាលា'}
                 >
                   <Camera className="w-4 h-4" />
                 </button>
@@ -270,11 +368,23 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
               {/* Upload Controls for Mobile and PC */}
               <div className="flex-1 min-w-0 space-y-2.5 w-full text-center sm:text-left">
                 <div>
-                  <h4 className="text-sm font-black text-slate-800 dark:text-slate-100">
-                    រូបថតតំណាង (Profile Photo)
+                  <h4 className="text-sm font-black text-slate-800 dark:text-slate-100 flex items-center justify-center sm:justify-start gap-1.5">
+                    {imageTab === 'avatar' ? (
+                      <>
+                        <User className="w-4 h-4 text-indigo-500" />
+                        <span>រូបថតតំណាង (Profile Photo)</span>
+                      </>
+                    ) : (
+                      <>
+                        <School className="w-4 h-4 text-emerald-500" />
+                        <span>ឡូហ្គោសាលារៀន (School Logo)</span>
+                      </>
+                    )}
                   </h4>
-                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
-                    គាំទ្ររូបភាពពីទូរស័ព្ទ (Camera/Gallery), កុំព្យូទ័រ (PNG/JPG) ឬ Link
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5">
+                    {imageTab === 'avatar'
+                      ? 'គាំទ្ររូបភាពពីទូរស័ព្ទ (Camera/Gallery), កុំព្យូទ័រ (PNG/JPG) ឬ Link'
+                      : 'គាំទ្រ Drag & Drop, Paste (Ctrl+V), ឯកសាររូបភាព ឬ Google Drive Link'}
                   </p>
                 </div>
 
@@ -282,7 +392,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 <input
                   ref={fileInputRef}
                   type="file"
-                  accept="image/png, image/jpeg, image/webp, image/gif, image/*"
+                  accept="image/png, image/jpeg, image/webp, image/gif, image/svg+xml, image/*"
                   onChange={handleFileChange}
                   className="hidden"
                   id="teacher-profile-file-input"
@@ -333,12 +443,12 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                   </button>
 
                   {/* Remove Button */}
-                  {avatarUrl && (
+                  {((imageTab === 'avatar' && avatarUrl) || (imageTab === 'schoolLogo' && schoolLogoUrl)) && (
                     <button
                       type="button"
                       onClick={handleRemovePhoto}
                       className="px-2.5 py-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl text-xs font-bold flex items-center gap-1 border border-red-200 dark:border-red-900/50 cursor-pointer transition-all"
-                      title="លុបរូបភាព Profile ចេញ"
+                      title={imageTab === 'avatar' ? 'លុបរូបភាព Profile ចេញ' : 'លុបឡូហ្គោសាលាចេញ'}
                     >
                       <Trash2 className="w-3.5 h-3.5" />
                       <span>លុបរូប</span>
@@ -349,7 +459,11 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 {/* Helpful drag-and-drop & paste hint */}
                 <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1.5 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50 inline-flex items-center gap-1.5 mt-1">
                   <Sparkles className="w-3 h-3 shrink-0 text-indigo-500" />
-                  <span>អាចទាញទម្លាក់រូប (Drag & Drop) ឬចុច Ctrl+V ដើម្បី Paste រូបភាពពីគ្រប់ទីកន្លែង</span>
+                  <span>
+                    {imageTab === 'avatar'
+                      ? 'អាចទាញទម្លាក់រូប (Drag & Drop) ឬចុច Ctrl+V ដើម្បី Paste រូបភាព Profile'
+                      : 'អាចទាញទម្លាក់រូប (Drag & Drop) ឬចុច Ctrl+V ដើម្បី Paste ឡូហ្គោសាលារៀន'}
+                  </span>
                 </div>
               </div>
             </div>
@@ -357,7 +471,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
             {/* Paste Google Drive / Web Image Link Option */}
             <div className="space-y-1.5">
               <label className="block text-xs font-bold text-slate-700 dark:text-slate-300">
-                ឬបិទភ្ជាប់ Google Drive Link / Web Image URL
+                ឬបិទភ្ជាប់ Google Drive Link / Web Image URL សម្រាប់ {imageTab === 'avatar' ? 'រូបថតតំណាង' : 'ឡូហ្គោសាលារៀន'}
               </label>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
@@ -367,7 +481,7 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                     value={linkInput}
                     onChange={(e) => setLinkInput(e.target.value)}
                     placeholder="https://drive.google.com/file/d/... ឬ Image URL"
-                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white placeholder:text-slate-400"
+                    className="w-full pl-9 pr-3 py-2 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white placeholder:text-slate-400 font-medium"
                   />
                 </div>
                 <button
@@ -416,17 +530,38 @@ export const TeacherProfileModal: React.FC<TeacherProfileModalProps> = ({
                 </div>
 
                 <div>
-                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center gap-1.5">
-                    <School className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>សាលារៀន</span>
+                  <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <School className="w-3.5 h-3.5 text-emerald-500" />
+                      <span>សាលារៀន</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setImageTab('schoolLogo')}
+                      className="text-[10px] text-indigo-600 dark:text-indigo-400 hover:underline font-bold flex items-center gap-1 cursor-pointer"
+                    >
+                      <ImageIcon className="w-3 h-3" />
+                      <span>{schoolLogoUrl ? 'ប្ដូរឡូហ្គោ' : '+ បញ្ចូលឡូហ្គោ'}</span>
+                    </button>
                   </label>
-                  <input
-                    type="text"
-                    value={schoolName}
-                    onChange={(e) => setSchoolName(e.target.value)}
-                    className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white"
-                    placeholder="ឧ. សាលារៀនសុវណ្ណភូមិ"
-                  />
+                  <div className="flex items-center gap-2">
+                    {schoolLogoUrl && (
+                      <div 
+                        onClick={() => setImageTab('schoolLogo')}
+                        className="w-8 h-8 rounded-lg overflow-hidden border border-slate-200 dark:border-slate-700 bg-white p-0.5 shrink-0 cursor-pointer shadow-xs"
+                        title="ចុចដើម្បីប្ដូរឡូហ្គោសាលារៀន"
+                      >
+                        <img src={schoolLogoUrl} alt="School Logo" className="w-full h-full object-contain" />
+                      </div>
+                    )}
+                    <input
+                      type="text"
+                      value={schoolName}
+                      onChange={(e) => setSchoolName(e.target.value)}
+                      className="w-full px-3 py-2 text-xs font-semibold bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-800 dark:text-white"
+                      placeholder="ឧ. សាលារៀនសុវណ្ណភូមិ"
+                    />
+                  </div>
                 </div>
               </div>
             </div>

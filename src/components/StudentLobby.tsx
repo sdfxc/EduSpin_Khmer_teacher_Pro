@@ -49,6 +49,11 @@ export default function StudentLobby({
   const [revealStep, setRevealStep] = useState(0); // 0 = none, 1 = Rank 5, 2 = Rank 4, 3 = Rank 3, 4 = Rank 2, 5 = Rank 1
   const [liveLeftTime, setLiveLeftTime] = useState<number>(25);
   const [selectedDomain, setSelectedDomain] = useState<'auto' | 'aistudio' | 'vercel'>('auto');
+  const [selectedPendingIds, setSelectedPendingIds] = useState<string[]>([]);
+  const [autoApprove, setAutoApprove] = useState<boolean>(() => {
+    const saved = localStorage.getItem(`auto_approve_students_${activeClassId}`);
+    return saved ? JSON.parse(saved) : false;
+  });
 
   // Active question and metadata calculations
   const activeCard = cards.find(c => c.id === activeCardId) || null;
@@ -66,31 +71,111 @@ export default function StudentLobby({
   const wrongStudents = answeredStudents.filter(s => s.currentAnswerIsCorrect === false || s.currentAnswerIndex === -1);
   const pendingStudents = approvedStudents.filter(s => s.currentAnswerCardId !== activeCardId);
 
-
-
   const handleApproveStudent = async (studentId: string) => {
-    if (!teacher || !activeClassId) return;
+    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId) return;
     try {
-      const studentDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', studentId);
+      const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
       await safeSetDoc(studentDocRef, { isApproved: true }, { merge: true });
+      setSelectedPendingIds(prev => prev.filter(id => id !== studentId));
     } catch (err) {
       console.error("Student approval failed:", err);
     }
   };
 
   const handleApproveAllStudents = async () => {
-    if (!teacher || !activeClassId) return;
+    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId) return;
     try {
       await Promise.all(
         pendingApprovalStudents.map(student => {
-          const studentDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', student.id);
+          const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', student.id);
           return safeSetDoc(studentDocRef, { isApproved: true }, { merge: true });
         })
       );
+      setSelectedPendingIds([]);
     } catch (err) {
       console.error("All students approval failed:", err);
     }
   };
+
+  const handleToggleAutoApprove = async () => {
+    const nextVal = !autoApprove;
+    setAutoApprove(nextVal);
+    localStorage.setItem(`auto_approve_students_${activeClassId}`, JSON.stringify(nextVal));
+    const currentTeacherId = teacher?.id || 'local';
+    if (activeClassId) {
+      try {
+        const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
+        await safeSetDoc(classDocRef, { autoApproveStudents: nextVal }, { merge: true });
+      } catch (e) {
+        console.error("Failed to update auto-approve in Firestore:", e);
+      }
+    }
+    if (nextVal && pendingApprovalStudents.length > 0) {
+      handleApproveAllStudents();
+    }
+  };
+
+  const handleToggleSelectPending = (id: string) => {
+    setSelectedPendingIds(prev => 
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
+    );
+  };
+
+  const handleSelectAllPending = () => {
+    if (selectedPendingIds.length === pendingApprovalStudents.length) {
+      setSelectedPendingIds([]);
+    } else {
+      setSelectedPendingIds(pendingApprovalStudents.map(s => s.id));
+    }
+  };
+
+  const handleApproveSelected = async () => {
+    if (selectedPendingIds.length === 0) return;
+    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId) return;
+    try {
+      await Promise.all(
+        selectedPendingIds.map(studentId => {
+          const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId);
+          return safeSetDoc(studentDocRef, { isApproved: true }, { merge: true });
+        })
+      );
+      setSelectedPendingIds([]);
+    } catch (err) {
+      console.error("Batch approve failed:", err);
+    }
+  };
+
+  // Audio alert chime when new pending students join
+  const prevPendingCountRef = React.useRef(pendingApprovalStudents.length);
+  useEffect(() => {
+    if (pendingApprovalStudents.length > prevPendingCountRef.current) {
+      try {
+        const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
+        if (AudioContext) {
+          const ctx = new AudioContext();
+          const now = ctx.currentTime;
+          const osc = ctx.createOscillator();
+          const gain = ctx.createGain();
+          osc.connect(gain);
+          gain.connect(ctx.destination);
+          osc.type = 'sine';
+          osc.frequency.setValueAtTime(440, now);
+          osc.frequency.exponentialRampToValueAtTime(880, now + 0.15);
+          gain.gain.setValueAtTime(0.15, now);
+          gain.gain.exponentialRampToValueAtTime(0.001, now + 0.35);
+          osc.start(now);
+          osc.stop(now + 0.35);
+        }
+      } catch {}
+    }
+    if (autoApprove && pendingApprovalStudents.length > 0) {
+      handleApproveAllStudents();
+    }
+    prevPendingCountRef.current = pendingApprovalStudents.length;
+  }, [pendingApprovalStudents.length, autoApprove]);
 
   const handleDeclineStudent = async (studentId: string) => {
     const currentTeacherId = teacher?.id || 'local';
@@ -689,7 +774,7 @@ export default function StudentLobby({
     const isRevealed = activeCardState === 'revealed';
     
     return (
-      <div className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#0b0f19] relative transition-colors duration-300">
+      <div className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#222222] relative transition-colors duration-300">
         {/* Host Control Deck Header */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
@@ -902,38 +987,59 @@ export default function StudentLobby({
 
   return (
     <div className={`flex-1 flex flex-col p-4 md:p-6 overflow-y-auto custom-scrollbar relative transition-colors duration-300 ${
-      isDarkMode ? 'bg-[#0b0f19] text-white' : 'bg-slate-50 text-slate-800'
+      isDarkMode ? 'bg-[#222222] text-white' : 'bg-slate-50 text-slate-800'
     }`}>
       {/* Background visual effects for game feel */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08)_0%,transparent_50%)] pointer-events-none" />
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_bottom_left,rgba(245,158,11,0.04)_0%,transparent_50%)] pointer-events-none" />
 
-      {/* Top Header Panel - Styled like original StudyPlay Host */}
+      {/* Top Header Panel - Styled for Study Game Arena */}
       <div className={`flex flex-col md:flex-row items-center justify-between pb-4 mb-6 border-b gap-4 relative z-10 shrink-0 ${
         isDarkMode ? 'border-indigo-950/60' : 'border-slate-200'
       }`}>
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-tr from-indigo-500 to-amber-500 rounded-xl flex items-center justify-center font-black text-xl text-white shadow-md shadow-indigo-500/10">
+          <div className="w-11 h-11 bg-gradient-to-tr from-indigo-500 via-purple-500 to-amber-500 rounded-2xl flex items-center justify-center font-black text-2xl text-white shadow-lg shadow-indigo-500/20 animate-pulse">
             🎮
           </div>
           <div>
             <div className="flex items-center gap-2">
-              <h1 className={`text-xl font-black tracking-tight flex items-center gap-1 ${
+              <h1 className={`text-xl font-black tracking-tight flex items-center gap-1.5 ${
                 isDarkMode ? 'text-white' : 'text-slate-900'
               }`}>
-                StudyPlay Host <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 px-2 py-0.5 rounded-full">របៀបគ្រូ (Classic)</span>
+                Study Game <span className="text-xs font-semibold bg-indigo-500/20 text-indigo-300 border border-indigo-500/20 px-2.5 py-0.5 rounded-full">បន្ទប់លេងហ្គេម និងសំណួរ</span>
               </h1>
             </div>
-            <p className={`text-[10px] font-bold mt-0.5 ${
+            <p className={`text-[10.5px] font-bold mt-0.5 ${
               isDarkMode ? 'text-slate-400' : 'text-slate-500'
             }`}>
-              ថ្នាក់រៀន៖ <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{className}</span> • គាំទ្រការឆ្លើយតបពេលវេលាពិត (Connected Room Live Sync)
+              ថ្នាក់រៀន៖ <span className="text-indigo-600 dark:text-indigo-400 font-extrabold">{className}</span> • គាំទ្រការឆ្លើយតប Real-time
             </p>
           </div>
         </div>
 
-        {/* Live connections badge & Smart Notes */}
-        <div className="flex items-center gap-2.5">
+        {/* Top Controls: Auto-Approve Toggle, Smart Notes & Live Status */}
+        <div className="flex flex-wrap items-center gap-2.5">
+          {/* Auto-Approve Toggle Switch */}
+          <button
+            type="button"
+            onClick={handleToggleAutoApprove}
+            className={`flex items-center gap-2 px-3 py-1.5 rounded-xl text-xs font-bold border transition-all cursor-pointer select-none shadow-xs ${
+              autoApprove
+                ? 'bg-emerald-500/15 text-emerald-400 border-emerald-500/30 hover:bg-emerald-500/25'
+                : isDarkMode
+                  ? 'bg-slate-900 border-slate-700 text-slate-400 hover:text-slate-200'
+                  : 'bg-white border-slate-200 text-slate-600 hover:text-slate-900'
+            }`}
+            title="ពេលបើក Auto-Approve សិស្សដែលស្កេន ឬចុច Link ចូល នឹងត្រូវបានអនុញ្ញាតចូលលេងភ្លាមៗដោយស្វ័យប្រវត្ត"
+          >
+            <div className={`w-3.5 h-3.5 rounded-full flex items-center justify-center text-[8px] font-black ${
+              autoApprove ? 'bg-emerald-500 text-slate-950' : 'bg-slate-600 text-white'
+            }`}>
+              {autoApprove ? '✓' : '✕'}
+            </div>
+            <span>{autoApprove ? 'អនុញ្ញាតស្វ័យប្រវត្ត (Auto ON)' : 'អនុញ្ញាតដោយដៃ (Manual)'}</span>
+          </button>
+
           {onNavigateToSmartNotes && (
             <button
               type="button"
@@ -956,6 +1062,123 @@ export default function StudentLobby({
           </div>
         </div>
       </div>
+
+      {/* Prominent Top Student Waiting Room Banner / Card (When students are waiting for approval) */}
+      {pendingApprovalStudents.length > 0 && (
+        <div className="mb-6 p-5 bg-gradient-to-r from-amber-500/15 via-orange-500/10 to-amber-500/15 border-2 border-amber-500/40 rounded-[2rem] shadow-xl flex flex-col animate-in fade-in slide-in-from-top duration-300 relative z-20">
+          <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 mb-3 border-b border-amber-500/25 gap-3">
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 rounded-xl bg-amber-500/20 border border-amber-500/30 flex items-center justify-center text-amber-400 font-black text-lg animate-bounce">
+                ⏳
+              </div>
+              <div>
+                <h3 className="text-sm font-black text-amber-400 flex items-center gap-2">
+                  <span>បន្ទប់រង់ចាំការអនុញ្ញាត (Student Waiting Room)</span>
+                  <span className="px-2 py-0.5 text-xs font-black bg-amber-500 text-slate-950 rounded-full shadow-xs">
+                    {pendingApprovalStudents.length} នាក់
+                  </span>
+                </h3>
+                <p className="text-[11px] text-slate-300 dark:text-slate-400 font-bold mt-0.5">
+                  សិស្សខាងក្រោមបាន Scan QR/ចុច Link ហើយកំពុងរង់ចាំលោកគ្រូ-អ្នកគ្រូចុច Tick ឬ Aprove ដើម្បីចូលរួម
+                </p>
+              </div>
+            </div>
+
+            {/* Quick Batch Action Buttons */}
+            <div className="flex flex-wrap items-center gap-2 self-stretch sm:self-auto justify-end">
+              <button
+                type="button"
+                onClick={handleSelectAllPending}
+                className="px-3 py-1.5 bg-slate-800/80 hover:bg-slate-700 text-slate-200 font-black text-xs rounded-xl border border-slate-700 transition-all cursor-pointer select-none"
+              >
+                {selectedPendingIds.length === pendingApprovalStudents.length ? 'ដោះជ្រើសរើស (Deselect)' : 'ជ្រើសទាំងអស់ (Select All)'}
+              </button>
+
+              {selectedPendingIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleApproveSelected}
+                  className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white font-black text-xs rounded-xl transition-all cursor-pointer select-none active:scale-95 border-none shadow-md shadow-emerald-600/20 flex items-center gap-1.5"
+                >
+                  <Check className="w-3.5 h-3.5" />
+                  <span>អនុញ្ញាតសិស្សដែលបានជ្រើស ({selectedPendingIds.length})</span>
+                </button>
+              )}
+
+              <button
+                type="button"
+                onClick={handleApproveAllStudents}
+                className="px-4 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white font-black text-xs rounded-xl transition-all cursor-pointer select-none active:scale-95 border-none shadow-md shadow-emerald-600/30 flex items-center gap-1.5"
+              >
+                <CheckCircle className="w-4 h-4" />
+                <span>✓ អនុញ្ញាតទាំងអស់ (Approve All)</span>
+              </button>
+            </div>
+          </div>
+
+          {/* Cards Grid for Pending Students with Checkbox & Direct Action Buttons */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-3 max-h-[220px] overflow-y-auto custom-scrollbar p-1">
+            {pendingApprovalStudents.map(student => {
+              const isSelected = selectedPendingIds.includes(student.id);
+              return (
+                <div
+                  key={student.id}
+                  onClick={() => handleToggleSelectPending(student.id)}
+                  className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer shadow-sm ${
+                    isSelected
+                      ? 'bg-indigo-950/80 border-indigo-500 ring-2 ring-indigo-500/40'
+                      : isDarkMode
+                        ? 'bg-slate-900/90 border-slate-800 hover:border-amber-500/50'
+                        : 'bg-white border-slate-200 hover:border-amber-400'
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    {/* Checkbox / Tick Indicator */}
+                    <div className={`w-5 h-5 rounded-lg border flex items-center justify-center transition-all ${
+                      isSelected
+                        ? 'bg-indigo-600 border-indigo-500 text-white shadow-xs'
+                        : 'border-slate-600 bg-slate-800/40 text-transparent'
+                    }`}>
+                      <Check className="w-3.5 h-3.5" />
+                    </div>
+
+                    <span className="text-2xl select-none">{student.emoji || "🧑‍🎓"}</span>
+                    <div className="min-w-0">
+                      <p className={`text-xs font-black truncate ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
+                        {student.name}
+                      </p>
+                      <span className="text-[9.5px] font-bold text-amber-400 flex items-center gap-1">
+                        <span className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-ping inline-block" />
+                        រង់ចាំការយល់ព្រម
+                      </span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-1.5 shrink-0 ml-2" onClick={(e) => e.stopPropagation()}>
+                    <button
+                      type="button"
+                      onClick={() => handleApproveStudent(student.id)}
+                      className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center gap-1 cursor-pointer transition-all border-none font-black text-xs shadow-sm active:scale-95"
+                      title="ចុចទទួលសិស្ស (Approve Student)"
+                    >
+                      <Check className="w-3.5 h-3.5 text-white" />
+                      <span>ទទួល</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => handleDeclineStudent(student.id)}
+                      className="p-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-xl flex items-center justify-center cursor-pointer transition-all border border-red-500/30"
+                      title="បដិសេធ (Decline)"
+                    >
+                      <XCircle className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Main Layout Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-stretch flex-1 relative z-10">
@@ -1169,64 +1392,6 @@ export default function StudentLobby({
               </button>
             </div>
           </div>
-
-          {/* Pending Approval Join Requests Container */}
-          {pendingApprovalStudents.length > 0 && (
-            <div className="p-5 bg-amber-550/10 bg-amber-500/5 border-2 border-dashed border-amber-500/30 rounded-3xl flex flex-col animate-in fade-in duration-300 shrink-0">
-              <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between pb-3 mb-3 border-b border-amber-500/25 gap-3">
-                <div className="flex items-center gap-2.5">
-                  <span className="w-2.5 h-2.5 bg-amber-500 rounded-full animate-ping" />
-                  <div>
-                    <h3 className="text-xs font-black text-amber-400">សិស្សរង់ចាំការអនុញ្ញាត ({pendingApprovalStudents.length} នាក់)</h3>
-                    <p className="text-[10px] text-slate-400 font-bold mt-0.5">
-                      សិស្សកំពុងរង់ចាំការអនុញ្ញាតដើម្បីចូលរួមឆ្លើយសំណួរយកពិន្ទុ
-                    </p>
-                  </div>
-                </div>
-                
-                <button
-                  type="button"
-                  onClick={handleApproveAllStudents}
-                  className="px-3.5 py-1.5 bg-amber-500 hover:bg-amber-600 text-slate-950 font-black text-[10px] rounded-xl transition-all cursor-pointer select-none active:scale-95 border-none shadow-md shadow-amber-500/15"
-                >
-                  អនុញ្ញាតទាំងអស់ (Approve All)
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5 max-h-[140px] overflow-y-auto custom-scrollbar p-1">
-                {pendingApprovalStudents.map(student => (
-                  <div
-                    key={student.id}
-                    className="flex items-center justify-between p-2.5 bg-slate-950/65 border border-indigo-950/50 rounded-2xl shadow-sm"
-                  >
-                    <div className="flex items-center gap-2 min-w-0">
-                      <span className="text-xl select-none">{student.emoji || "🧑‍🎓"}</span>
-                      <p className="text-[11px] font-black truncate text-slate-200">{student.name}</p>
-                    </div>
-
-                    <div className="flex items-center gap-1.5 shrink-0 ml-1.5">
-                      <button
-                        type="button"
-                        onClick={() => handleApproveStudent(student.id)}
-                        className="w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all border-none"
-                        title="អនុញ្ញាត (Approve)"
-                      >
-                        <Check className="w-3.5 h-3.5 text-white" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => handleDeclineStudent(student.id)}
-                        className="w-7 h-7 bg-red-650 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all border-none"
-                        title="បដិសេធ (Decline)"
-                      >
-                        <XCircle className="w-3.5 h-3.5 text-white" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
 
           {/* Connected Students Block Grid (StudyPlay Blocks Theme) */}
           <div className={`border rounded-[2.5rem] p-6 flex flex-col flex-1 min-h-[300px] transition-all duration-300 ${

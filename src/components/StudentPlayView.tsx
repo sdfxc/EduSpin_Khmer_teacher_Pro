@@ -32,6 +32,7 @@ export default function StudentPlayView() {
   const [classCards, setClassCards] = useState<any[]>([]);
   const [allStudents, setAllStudents] = useState<Student[]>([]);
   const [directActiveCard, setDirectActiveCard] = useState<QuizCard | null>(null);
+  const [classAutoApprove, setClassAutoApprove] = useState<boolean>(false);
 
   // Local play state
   const [currentQuestion, setCurrentQuestion] = useState<Question | null>(null);
@@ -137,6 +138,7 @@ export default function StudentPlayView() {
         setActiveCardId(data.activeCardId || null);
         setActiveCardState(data.activeCardState || 'answering');
         setDirectActiveCard(data.activeCard || null);
+        setClassAutoApprove(!!data.autoApproveStudents);
       }
     }, (err) => {
       console.error("Live Class snapshot failed:", err);
@@ -379,6 +381,7 @@ export default function StudentPlayView() {
       } else {
         // Create a new customized student profile
         const newId = `student-${Date.now()}-${Math.random().toString(36).substr(2, 5)}`;
+        const initialApproved = classAutoApprove === true;
         const newStud: Student = {
           id: newId,
           name: name.trim(),
@@ -386,7 +389,8 @@ export default function StudentPlayView() {
           emoji: selectedEmoji,
           gender: 'ប្រុស',
           status: 'សកម្ម',
-          isApproved: false
+          isApproved: initialApproved,
+          classId: classId
         };
 
         const docRef = doc(db, 'teachers', teacherId, 'classes', classId, 'students', newId);
@@ -439,7 +443,7 @@ export default function StudentPlayView() {
             <div className="w-16 h-16 rounded-2xl bg-indigo-600/30 border-2 border-indigo-500/30 flex items-center justify-center text-3xl">
               🦁
             </div>
-            <h3 className="text-xl font-black text-white">ចុះឈ្មោះចូលបន្ទប់ live</h3>
+            <h3 className="text-xl font-black text-white">ចុះឈ្មោះចូលបន្ទប់ Study Game</h3>
             <p className="text-[10px] uppercase font-black tracking-wider text-indigo-400">Smart student response cell</p>
           </div>
 
@@ -511,7 +515,7 @@ export default function StudentPlayView() {
             <div className="w-20 h-20 bg-indigo-600/10 border-2 border-indigo-500/20 rounded-[2rem] flex items-center justify-center text-3xl mx-auto animate-pulse">
               {joinedStudent.emoji || "🧑‍🎓"}
             </div>
-            <div className="absolute -top-1 -right-1 w-5 h-5 bg-yellow-500 rounded-full flex items-center justify-center text-[10px] text-white font-extrabold animate-bounce">
+            <div className="absolute -top-1 -right-1 w-6 h-6 bg-amber-500 rounded-full flex items-center justify-center text-xs text-white font-black animate-bounce shadow-md">
               ⏳
             </div>
           </div>
@@ -522,30 +526,52 @@ export default function StudentPlayView() {
               កំពុងរង់ចាំគ្រូអនុញ្ញាតចូលលេង...
             </p>
             <p className="text-[10px] uppercase font-black tracking-wider text-slate-400 mt-2">
-              (Waiting for teacher approval to join)
+              (Waiting for teacher approval)
             </p>
           </div>
 
           <div className="p-4 bg-slate-950/60 rounded-2xl text-left text-xs border border-slate-900/80 leading-relaxed font-semibold text-slate-300">
-            👋 សូមរង់ចាំលោកគ្រូ-អ្នកគ្រូអនុញ្ញាត! ឈ្មោះរបស់អ្នកត្រូវបានបញ្ចូលទៅកាន់បញ្ជីស្នើសុំរបស់លោកគ្រូ-អ្នកគ្រូហើយ។ នៅពេលលោកគ្រូ-អ្នកគ្រូចុច "អនុញ្ញាត" អ្នកនឹងអាចចូលរួមលេង Quiz ជាមួយមិត្តភក្តិភ្លាមៗ។
+            👋 សូមរង់ចាំលោកគ្រូ-អ្នកគ្រូអនុញ្ញាត! ឈ្មោះរបស់អ្នកបានទៅដល់អេក្រង់លោកគ្រូ-អ្នកគ្រូរួចរាល់ហើយ។ នៅពេលលោកគ្រូ-អ្នកគ្រូចុច Tick ឬ ទទួល អ្នកនឹងចូលរួមលេងភ្លាមៗ។
           </div>
 
-          <button
-            type="button"
-            onClick={async () => {
-              try {
-                const docRef = doc(db, 'teachers', teacherId, 'classes', classId, 'students', studentId);
-                localStorage.removeItem(`my_student_id_${classId}`);
-                setStudentId(null);
-                setJoinedStudent(null);
-              } catch (err) {
-                console.error(err);
-              }
-            }}
-            className="w-full py-3 bg-red-650 hover:bg-red-700 text-white font-black text-xs rounded-xl transition-all cursor-pointer select-none border-none text-center"
-          >
-            បោះបង់ ឬចុះឈ្មោះឡើងវិញ (Cancel or Re-register)
-          </button>
+          <div className="space-y-2">
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const stdColl = collection(db, 'teachers', teacherId, 'classes', classId, 'students');
+                  const stdSnap = await safeGetDocs(stdColl);
+                  stdSnap.forEach(snap => {
+                    const dat = snap.data() as Student;
+                    if (dat.id === studentId) {
+                      setJoinedStudent(dat);
+                    }
+                  });
+                } catch (e) {}
+              }}
+              className="w-full py-2.5 bg-indigo-600/30 hover:bg-indigo-600/50 text-indigo-300 font-black text-xs rounded-xl border border-indigo-500/30 transition-all cursor-pointer select-none flex items-center justify-center gap-2"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+              <span>ពិនិត្យស្ថានភាពអនុញ្ញាត (Check Approval)</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={async () => {
+                try {
+                  const docRef = doc(db, 'teachers', teacherId, 'classes', classId, 'students', studentId);
+                  localStorage.removeItem(`my_student_id_${classId}`);
+                  setStudentId(null);
+                  setJoinedStudent(null);
+                } catch (err) {
+                  console.error(err);
+                }
+              }}
+              className="w-full py-2.5 bg-red-500/20 hover:bg-red-500/30 text-red-300 font-black text-xs rounded-xl transition-all cursor-pointer select-none border border-red-500/30 text-center"
+            >
+              បោះបង់ ឬចុះឈ្មោះឡើងវិញ (Cancel/Re-register)
+            </button>
+          </div>
         </div>
       </div>
     );

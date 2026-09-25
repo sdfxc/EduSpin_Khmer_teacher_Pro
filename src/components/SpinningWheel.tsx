@@ -5,6 +5,7 @@ import confetti from 'canvas-confetti';
 import { Student } from '../types';
 import StudentListCallingModal from './StudentListCallingModal';
 import { getCurrentDateScoreSlot, getStudentCurrentWeekActivityScore } from '../lib/scoreUtils';
+import { playTickSound, playWinnerSound } from '../lib/soundUtils';
 
 interface SpinningWheelProps {
   students: Student[];
@@ -27,51 +28,6 @@ interface SpinningWheelProps {
 
 const PALETTE = ['#06b6d4', '#6366f1', '#ec4899', '#10b981', '#f59e0b', '#8b5cf6', '#14b8a6', '#ef4444'];
 const WINNER_EMOJIS = ['🎉', '🥳', '🌟', '🏆', '👑', '😎', '🚀', '🤩', '🎯', '✨', '👏', '🔥', '🌈', '💯', '🎖️', '🦸‍♂️', '🦸‍♀️'];
-
-// Custom warm, pleasant, medium-low frequency synthetic tick sound that won't hurt the ears (សំឡេង "តិកៗ" បន្ធូរប្រេកង់ និងឮល្មមមិនឈឺត្រចៀក)
-const playHighPitchTick = () => {
-  try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    
-    const osc = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gainNode = ctx.createGain();
-    
-    // Satisfying woody tick frequency profile (increased slightly from 550Hz to 850Hz)
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(850, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.03);
-    
-    // Bandpass filter centered at 480Hz to restore a bit of crisp resonance without ear strain
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(480, ctx.currentTime);
-    filter.Q.value = 1.8;
-    
-    // Gentle amplitude (increased slightly to 0.45 for better presence)
-    gainNode.gain.setValueAtTime(0.45, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
-    
-    osc.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    osc.start();
-    osc.stop(ctx.currentTime + 0.04);
-    
-    setTimeout(() => {
-      ctx.close().catch(() => {});
-    }, 80);
-  } catch (err) {
-    console.error("Pleasant tick synthesis error:", err);
-  }
-};
-
-// URLs of high-fidelity audio assets
-const TICK_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
-const FIREWORK_URL = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
-const APPLAUSE_URL = 'https://assets.mixkit.co/active_storage/sfx/2010/2010-preview.mp3';
 
 export default function SpinningWheel({
   students,
@@ -98,42 +54,11 @@ export default function SpinningWheel({
   const [showWinnerModal, setShowWinnerModal] = useState(false);
   const [showStudentListModal, setShowStudentListModal] = useState(false);
   const [randomEmoji, setRandomEmoji] = useState('🎉');
+  const [displayMode, setDisplayMode] = useState<'profile' | 'emoji'>('profile');
   const controls = useAnimation();
   const [bulkText, setBulkText] = useState('');
   const wheelRef = useRef<HTMLDivElement>(null);
-
-  // Audio References for loading sound samples of tick-tock, fireworks, and classroom claps
-  const tickAudio = useRef<HTMLAudioElement | null>(null);
-  const fireworkAudio = useRef<HTMLAudioElement | null>(null);
-  const applauseAudio = useRef<HTMLAudioElement | null>(null);
   const lastSegment = useRef<number>(-1);
-
-  // Load and cache all critical sound assets
-  useEffect(() => {
-    tickAudio.current = new Audio(TICK_URL);
-    fireworkAudio.current = new Audio(FIREWORK_URL);
-    applauseAudio.current = new Audio(APPLAUSE_URL);
-    
-    tickAudio.current.load();
-    fireworkAudio.current.load();
-    applauseAudio.current.load();
-
-    // Volume configuration (max is 1.0)
-    tickAudio.current.volume = 1.0;
-    fireworkAudio.current.volume = 1.0;
-    applauseAudio.current.volume = 1.0;
-
-    const handleError = (e: any) => console.warn('Audio failed to load:', e.target.src);
-    tickAudio.current.addEventListener('error', handleError);
-    fireworkAudio.current.addEventListener('error', handleError);
-    applauseAudio.current.addEventListener('error', handleError);
-    
-    return () => {
-      tickAudio.current?.removeEventListener('error', handleError);
-      fireworkAudio.current?.removeEventListener('error', handleError);
-      applauseAudio.current?.removeEventListener('error', handleError);
-    };
-  }, []);
 
   // Exclude both wheel-called (pickedIds) and teacher manually called (manualCalledIds)
   const availableStudents = students.filter(s => !pickedIds.includes(s.id) && !manualCalledIds.includes(s.id));
@@ -173,12 +98,7 @@ export default function SpinningWheel({
 
         // Sector ticking audio trigger!
         if (currentIdx !== lastSegment.current) {
-          if (tickAudio.current) {
-            tickAudio.current.currentTime = 0;
-            tickAudio.current.play().catch(() => {});
-          }
-          // Custom high frequency, high amplitude synthesized physical sound
-          playHighPitchTick();
+          playTickSound();
           lastSegment.current = currentIdx;
         }
       }
@@ -214,24 +134,6 @@ export default function SpinningWheel({
     if (students.length === 0 || isSpinning) return;
 
     setShowWinnerModal(false);
-
-    // Soft-trigger warm up of audio contexts on user touch/click gesture to stop autoplay blocks
-    if (tickAudio.current) {
-      tickAudio.current.play().then(() => {
-        tickAudio.current?.pause();
-      }).catch(() => {});
-    }
-    if (applauseAudio.current) {
-      applauseAudio.current.play().then(() => {
-        applauseAudio.current?.pause();
-      }).catch(() => {});
-    }
-    if (fireworkAudio.current) {
-      fireworkAudio.current.play().then(() => {
-        fireworkAudio.current?.pause();
-      }).catch(() => {});
-    }
-
     setIsSpinning(true);
 
     // Filter available pool (excluding both wheel-picked and teacher manually called)
@@ -292,14 +194,7 @@ export default function SpinningWheel({
     setNeedleColor(winningColor);
 
     // Play real audio!
-    if (fireworkAudio.current) {
-      fireworkAudio.current.currentTime = 0;
-      fireworkAudio.current.play().catch(() => {});
-    }
-    if (applauseAudio.current) {
-      applauseAudio.current.currentTime = 0;
-      applauseAudio.current.play().catch(() => {});
-    }
+    playWinnerSound();
 
     // Fire continuous fireworks confetti
     triggerFireworks();
@@ -464,7 +359,7 @@ export default function SpinningWheel({
         <motion.div
           ref={wheelRef}
           animate={controls}
-          className="w-full h-full rounded-full shadow-2xl bg-white dark:bg-slate-900 border-8 border-white dark:border-slate-800 p-1 relative overflow-hidden"
+          className="w-full h-full rounded-full shadow-2xl bg-white dark:bg-[#222222] border-8 border-white dark:border-[#333333] p-1 relative overflow-hidden"
           style={{ originX: '50%', originY: '50%' }}
         >
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible">
@@ -476,7 +371,7 @@ export default function SpinningWheel({
         <button
           onClick={handleSpin}
           disabled={isSpinning || students.length === 0}
-          className="absolute w-16 h-16 bg-white dark:bg-slate-800 rounded-full border-4 border-indigo-600 dark:border-indigo-500 shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-40 transition-all z-10 cursor-pointer"
+          className="absolute w-16 h-16 bg-white dark:bg-[#2a2a2a] rounded-full border-4 border-indigo-600 dark:border-indigo-500 shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-40 transition-all z-10 cursor-pointer"
         >
           <Play className="w-8 h-8 fill-indigo-600 text-indigo-600" />
         </button>
@@ -487,7 +382,7 @@ export default function SpinningWheel({
         {/* Reset - Left (ខាងឆ្វេង) */}
         <button
           onClick={handleResetPicked}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs active:scale-95"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-[#2a2a2a] border border-slate-200 dark:border-[#383838] text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-[#333333] transition-all cursor-pointer shadow-2xs active:scale-95"
           title="កំណត់ឡើងវិញ / Reset"
         >
           <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
@@ -498,7 +393,7 @@ export default function SpinningWheel({
         <button
           onClick={handleRepick}
           disabled={isSpinning || students.length === 0}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-[#2a2a2a] border border-slate-200 dark:border-[#383838] text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-[#333333] transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
           title="រើសម្តងទៀត / Re-pick"
         >
           <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
@@ -517,8 +412,8 @@ export default function SpinningWheel({
         </button>
       </div>
 
-      {/* កូន tap តូចមួយសម្រាប់ចុចចូលមើលឈ្មោះសិស្សទាំងអស់ (View All Students & Manual Call Status) */}
-      <div className="w-full max-w-sm flex items-center justify-center mb-5">
+      {/* កូន tap តូចមួយសម្រាប់ចុចចូលមើលឈ្មោះសិស្សទាំងអស់ និង Profile/Emoji Switch */}
+      <div className="w-full max-w-sm flex items-center justify-center gap-2 mb-5 flex-wrap">
         <button
           onClick={() => setShowStudentListModal(true)}
           className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 border border-indigo-200/80 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 rounded-full font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 group"
@@ -536,6 +431,33 @@ export default function SpinningWheel({
             </span>
           )}
         </button>
+
+        {/* Profile / Emoji Toggle Tap */}
+        <div className="inline-flex items-center gap-1 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-bold shadow-2xs">
+          <button
+            type="button"
+            onClick={() => setDisplayMode('profile')}
+            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+              displayMode === 'profile'
+                ? 'text-rose-600 dark:text-rose-400 font-black bg-white dark:bg-slate-900 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+            }`}
+          >
+            Profile
+          </button>
+          <span className="text-slate-400 font-bold">/</span>
+          <button
+            type="button"
+            onClick={() => setDisplayMode('emoji')}
+            className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+              displayMode === 'emoji'
+                ? 'text-rose-600 dark:text-rose-400 font-black bg-white dark:bg-slate-900 shadow-xs'
+                : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+            }`}
+          >
+            Emoji
+          </button>
+        </div>
       </div>
 
       {/* Bulk Add trigger link */}
@@ -608,9 +530,36 @@ export default function SpinningWheel({
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               </div>
 
+              {/* Profile / Emoji Toggle Tap */}
+              <div className="flex items-center justify-center gap-1.5 mb-2 bg-slate-100 dark:bg-slate-800/80 p-1 rounded-full border border-slate-200 dark:border-slate-700 text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('profile')}
+                  className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                    displayMode === 'profile'
+                      ? 'text-rose-600 dark:text-rose-400 font-black bg-white dark:bg-slate-900 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+                  }`}
+                >
+                  Profile
+                </button>
+                <span className="text-slate-400 font-bold">/</span>
+                <button
+                  type="button"
+                  onClick={() => setDisplayMode('emoji')}
+                  className={`px-3 py-1 rounded-full transition-all cursor-pointer ${
+                    displayMode === 'emoji'
+                      ? 'text-rose-600 dark:text-rose-400 font-black bg-white dark:bg-slate-900 shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400 hover:text-slate-800'
+                  }`}
+                >
+                  Emoji
+                </button>
+              </div>
+
               {/* Profile Photo OR Animated Emoji */}
               <div className="relative my-2">
-                {winnerStudent.avatarUrl ? (
+                {displayMode === 'profile' && winnerStudent.avatarUrl ? (
                   <div className="relative">
                     <img
                       src={winnerStudent.avatarUrl}
@@ -627,7 +576,7 @@ export default function SpinningWheel({
                     transition={{ repeat: Infinity, duration: 2.5, ease: "easeInOut" }}
                     className="w-28 h-28 sm:w-32 sm:h-32 rounded-3xl bg-linear-to-tr from-indigo-500/15 via-purple-500/20 to-pink-500/15 dark:from-indigo-500/25 dark:to-purple-500/25 ring-4 ring-indigo-500/30 flex items-center justify-center text-6xl sm:text-7xl shadow-2xl select-none mx-auto"
                   >
-                    {randomEmoji}
+                    {winnerStudent.emoji || randomEmoji}
                   </motion.div>
                 )}
               </div>

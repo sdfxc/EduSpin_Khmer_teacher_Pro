@@ -14,7 +14,7 @@ import SlidesManager from './SlidesManager';
 import LessonPlansManager from './LessonPlansManager';
 import { WordDocItem, SlideDeckItem, LessonPlanItem } from '../../types/lessonMaterials';
 import { DEFAULT_WORD_DOCS, DEFAULT_SLIDES, DEFAULT_LESSON_PLANS, DEMO_SAMPLE_IDS } from '../../lib/defaultLessonMaterials';
-import { db, doc, setDoc, safeGetDoc, safeOnSnapshot } from '../../lib/firebase';
+import { db, doc, safeSetDoc, safeGetDoc, safeOnSnapshot } from '../../lib/firebase';
 import { TeacherAccount } from '../../types';
 
 interface LessonsPanelProps {
@@ -141,12 +141,12 @@ export default function LessonsPanel({
 
         if (teacher?.id && activeClassId) {
           const matDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'lessonMaterials', 'data');
-          await setDoc(matDocRef, {
+          await safeSetDoc(matDocRef, {
             wordDocs: newWords,
             slides: newSlides,
             lessonPlans: newPlans,
             updatedAt: new Date().toISOString()
-          }, { merge: true }).catch((e) => console.warn('Cloud save warning (offline):', e));
+          }, { merge: true });
         }
       } catch (err) {
         console.warn('Persist error:', err);

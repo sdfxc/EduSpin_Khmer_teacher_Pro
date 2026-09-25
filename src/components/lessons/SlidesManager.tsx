@@ -51,7 +51,7 @@ export default function SlidesManager({
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editingDeckId, setEditingDeckId] = useState<string | null>(null);
   const [deckTitle, setDeckTitle] = useState('');
-  const [deckSubject, setDeckSubject] = useState('រូបវិទ្យា');
+  const [deckSubject, setDeckSubject] = useState('ភាសាខ្មែរ');
   const [deckChapter, setDeckChapter] = useState('');
   const [deckLessonNumber, setDeckLessonNumber] = useState('មេរៀនទី ១');
   const [deckEmbedUrl, setDeckEmbedUrl] = useState('');
@@ -94,7 +94,7 @@ export default function SlidesManager({
   const handleOpenCreateDeck = () => {
     setEditingDeckId(null);
     setDeckTitle('');
-    setDeckSubject('រូបវិទ្យា');
+    setDeckSubject('ភាសាខ្មែរ');
     setDeckChapter('ជំពូកទី ៣៖ អគ្គិសនី');
     setDeckLessonNumber('មេរៀនទី ១');
     setDeckEmbedUrl('');
@@ -131,7 +131,7 @@ export default function SlidesManager({
   const handleOpenEditDeck = (deck: SlideDeckItem) => {
     setEditingDeckId(deck.id);
     setDeckTitle(deck.title);
-    setDeckSubject(deck.subject || 'រូបវិទ្យា');
+    setDeckSubject(deck.subject || 'ភាសាខ្មែរ');
     setDeckChapter(deck.chapter || '');
     setDeckLessonNumber(deck.lessonNumber || 'មេរៀនទី ១');
     setDeckEmbedUrl(deck.externalEmbedUrl || '');

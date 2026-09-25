@@ -7,46 +7,7 @@ import { Student } from '../types';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 import StudentListCallingModal from './StudentListCallingModal';
 import { getCurrentDateScoreSlot, getStudentCurrentWeekActivityScore } from '../lib/scoreUtils';
-
-const TICK_URL = 'https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3';
-const FIREWORK_URL = 'https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3';
-const APPLAUSE_URL = 'https://assets.mixkit.co/active_storage/sfx/2010/2010-preview.mp3';
-
-const playSyntheticTick = () => {
-  try {
-    const AudioContext = window.AudioContext || (window as any).webkitAudioContext;
-    if (!AudioContext) return;
-    const ctx = new AudioContext();
-    
-    const osc = ctx.createOscillator();
-    const filter = ctx.createBiquadFilter();
-    const gainNode = ctx.createGain();
-    
-    osc.type = 'triangle';
-    osc.frequency.setValueAtTime(850, ctx.currentTime);
-    osc.frequency.exponentialRampToValueAtTime(120, ctx.currentTime + 0.03);
-    
-    filter.type = 'bandpass';
-    filter.frequency.setValueAtTime(480, ctx.currentTime);
-    filter.Q.value = 1.8;
-    
-    gainNode.gain.setValueAtTime(0.45, ctx.currentTime);
-    gainNode.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.035);
-    
-    osc.connect(filter);
-    filter.connect(gainNode);
-    gainNode.connect(ctx.destination);
-    
-    osc.start();
-    osc.stop(ctx.currentTime + 0.04);
-    
-    setTimeout(() => {
-      ctx.close().catch(() => {});
-    }, 80);
-  } catch (err) {
-    console.error("Pleasant tick synthesis error:", err);
-  }
-};
+import { playTickSound, playWinnerSound } from '../lib/soundUtils';
 
 interface StudentPanelProps {
   students: Student[];
@@ -89,36 +50,6 @@ export default function StudentPanel({
   const [bulkText, setBulkText] = useState('');
   const [showQuickEditModal, setShowQuickEditModal] = useState(false);
   const [showStudentListModal, setShowStudentListModal] = useState(false);
-
-  const tickAudio = useRef<HTMLAudioElement | null>(null);
-  const fireworkAudio = useRef<HTMLAudioElement | null>(null);
-  const applauseAudio = useRef<HTMLAudioElement | null>(null);
-
-  // Load and cache audio assets for student panel randomize button selection sounds
-  useEffect(() => {
-    tickAudio.current = new Audio(TICK_URL);
-    fireworkAudio.current = new Audio(FIREWORK_URL);
-    applauseAudio.current = new Audio(APPLAUSE_URL);
-    
-    tickAudio.current.load();
-    fireworkAudio.current.load();
-    applauseAudio.current.load();
-
-    tickAudio.current.volume = 1.0;
-    fireworkAudio.current.volume = 1.0;
-    applauseAudio.current.volume = 1.0;
-
-    const handleError = (e: any) => console.warn('StudentPanel audio failed to load:', e.target.src);
-    tickAudio.current.addEventListener('error', handleError);
-    fireworkAudio.current.addEventListener('error', handleError);
-    applauseAudio.current.addEventListener('error', handleError);
-    
-    return () => {
-      tickAudio.current?.removeEventListener('error', handleError);
-      fireworkAudio.current?.removeEventListener('error', handleError);
-      applauseAudio.current?.removeEventListener('error', handleError);
-    };
-  }, []);
 
   // Reset picked list if students are cleared from external source
   useEffect(() => {
@@ -170,23 +101,6 @@ export default function StudentPanel({
 
   const spin = () => {
     if (students.length === 0 || isSpinning) return;
-    
-    // Soft-trigger warm up of audio contexts on user touch/click gesture to prevent autoplay blocks
-    if (tickAudio.current) {
-      tickAudio.current.play().then(() => {
-        tickAudio.current?.pause();
-      }).catch(() => {});
-    }
-    if (applauseAudio.current) {
-      applauseAudio.current.play().then(() => {
-        applauseAudio.current?.pause();
-      }).catch(() => {});
-    }
-    if (fireworkAudio.current) {
-      fireworkAudio.current.play().then(() => {
-        fireworkAudio.current?.pause();
-      }).catch(() => {});
-    }
 
     setIsSpinning(true);
     let count = 0;
@@ -208,6 +122,7 @@ export default function StudentPanel({
     const interval = setInterval(() => {
       const displayIndex = Math.floor(Math.random() * students.length);
       onSelectStudent(students[displayIndex]);
+      playTickSound();
 
       count++;
       
@@ -224,14 +139,7 @@ export default function StudentPanel({
         setIsSpinning(false);
 
         // Play celebration audio on final selection
-        if (fireworkAudio.current) {
-          fireworkAudio.current.currentTime = 0;
-          fireworkAudio.current.play().catch(() => {});
-        }
-        if (applauseAudio.current) {
-          applauseAudio.current.currentTime = 0;
-          applauseAudio.current.play().catch(() => {});
-        }
+        playWinnerSound();
 
         // Fire continuous high-intensity fireworks confetti sequence (lasts for 2.5 seconds)
         const duration = 2.5 * 1000;
@@ -257,7 +165,7 @@ export default function StudentPanel({
   return (
     <div className={`flex flex-col h-full border-r p-6 overflow-hidden transition-colors duration-300 ${
       isDarkMode 
-        ? 'bg-slate-900 border-slate-800 text-white' 
+        ? 'bg-[#222222] border-[#333333] text-white' 
         : 'bg-white border-[#e2e8f0] text-slate-800'
     }`}>
       <div className="flex flex-col mb-6 gap-2">
@@ -466,8 +374,8 @@ export default function StudentPanel({
                   : manualCalledIds.includes(student.id)
                     ? 'bg-amber-50/70 dark:bg-amber-950/20 border-amber-200/60 dark:border-amber-800/40 text-amber-900 dark:text-amber-200'
                     : pickedIds.includes(student.id)
-                      ? 'bg-slate-50 dark:bg-slate-800/45 border-slate-100 dark:border-slate-800 opacity-40 grayscale'
-                      : 'bg-white dark:bg-slate-900 border-[#e2e8f0] dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors text-slate-700 dark:text-slate-300'
+                      ? 'bg-slate-50 dark:bg-[#1f1f1f] border-slate-100 dark:border-[#333333] opacity-40 grayscale'
+                      : 'bg-white dark:bg-[#2a2a2a] border-[#e2e8f0] dark:border-[#383838] hover:border-slate-300 dark:hover:border-slate-600 transition-colors text-slate-700 dark:text-slate-300'
               }`}
             >
               <div className="flex items-center gap-4">
@@ -535,14 +443,14 @@ export default function StudentPanel({
         )}
       </div>
 
-      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-slate-800">
+      <div className="space-y-3 pt-4 border-t border-slate-200 dark:border-[#333333]">
         <form onSubmit={handleAdd} className="flex gap-2">
           <input
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
             placeholder="បញ្ចូលឈ្មោះសិស្ស..."
-            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-900 dark:text-slate-100"
+            className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-[#333333] bg-white dark:bg-[#1a1a1a] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-900 dark:text-slate-100"
           />
           <button
             type="submit"

@@ -5,19 +5,24 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera, Pin, PinOff } from 'lucide-react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera, Pin, PinOff, Maximize, Minimize, Volume2, VolumeX, Database, Keyboard, HelpCircle, Settings } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
 import TeacherAuthModal from './components/TeacherAuthModal';
 import { TeacherProfileModal } from './components/TeacherProfileModal';
+import { BackupRestoreModal } from './components/BackupRestoreModal';
+import { SettingsMenuDrawer } from './components/SettingsMenuDrawer';
+import { GlassLiquidOverlay } from './components/GlassLiquidCapsule';
+import { ShortcutsHelpModal } from './components/ShortcutsHelpModal';
+import { isSoundEnabled, setSoundEnabled, playChimeSound } from './lib/soundUtils';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
 import StopwatchPanel from './components/StopwatchPanel';
 import StudentManager from './components/StudentManager';
-import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass } from './types';
+import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass, DEFAULT_CLOUD_TEACHER } from './types';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs } from './lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs, isQuotaExceeded } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
@@ -27,6 +32,55 @@ import { ClassModal } from './components/ClassModal';
 import SmartNotesApp from './components/smart-notes/SmartNotesApp';
 import { BookOpen } from 'lucide-react';
 import { addActivityPointsToStudent, setActivityScoreForStudent, addGroupWorkPointsToStudent, getCurrentDateScoreSlot } from './lib/scoreUtils';
+
+// Globally patch localStorage.setItem to gracefully handle QuotaExceededError and auto-sanitize
+function cleanupLocalStorageQuota() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key) continue;
+
+      if (key === 'khmer_teacher_classes' || key.startsWith('khmer_teacher_classes_')) {
+        const value = localStorage.getItem(key);
+        if (value) {
+          try {
+            const parsed = JSON.parse(value);
+            if (Array.isArray(parsed)) {
+              const sanitized = parsed.map((c: any) => ({
+                id: String(c?.id || ''),
+                name: String(c?.name || '').trim(),
+                order: typeof c?.order === 'number' ? c.order : 0,
+                isPinned: !!c?.isPinned
+              })).filter(c => c.id && c.name);
+              localStorage.setItem(key, JSON.stringify(sanitized));
+            }
+          } catch (err) {
+            console.error(`Failed to sanitize key ${key}:`, err);
+          }
+        }
+      }
+    }
+  } catch (e) {
+    console.error('Error during localStorage quota cleanup:', e);
+  }
+}
+
+const originalSetItem = localStorage.setItem;
+localStorage.setItem = function (key, value) {
+  try {
+    originalSetItem.call(localStorage, key, value);
+  } catch (error: any) {
+    console.error(`[LocalStorage Overwrite] Error writing key "${key}":`, error);
+    if (error.name === 'QuotaExceededError' || error.code === 22) {
+      cleanupLocalStorageQuota();
+      try {
+        originalSetItem.call(localStorage, key, value);
+      } catch (retryError) {
+        console.error(`[LocalStorage Overwrite] Retry failed for key "${key}":`, retryError);
+      }
+    }
+  }
+};
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
@@ -61,14 +115,18 @@ function getMigratedSubjects(loadedChapters: QuizChapter[]): { subjects: QuizSub
 
 const SAMPLE_STUDENTS: Record<string, Student[]> = {};
 
-const DEFAULT_CLASSES: ClassInfo[] = [
-  { id: 'class-7a', name: 'ថ្នាក់ទី៧ក', order: 0 },
-  { id: 'class-8a', name: 'ថ្នាក់ទី៨ក', order: 1 },
-  { id: 'class-9a', name: 'ថ្នាក់ទី៩ក', order: 2 }
-];
+const DEFAULT_CLASSES: ClassInfo[] = [];
 
 const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
-  const clean = classList.filter(c => c && c.name && c.name.trim() !== '');
+  const clean = (classList || [])
+    .filter(c => c && c.name && c.name.trim() !== '')
+    .map(c => ({
+      id: String(c.id),
+      name: String(c.name).trim(),
+      order: typeof c.order === 'number' ? c.order : 999,
+      isPinned: !!c.isPinned
+    }));
+
   const uniqueIds = new Set<string>();
   const uniqueNames = new Set<string>();
   const filtered = clean.filter(c => {
@@ -85,12 +143,15 @@ const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
     if (pinA !== pinB) {
       return pinB - pinA; // Pinned items stay at the front
     }
-    const orderA = typeof a.order === 'number' ? a.order : 999;
-    const orderB = typeof b.order === 'number' ? b.order : 999;
-    return orderA - orderB;
+    return a.order - b.order;
   });
 
-  return sorted.map((c, idx) => ({ ...c, order: idx }));
+  return sorted.map((c, idx) => ({
+    id: c.id,
+    name: c.name,
+    order: idx,
+    isPinned: c.isPinned
+  }));
 };
 
 function getInitialActiveTeacherAndClass() {
@@ -113,7 +174,14 @@ function getInitialActiveTeacherAndClass() {
   if (savedClassesRaw) {
     try {
       const raw = JSON.parse(savedClassesRaw) as ClassInfo[];
-      parsedClasses = (raw || []).filter(c => c && c.name && c.name.trim() !== '');
+      parsedClasses = (raw || [])
+        .filter(c => c && c.name && c.name.trim() !== '')
+        .map(c => ({
+          id: String(c.id),
+          name: String(c.name).trim(),
+          order: typeof c.order === 'number' ? c.order : 0,
+          isPinned: !!c.isPinned
+        }));
       if (savedActiveId && parsedClasses.some(c => c.id === savedActiveId)) {
         effectiveClassId = savedActiveId;
       } else if (parsedClasses.length > 0) {
@@ -131,6 +199,94 @@ function getInitialActiveTeacherAndClass() {
   };
 }
 
+function shrinkBase64Image(base64: string, maxDim = 128, quality = 0.6): Promise<string> {
+  return new Promise((resolve) => {
+    if (!base64 || !base64.startsWith('data:image/')) {
+      resolve(base64);
+      return;
+    }
+    const img = new Image();
+    img.onload = () => {
+      let { width, height } = img;
+      if (width <= maxDim && height <= maxDim) {
+        resolve(base64);
+        return;
+      }
+      if (width > height) {
+        if (width > maxDim) {
+          height = Math.round((height * maxDim) / width);
+          width = maxDim;
+        }
+      } else {
+        if (height > maxDim) {
+          width = Math.round((width * maxDim) / height);
+          height = maxDim;
+        }
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = width;
+      canvas.height = height;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) {
+        resolve(base64);
+        return;
+      }
+      ctx.imageSmoothingEnabled = true;
+      ctx.imageSmoothingQuality = 'medium';
+      ctx.drawImage(img, 0, 0, width, height);
+      try {
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch {
+        resolve(base64);
+      }
+    };
+    img.onerror = () => resolve(base64);
+    img.src = base64;
+  });
+}
+
+async function healOversizedLocalStorageAvatars() {
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const key = localStorage.key(i);
+      if (!key || !key.startsWith('students_class_')) continue;
+
+      const value = localStorage.getItem(key);
+      if (!value) continue;
+
+      try {
+        const students = JSON.parse(value);
+        if (Array.isArray(students)) {
+          let updated = false;
+          const healedStudents = await Promise.all(
+            students.map(async (student: any) => {
+              if (student?.avatarUrl && student.avatarUrl.startsWith('data:image/') && student.avatarUrl.length > 25000) {
+                try {
+                  const shrunk = await shrinkBase64Image(student.avatarUrl, 128, 0.6);
+                  if (shrunk.length < student.avatarUrl.length) {
+                    student.avatarUrl = shrunk;
+                    updated = true;
+                  }
+                } catch {}
+              }
+              return student;
+            })
+          );
+
+          if (updated) {
+            localStorage.setItem(key, JSON.stringify(healedStudents));
+            console.log(`[Self-Healing] Successfully shrunk oversized avatars for key ${key}`);
+          }
+        }
+      } catch (e) {
+        console.error(`Failed to parse/heal key ${key}:`, e);
+      }
+    }
+  } catch (e) {
+    console.warn('Error during avatar storage healing:', e);
+  }
+}
+
 export default function App() {
   const [studentMode] = useState<boolean>(() => {
     const params = new URLSearchParams(window.location.search);
@@ -138,6 +294,10 @@ export default function App() {
   });
 
   const [authModalMode, setAuthModalMode] = useState<'login' | 'register'>('login');
+
+  useEffect(() => {
+    healOversizedLocalStorageAvatars();
+  }, []);
 
   if (studentMode) {
     return <StudentPlayView />;
@@ -149,6 +309,18 @@ export default function App() {
   const [showWheelBulk, setShowWheelBulk] = useState(false);
   const [quizLeftView, setQuizLeftView] = useState<'wheel' | 'list'>('wheel');
   const [loadingCloudData, setLoadingCloudData] = useState(false);
+  const [quotaExceeded, setQuotaExceededState] = useState<boolean>(() => isQuotaExceeded());
+  const [quotaBannerDismissed, setQuotaBannerDismissed] = useState<boolean>(false);
+
+  useEffect(() => {
+    const handleQuotaExceeded = () => {
+      setQuotaExceededState(true);
+    };
+    window.addEventListener('firestore-quota-exceeded', handleQuotaExceeded);
+    return () => {
+      window.removeEventListener('firestore-quota-exceeded', handleQuotaExceeded);
+    };
+  }, []);
 
   const [isDarkMode, setIsDarkMode] = useState<boolean>(() => {
     const saved = localStorage.getItem('khmer_teacher_dark_mode');
@@ -186,8 +358,8 @@ export default function App() {
   });
   
   const [cards, setCards] = useState<QuizCard[]>(() => {
-    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!activeId) return [];
+    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!teacher || !activeId) return [];
     try {
       // 1. Direct class card cache
       const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
@@ -307,7 +479,9 @@ export default function App() {
   const [activeCardState, setActiveCardState] = useState<'answering' | 'revealed'>('answering');
 
   useEffect(() => {
-    setActiveCardState('answering');
+    if (activeCardState !== 'answering') {
+      setActiveCardState('answering');
+    }
   }, [activeCardId]);
 
   const [isLessonModalOpen, setIsLessonModalOpen] = useState(false);
@@ -326,6 +500,20 @@ export default function App() {
     currentName: ''
   });
 
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
+  const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
+  const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => {
+      setToastMessage(prev => (prev === msg ? null : prev));
+    }, 2800);
+  }, []);
+
   const [teacher, setTeacher] = useState<TeacherAccount | null>(() => {
     const saved = localStorage.getItem('logged_in_teacher');
     if (saved) {
@@ -340,11 +528,35 @@ export default function App() {
   });
 
   const lastSubjectsStrRef = useRef<string>('');
+  const lastChaptersStrRef = useRef<string>('');
+  const lastCardsStrRef = useRef<string>('');
   const activeSubjectIdRef = useRef<string | null>(activeSubjectId);
   const activeRoomIdRef = useRef<string | null>(activeRoomId);
   const lastPickedStrRef = useRef<string>('');
   const activeCardIdRef = useRef<string | null>(activeCardId);
   const activeCardStateRef = useRef<'answering' | 'revealed'>(activeCardState);
+
+  const lastSyncedQuizRef = useRef<{
+    activeCardId: string | null;
+    activeRoomId: string | null;
+    activeTab: string;
+    activeCardState: 'answering' | 'revealed';
+    activeCardIdOfCard: string | null;
+    activeSubjectId: string | null;
+    subjectsStr: string;
+    pickedIdsStr: string;
+  }>({
+    activeCardId: null,
+    activeRoomId: null,
+    activeTab: 'wheel',
+    activeCardState: 'answering',
+    activeCardIdOfCard: null,
+    activeSubjectId: null,
+    subjectsStr: '',
+    pickedIdsStr: '',
+  });
+
+  const lastWriteTimeRef = useRef<number>(0);
 
   useEffect(() => {
     activeSubjectIdRef.current = activeSubjectId;
@@ -447,13 +659,9 @@ export default function App() {
         localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
         (async () => {
           try {
-            for (let i = 0; i < finalizedClasses.length; i++) {
-              const cls = finalizedClasses[i];
-              await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                order: i,
-                isPinned: !!cls.isPinned
-              }, { merge: true });
-            }
+            await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId), {
+              isPinned: newPinnedState
+            }, { merge: true });
           } catch (err) {
             console.error("Failed to save pinned class state to Firestore:", err);
           }
@@ -484,13 +692,14 @@ export default function App() {
         localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
         (async () => {
           try {
-            for (let i = 0; i < finalizedClasses.length; i++) {
-              const cls = finalizedClasses[i];
-              await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
-                order: i,
-                isPinned: !!cls.isPinned
-              }, { merge: true });
-            }
+            await Promise.all([
+              safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', temp.id), {
+                order: targetIndex
+              }, { merge: true }),
+              safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', updated[index].id), {
+                order: index
+              }, { merge: true })
+            ]);
           } catch (err) {
             console.error("Failed to save reordered classes to Firestore:", err);
           }
@@ -513,6 +722,16 @@ export default function App() {
       setCards([]);
       setPickedIds([]);
       setLoadingCloudData(false);
+      try {
+        const keysToRemove: string[] = [];
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && (key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_'))) {
+            keysToRemove.push(key);
+          }
+        }
+        keysToRemove.forEach(k => localStorage.removeItem(k));
+      } catch {}
       return;
     }
 
@@ -556,65 +775,21 @@ export default function App() {
         let fetchedClasses: ClassInfo[] = [];
         const seenIds = new Set<string>();
 
-        const currentTeacherId = teacher.id;
-        const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
-        const deletedClassesStr = localStorage.getItem(deletedKey);
-        let deletedSet = new Set<string>();
-        if (deletedClassesStr) {
-          try {
-            deletedSet = new Set<string>(JSON.parse(deletedClassesStr));
-          } catch {}
-        }
-
         classesSnap.forEach((docSnap: any) => {
-          const clsData = docSnap.data() as ClassInfo;
+          const clsData = docSnap.data();
+          if (!clsData) return;
           const id = clsData.id || docSnap.id;
-          clsData.id = id;
-          if (deletedSet.has(id)) return;
-          if (clsData && clsData.name && clsData.name.trim() !== '') {
+          if (clsData.name && String(clsData.name).trim() !== '') {
             if (!seenIds.has(id)) {
               seenIds.add(id);
-              fetchedClasses.push(clsData);
+              fetchedClasses.push({
+                id: id,
+                name: String(clsData.name).trim(),
+                order: typeof clsData.order === 'number' ? clsData.order : 999,
+                isPinned: !!clsData.isPinned
+              });
             }
           }
-        });
-
-        // Get locally saved classes fallback
-        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
-        let parsedLocals: ClassInfo[] = [];
-        let localClassesMap = new Map<string, number>();
-        if (localClassesStr) {
-          try {
-            parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
-            parsedLocals.forEach((lc, index) => {
-              if (lc && lc.id) {
-                localClassesMap.set(lc.id, typeof lc.order === 'number' ? lc.order : index);
-              }
-            });
-          } catch (e) {}
-        }
-
-        // Preserve valid local classes not yet indexed
-        for (const lc of parsedLocals) {
-          if (deletedSet.has(lc.id)) continue;
-          const existsInFetched = fetchedClasses.some(fc => fc.id === lc.id || fc.name.trim() === lc.name.trim());
-          if (!existsInFetched) {
-            fetchedClasses.push(lc);
-            safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
-              id: lc.id,
-              name: lc.name.trim(),
-              order: typeof lc.order === 'number' ? lc.order : fetchedClasses.length,
-              createdAt: new Date().toISOString()
-            }, { merge: true }).catch(() => {});
-          }
-        }
-
-        fetchedClasses = fetchedClasses.map((cls, idx) => {
-          if (typeof cls.order === 'number') return cls;
-          if (localClassesMap.has(cls.id)) {
-            return { ...cls, order: localClassesMap.get(cls.id) };
-          }
-          return { ...cls, order: idx };
         });
 
         const sortedCloudClasses = sortClasses(fetchedClasses);
@@ -626,21 +801,34 @@ export default function App() {
         });
 
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedCloudClasses));
 
         if (sortedCloudClasses.length > 0) {
           setActiveClassId(curr => {
             if (curr && sortedCloudClasses.some(c => c.id === curr)) return curr;
-            const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || sortedCloudClasses[0].id;
+            const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || sortedCloudClasses[0].id;
             const exists = sortedCloudClasses.some(c => c.id === lastActiveId);
-            return exists ? lastActiveId : sortedCloudClasses[0].id;
+            return exists && lastActiveId ? lastActiveId : sortedCloudClasses[0].id;
           });
         } else {
           setActiveClassId('');
+          setStudents([]);
+          setCards([]);
+          setSubjects([]);
+          setChapters([]);
+          setPickedIds([]);
+          setManualCalledIds([]);
         }
         setLoadingCloudData(false);
       }, (err: any) => {
         console.warn('Notice: Operating with local class data while cloud sync is reconnecting:', err);
+        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`);
+        if (localClassesStr) {
+          try {
+            const parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[])
+              .filter(c => c && c.name && String(c.name).trim() !== '');
+            setClasses(sortClasses(parsedLocals));
+          } catch {}
+        }
         setLoadingCloudData(false);
       });
 
@@ -691,14 +879,11 @@ export default function App() {
         const rmId = localRoomId || loadedChaps[0]?.rooms[0]?.id || null;
         setActiveRoomId(rmId);
 
-        let loadedCards: QuizCard[] = [];
-        if (localCardsStr) {
-          try { loadedCards = JSON.parse(localCardsStr); } catch {}
-        }
-        if (loadedCards.length === 0 && loadedChaps[0]?.rooms[0]?.cards) {
-          loadedCards = loadedChaps[0].rooms[0].cards;
-        }
-        setCards(loadedCards);
+        // Without a teacher account, do not load or show demo quiz questions
+        setCards([]);
+        try {
+          localStorage.removeItem(`quiz_cards_class_${activeClassId}`);
+        } catch {}
 
         if (localStudentsStr) {
           try { setStudents(JSON.parse(localStudentsStr)); } catch {}
@@ -840,11 +1025,7 @@ export default function App() {
               if (activeRoom) {
                 activeRoom.cards = resolvedCards;
               }
-              // Sync back to cloud
-              safeSetDoc(classDocRef, {
-                subjects: loadedSubjects,
-                cards: resolvedCards
-              }, { merge: true }).catch(() => {});
+              // Removed redundant safeSetDoc here to avoid write spam during loading.
             }
           } catch {}
         }
@@ -888,19 +1069,15 @@ export default function App() {
             if (isStudentInClass(data, activeClassId, activeClassName)) {
               loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
             } else {
-              foreignStudentsToDelete.push(data.id);
-              if (data.classId) {
-                safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', data.classId, 'students', data.id), data).catch(() => {});
-              }
+              // Only delete if we are CERTAIN it belongs elsewhere, but let's avoid auto-delete during load too for now
+              // safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', data.id)).catch(() => {});
             }
           }
         });
 
-        for (const fId of foreignStudentsToDelete) {
-          safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', fId)).catch(() => {});
-        }
-
         // Merge locally saved students in case any were added before sync or offline
+        // WE ONLY READ from local storage here to populate UI. 
+        // WE DO NOT auto-write missing students back to cloud here to avoid write spam.
         const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
         if (localStudentsStr) {
           try {
@@ -910,9 +1087,7 @@ export default function App() {
                 if (std && std.id && !std.id.startsWith('sim-')) {
                   if (isStudentInClass(std, activeClassId, activeClassName)) {
                     if (!loadedStudents.some(s => s.id === std.id)) {
-                      const stdWithClass = std.classId ? std : { ...std, classId: activeClassId };
-                      loadedStudents.push(stdWithClass);
-                      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), stdWithClass).catch(() => {});
+                      loadedStudents.push(std.classId ? std : { ...std, classId: activeClassId });
                     }
                   }
                 }
@@ -944,33 +1119,17 @@ export default function App() {
     loadClassDetails();
   }, [activeClassId, teacher?.id]);
 
-  // Real-time Student Synchronization for cloud sessions (only for logged-in teachers)
+  // Real-time Student Synchronization across all devices (PC, Mac, iPhone, Android, iPad)
   useEffect(() => {
-    if (!activeClassId || !teacher) return;
+    const effectiveTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
+    if (!activeClassId || !effectiveTeacherId) return;
 
-    const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
+    const studentsCollRef = collection(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students');
     const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
       const activeCls = classes.find(c => c.id === activeClassId);
       const activeClassName = activeCls?.name;
 
       if (snapshot.empty) {
-        // Protect local students from being wiped if snapshot reports empty during network latency
-        const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
-        if (localStudentsStr) {
-          try {
-            const parsed = JSON.parse(localStudentsStr);
-            if (Array.isArray(parsed) && parsed.length > 0) {
-              const validLocals = parsed.filter((std: any) => std && std.id && !std.id.startsWith('sim-') && isStudentInClass(std, activeClassId, activeClassName));
-              if (validLocals.length > 0) {
-                for (const std of validLocals) {
-                  safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
-                }
-                setStudents(validLocals);
-                return;
-              }
-            }
-          } catch {}
-        }
         setStudents([]);
         return;
       }
@@ -982,7 +1141,7 @@ export default function App() {
           if (isStudentInClass(data, activeClassId, activeClassName)) {
             loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
           } else {
-            safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', data.id)).catch(() => {});
+            safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', data.id)).catch(() => {});
           }
         }
       });
@@ -1023,8 +1182,12 @@ export default function App() {
 
           const currentSub = classData.subjects.find((s: QuizSubject) => s.id === activeSubId) || classData.subjects[0];
           const currChapters = currentSub?.chapters || [];
-          setChapters(currChapters);
-          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(currChapters));
+          const incomingChaptersStr = JSON.stringify(currChapters);
+          if (incomingChaptersStr !== lastChaptersStrRef.current) {
+            lastChaptersStrRef.current = incomingChaptersStr;
+            setChapters(currChapters);
+            localStorage.setItem(`chapters_class_${activeClassId}`, incomingChaptersStr);
+          }
 
           // Find active room
           const targetRoomId = classData.activeRoomId || activeRoomIdRef.current;
@@ -1058,10 +1221,21 @@ export default function App() {
                 } catch {}
               }
             }
-            setCards(roomCards);
-            localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(roomCards));
-            setPickedIds(targetRoom.pickedIds || classData.pickedIds || []);
-            localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(targetRoom.pickedIds || classData.pickedIds || []));
+            
+            const incomingCardsStr = JSON.stringify(roomCards);
+            if (incomingCardsStr !== lastCardsStrRef.current) {
+              lastCardsStrRef.current = incomingCardsStr;
+              setCards(roomCards);
+              localStorage.setItem(`quiz_cards_class_${activeClassId}`, incomingCardsStr);
+            }
+
+            const roomPickedIds = targetRoom.pickedIds || classData.pickedIds || [];
+            const incomingRoomPickedStr = JSON.stringify(roomPickedIds);
+            if (incomingRoomPickedStr !== lastPickedStrRef.current) {
+              lastPickedStrRef.current = incomingRoomPickedStr;
+              setPickedIds(roomPickedIds);
+              localStorage.setItem(`picked_students_class_${activeClassId}`, incomingRoomPickedStr);
+            }
           }
         }
       }
@@ -1085,6 +1259,18 @@ export default function App() {
         activeCardStateRef.current = classData.activeCardState;
         setActiveCardState(classData.activeCardState);
       }
+
+      // Update ref to prevent infinite loop feedback
+      lastSyncedQuizRef.current = {
+        activeCardId: classData.activeCardId || null,
+        activeRoomId: classData.activeRoomId || null,
+        activeTab: classData.activeTab || 'wheel',
+        activeCardState: classData.activeCardState || 'answering',
+        activeCardIdOfCard: classData.activeCard?.id || null,
+        activeSubjectId: classData.activeSubjectId || null,
+        subjectsStr: JSON.stringify(classData.subjects || []),
+        pickedIdsStr: JSON.stringify(classData.pickedIds || []),
+      };
     }, (err) => {
       console.warn("Notice: Real-time class snapshot error:", err);
     });
@@ -1094,30 +1280,62 @@ export default function App() {
     };
   }, [activeClassId, teacher?.id]);
 
-  // Sync active quiz state to Class document in Firestore for student phones
+  // Sync active quiz presentation state to Class document in Firestore for student phones
   useEffect(() => {
-    if (!activeClassId || !teacher?.id) return;
+    if (!activeClassId || !teacher?.id || isQuotaExceeded()) return;
     const currentTeacherId = teacher.id;
 
-    const syncClassInfo = async () => {
+    const currentActiveCard = cards.find(c => c.id === activeCardId) || null;
+
+    // If a card is selected but its details are not loaded in the `cards` array yet,
+    // wait for the cards list to hydrate first instead of clearing activeCard on Firestore.
+    if (activeCardId && !currentActiveCard) {
+      return;
+    }
+
+    // Prevent loop: If what we want to sync is exactly what was last synced/received, skip the write!
+    if (
+      lastSyncedQuizRef.current.activeCardId === activeCardId &&
+      lastSyncedQuizRef.current.activeRoomId === activeRoomId &&
+      lastSyncedQuizRef.current.activeTab === activeTab &&
+      lastSyncedQuizRef.current.activeCardState === activeCardState &&
+      lastSyncedQuizRef.current.activeCardIdOfCard === (currentActiveCard?.id || null) &&
+      lastSyncedQuizRef.current.activeSubjectId === activeSubjectId
+    ) {
+      return;
+    }
+
+    // Debounce: Wait 1.5 seconds of user stillness before syncing presentation state to Firestore
+    const timer = setTimeout(async () => {
+      if (isQuotaExceeded()) return;
+
+      lastSyncedQuizRef.current = {
+        ...lastSyncedQuizRef.current,
+        activeCardId: activeCardId || null,
+        activeRoomId: activeRoomId || null,
+        activeTab: activeTab,
+        activeCardState: activeCardState,
+        activeCardIdOfCard: currentActiveCard?.id || null,
+        activeSubjectId: activeSubjectId,
+      };
+
       try {
         const classDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId);
-        const currentActiveCard = cards.find(c => c.id === activeCardId) || null;
-        
         await safeSetDoc(classDocRef, {
           activeCardId: activeCardId,
           activeRoomId: activeRoomId,
           activeTab: activeTab,
           activeCardState: activeCardState,
-          activeCard: currentActiveCard
+          activeCard: currentActiveCard,
+          activeSubjectId: activeSubjectId,
         }, { merge: true });
       } catch (err) {
-        console.error("Failed to sync active state to Firestore:", err);
+        console.error("Failed to sync active presentation state to Firestore:", err);
       }
-    };
+    }, 1500);
 
-    syncClassInfo();
-  }, [activeClassId, activeCardId, activeRoomId, activeTab, activeCardState, teacher, cards]);
+    return () => clearTimeout(timer);
+  }, [activeClassId, activeCardId, activeRoomId, activeTab, activeCardState, activeSubjectId, teacher?.id, cards]);
 
   // Save changes to localStorage on states update as fallback for offline use and fast initial load
   useEffect(() => {
@@ -1276,24 +1494,12 @@ export default function App() {
     localStorage.setItem(`active_subject_id_${activeClassId}`, currentSubId);
     localStorage.setItem(`active_room_id_${activeClassId}`, currentRoomId);
 
-    const currentTeacherId = teacher?.id || 'local';
-    try {
-      await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
-        subjects: updatedSubjects,
-        chapters: updatedChapters, // backward compatibility
-        activeRoomId: currentRoomId,
-        activeSubjectId: currentSubId,
-        cards: updatedCards,
-        pickedIds: updatedPickedIds
-      }, { merge: true });
-    } catch (err) {
-      console.error('Failed to save class metadata to cloud:', err);
-    }
+    // Redundant cloud write removed - syncClassInfo effect handles this throttled.
   }, [teacher, activeClassId, activeRoomId, chapters, subjects, activeSubjectId]);
 
   // Helper to save student score updates to Firestore
   const saveStudentScore = useCallback(async (studentId: string, newScore: number) => {
-    const currentTeacherId = teacher?.id || 'local';
+    const currentTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
     if (activeClassId) {
       try {
         await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId), {
@@ -1310,7 +1516,10 @@ export default function App() {
     setPickedIds(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       
-      const currentTeacherId = teacher?.id || 'local';
+      // Dirty check to avoid redundant Firestore writes
+      if (JSON.stringify(next) === JSON.stringify(prev)) return prev;
+      
+      const currentTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
       if (activeClassId && activeRoomId && activeSubjectId) {
         const updatedChapters = chapters.map(ch => {
           const updatedRooms = ch.rooms.map(r => {
@@ -1335,15 +1544,7 @@ export default function App() {
           return sub;
         });
 
-        safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
-          subjects: updatedSubjects,
-          chapters: updatedChapters,
-          activeRoomId: activeRoomId,
-          activeSubjectId: activeSubjectId,
-          pickedIds: next
-        }, { merge: true }).catch(err => {
-          console.error('Failed to sync pickedIds on updates in cloud:', err);
-        });
+        setSubjects(updatedSubjects);
       }
       return next;
     });
@@ -1352,7 +1553,7 @@ export default function App() {
   // Helper to award date-based activity points (5 points) into monthlyScores and total score
   const awardStudentActivityPoints = useCallback((studentId: string, points: number = 5) => {
     let targetStudent: Student | null = null;
-    const currentTeacherId = teacher?.id || 'local';
+    const currentTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
 
     setStudents(prev => {
       const student = prev.find(s => s.id === studentId);
@@ -1380,7 +1581,7 @@ export default function App() {
   // Helper to set exact activity score directly for a student
   const handleSetExactActivityScore = useCallback((studentId: string, exactScore: number) => {
     let targetStudent: Student | null = null;
-    const currentTeacherId = teacher?.id || 'local';
+    const currentTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
 
     setStudents(prev => {
       const student = prev.find(s => s.id === studentId);
@@ -1407,7 +1608,7 @@ export default function App() {
 
   // Helper to award group work points directly to students (adds to monthlyScores.groupWork)
   const awardStudentGroupWorkPoints = useCallback((studentIds: string[], points: number) => {
-    const currentTeacherId = teacher?.id || 'local';
+    const currentTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
     const updatedStudentsList: Student[] = [];
 
     setStudents(prev => {
@@ -1455,6 +1656,172 @@ export default function App() {
       return next;
     });
   }, [activeClassId]);
+
+  // Fullscreen toggle with fallback
+  const toggleFullscreen = useCallback(() => {
+    try {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen().catch(() => {});
+        showToast('បានបើកអេក្រង់ពេញ (Fullscreen)');
+      } else {
+        if (document.exitFullscreen) {
+          document.exitFullscreen().catch(() => {});
+          showToast('បានចាកចេញពីអេក្រង់ពេញ');
+        }
+      }
+    } catch {}
+  }, [showToast]);
+
+  // Sound Mute toggle
+  const toggleSound = useCallback(() => {
+    const next = !soundOn;
+    setSoundOn(next);
+    setSoundEnabled(next);
+    if (next) {
+      playChimeSound();
+      showToast('បានបើកសំឡេង 🔔');
+    } else {
+      showToast('បានបិទសំឡេង 🔕');
+    }
+  }, [soundOn, showToast]);
+
+  // Listen to browser fullscreen change event
+  useEffect(() => {
+    const handleFsChange = () => {
+      setIsFullscreen(!!document.fullscreenElement);
+    };
+    document.addEventListener('fullscreenchange', handleFsChange);
+    return () => document.removeEventListener('fullscreenchange', handleFsChange);
+  }, []);
+
+  // Global Keyboard Shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const activeEl = document.activeElement;
+      const isInput = activeEl && (
+        activeEl.tagName === 'INPUT' ||
+        activeEl.tagName === 'TEXTAREA' ||
+        activeEl.tagName === 'SELECT' ||
+        (activeEl as HTMLElement).isContentEditable
+      );
+      if (isInput) return;
+
+      if (e.code === 'Space') {
+        if (activeTab === 'wheel') {
+          e.preventDefault();
+          const spinBtn = document.querySelector('button[title*="បង្វិល"]') as HTMLButtonElement | null;
+          if (spinBtn) {
+            spinBtn.click();
+          }
+        }
+      } else if (e.key === 'f' || e.key === 'F') {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          toggleFullscreen();
+        }
+      } else if (e.key === 'm' || e.key === 'M') {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+          e.preventDefault();
+          toggleSound();
+        }
+      } else if (e.key === 'r' || e.key === 'R') {
+        if (!e.ctrlKey && !e.metaKey && !e.altKey && activeTab === 'wheel') {
+          e.preventDefault();
+          handleSetPickedIds([]);
+          setManualCalledIds([]);
+          if (activeClassId) {
+            localStorage.removeItem(`manual_called_students_class_${activeClassId}`);
+          }
+          showToast('បានសម្អាតការហៅឈ្មោះឡើងវិញ!');
+        }
+      } else if (e.key === '?') {
+        e.preventDefault();
+        setIsShortcutsModalOpen(prev => !prev);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activeTab, toggleFullscreen, toggleSound, showToast, activeClassId, handleSetPickedIds]);
+
+  // Full 100% Comprehensive Data Restore handler
+  const handleRestoreFullData = useCallback(async (backup: any) => {
+    if (!backup || typeof backup !== 'object') return;
+    
+    // 1. Restore storageDump into localStorage first if present
+    if (backup.storageDump && typeof backup.storageDump === 'object') {
+      try {
+        for (const [k, v] of Object.entries(backup.storageDump)) {
+          if (typeof v === 'string') {
+            localStorage.setItem(k, v);
+          } else {
+            localStorage.setItem(k, JSON.stringify(v));
+          }
+        }
+      } catch (e) {
+        console.error('Storage dump restore error:', e);
+      }
+    }
+
+    const currentTeacherId = teacher?.id || backup.teacher?.id;
+
+    // 2. Restore Classes
+    if (Array.isArray(backup.classes) && backup.classes.length > 0) {
+      const restoredClasses = sortClasses(backup.classes);
+      setClasses(restoredClasses);
+      if (currentTeacherId) {
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(restoredClasses));
+      }
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(restoredClasses));
+      
+      if (currentTeacherId) {
+        // Sync to cloud
+        for (const cls of restoredClasses) {
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', cls.id), {
+            id: cls.id,
+            name: cls.name,
+            order: cls.order,
+            isPinned: !!cls.isPinned,
+            updatedAt: Date.now()
+          }, { merge: true }).catch(() => {});
+        }
+      }
+    }
+
+    // 3. Restore Students
+    if (Array.isArray(backup.students) && backup.students.length > 0) {
+      setStudents(backup.students);
+      if (currentTeacherId) {
+        for (const std of backup.students) {
+          const targetClassId = std.classId || backup.activeClassId || (backup.classes?.[0]?.id) || 'default';
+          safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetClassId, 'students', std.id), std, { merge: true }).catch(() => {});
+        }
+      }
+    }
+
+    // 4. Restore Subjects & Chapters & Cards
+    if (Array.isArray(backup.subjects)) {
+      setSubjects(backup.subjects);
+    }
+    if (Array.isArray(backup.chapters)) {
+      setChapters(backup.chapters);
+    }
+    if (Array.isArray(backup.cards)) {
+      setCards(backup.cards);
+    }
+
+    // 5. Restore Active Class Target
+    const targetClassId = backup.activeClassId || (backup.classes && backup.classes[0]?.id) || activeClassId;
+    if (targetClassId) {
+      setActiveClassId(targetClassId);
+      if (currentTeacherId) {
+        localStorage.setItem(`khmer_teacher_active_class_id_${currentTeacherId}`, targetClassId);
+      }
+      localStorage.setItem('khmer_teacher_active_class_id', targetClassId);
+    }
+
+    showToast('🎉 បានស្ដារទិន្នន័យទាំងអស់ត្រឡប់មកវិញ ១០០%!');
+  }, [teacher, activeClassId, showToast]);
 
   const handleSelectRoom = useCallback((roomId: string) => {
     setActiveRoomId(roomId);
@@ -2268,61 +2635,64 @@ export default function App() {
 
   const handleRemoveClass = async (e: React.MouseEvent, classId: string, className: string) => {
     e.stopPropagation(); // prevent switching to it
-    if (classes.length <= 1) {
-      confirmAction({
-        title: 'មិនអាចលុបបានទេ',
-        message: 'ត្រូវតែមានថ្នាក់រៀនយ៉ាងហោចណាស់មួយនៅក្នុងប្រព័ន្ធ!',
-        confirmText: 'យល់ព្រម',
-        variant: 'warning',
-        onConfirm: () => {}
-      });
-      return;
-    }
 
     confirmAction({
-      title: 'លុបថ្នាក់ទី',
-      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបថ្នាក់ទី «${className}» នេះចោលមែនទេ? រាល់បញ្ជីឈ្មោះសិស្ស និងកាតសំណួរទាំងអស់ក្នុងថ្នាក់នេះនឹងត្រូវបាត់បង់ទាំងស្រុង។`,
+      title: 'លុបថ្នាក់រៀន',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបថ្នាក់ «${className}» នេះចោលមែនទេ? រាល់បញ្ជីឈ្មោះសិស្ស និងសំណួរទាំងអស់ក្នុងថ្នាក់នេះនឹងត្រូវលុបចេញទាំងស្រុង។`,
       confirmText: 'បាទ/ចាស លុបថ្នាក់',
       variant: 'danger',
       onConfirm: async () => {
         const updatedClasses = classes.filter(c => c.id !== classId);
-        
-        const currentTeacherId = teacher?.id || 'local';
-        const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
-        const deletedClassesStr = localStorage.getItem(deletedKey);
-        let deletedSet = new Set<string>();
-        if (deletedClassesStr) {
-          try {
-            deletedSet = new Set<string>(JSON.parse(deletedClassesStr));
-          } catch {}
-        }
-        deletedSet.add(classId);
-        localStorage.setItem(deletedKey, JSON.stringify(Array.from(deletedSet)));
-
-        try {
-          await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
-        } catch (err) {
-          console.error(err);
-        }
-        
         const sortedClasses = sortClasses(updatedClasses);
         setClasses(sortedClasses);
+
+        // 1. Delete from Firestore if teacher is logged in
+        if (teacher?.id) {
+          try {
+            await safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
+          } catch (err) {
+            console.error('Failed to delete class from Firestore:', err);
+          }
+        }
+
+        // 2. Update localStorage strictly for this teacher
         if (teacher) {
           localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
+          if (sortedClasses.length === 0) {
+            localStorage.removeItem(`khmer_teacher_active_class_id_${teacher.id}`);
+          }
+        } else {
+          localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
+          if (sortedClasses.length === 0) {
+            localStorage.removeItem('khmer_teacher_active_class_id');
+          }
         }
-        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
 
+        // 3. Clear all cached class data from localStorage
         localStorage.removeItem(`students_class_${classId}`);
         localStorage.removeItem(`quiz_cards_class_${classId}`);
         localStorage.removeItem(`picked_students_class_${classId}`);
+        localStorage.removeItem(`manual_called_students_class_${classId}`);
         localStorage.removeItem(`subjects_class_${classId}`);
         localStorage.removeItem(`chapters_class_${classId}`);
         localStorage.removeItem(`active_subject_id_${classId}`);
         localStorage.removeItem(`active_room_id_${classId}`);
         
+        // 4. Handle active class switch
         if (activeClassId === classId) {
-          handleSwitchClass(sortedClasses[0].id);
+          if (sortedClasses.length > 0) {
+            handleSwitchClass(sortedClasses[0].id);
+          } else {
+            setActiveClassId('');
+            setStudents([]);
+            setCards([]);
+            setSubjects([]);
+            setChapters([]);
+            setPickedIds([]);
+            setManualCalledIds([]);
+          }
         }
+        showToast(`បានលុបថ្នាក់ «${className}» ដោយជោគជ័យ`);
       }
     });
   };
@@ -2529,7 +2899,7 @@ export default function App() {
 
   const updateStudentDetail = useCallback(async (id: string, fields: Partial<Student>) => {
     let updatedStudent: Student | null = null;
-    const currentTeacherId = teacher?.id || 'local';
+    const currentTeacherId = teacher?.id || DEFAULT_CLOUD_TEACHER.id;
     
     setStudents(prev => {
       const studentToUpdate = prev.find(s => s.id === id);
@@ -2655,7 +3025,11 @@ export default function App() {
   const handleUpdateCards = useCallback((updatedCards: QuizCard[]) => {
     setCards(updatedCards);
     if (activeClassId) {
-      localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(updatedCards));
+      if (updatedCards.length === 0) {
+        localStorage.removeItem(`quiz_cards_class_${activeClassId}`);
+      } else {
+        localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(updatedCards));
+      }
     }
     saveClassMetadata(updatedCards, pickedIds);
   }, [activeClassId, pickedIds, saveClassMetadata]);
@@ -2735,10 +3109,13 @@ export default function App() {
         setCards([]);
         setSelectedStudentId(null);
         setPickedIds([]);
+        setManualCalledIds([]);
+        setSubjects([]);
+        setChapters([]);
         setActiveCardId(null);
         setTeacher(null);
-        setClasses(DEFAULT_CLASSES);
-        setActiveClassId('class-7a');
+        setClasses([]);
+        setActiveClassId('');
       }
     });
   }, [confirmAction]);
@@ -2757,30 +3134,44 @@ export default function App() {
     // Also clear active teacher's selected class ID in memory & offline caches
     if (teacher) {
       localStorage.removeItem(`khmer_teacher_active_class_id_${teacher.id}`);
+      localStorage.removeItem(`khmer_teacher_classes_${teacher.id}`);
     }
     localStorage.removeItem('khmer_teacher_active_class_id');
     localStorage.removeItem('khmer_teacher_classes');
 
     // Clear all cached students/cards/pickedIds in localstorage for a clean slate
-    const keysToClear = [];
+    const keysToClear: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('students_class_') || key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_') || key.startsWith('manual_called_students_class_'))) {
+      if (key && (
+        key.startsWith('students_class_') || 
+        key.startsWith('quiz_cards_class_') || 
+        key.startsWith('picked_students_class_') || 
+        key.startsWith('manual_called_students_class_') ||
+        key.startsWith('subjects_class_') ||
+        key.startsWith('chapters_class_') ||
+        key.startsWith('active_subject_id_') ||
+        key.startsWith('active_room_id_') ||
+        key.startsWith('khmer_teacher_deleted_classes_')
+      )) {
         keysToClear.push(key);
       }
     }
     keysToClear.forEach(k => localStorage.removeItem(k));
 
-    // Reset application states back to fresh template
+    // Reset application states back to fresh empty state
     setTeacher(null);
-    setClasses(DEFAULT_CLASSES);
-    setActiveClassId('class-7a');
+    setClasses([]);
+    setActiveClassId('');
     setStudents([]);
     setCards([]);
+    setSubjects([]);
+    setChapters([]);
     setPickedIds([]);
     setManualCalledIds([]);
     setSelectedStudentId(null);
     setActiveCardId(null);
+    showToast('បានចាកចេញពីគណនី (Logged Out)');
   };
 
   const activeClass = classes.find(c => c.id === activeClassId) || null;
@@ -2803,11 +3194,32 @@ export default function App() {
   const selectedStudent = currentClassStudents.find(s => s.id === selectedStudentId) || null;
   const activeCard = cards.find(c => c.id === activeCardId) || null;
 
+  const pendingApprovalStudents = React.useMemo(() => {
+    return currentClassStudents.filter(s => s.isApproved === false);
+  }, [currentClassStudents]);
+  const pendingStudentsCount = pendingApprovalStudents.length;
+
+  const handleApproveAllPending = async () => {
+    const currentTeacherId = teacher?.id || 'local';
+    if (!activeClassId) return;
+    try {
+      await Promise.all(
+        pendingApprovalStudents.map(student => {
+          const studentDocRef = doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', student.id);
+          return safeSetDoc(studentDocRef, { isApproved: true }, { merge: true });
+        })
+      );
+      showToast(`បានអនុញ្ញាតសិស្សចំនួន ${pendingStudentsCount} នាក់ចូលរួម`);
+    } catch (err) {
+      console.error("Approve all pending failed:", err);
+    }
+  };
+
   return (
-    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
+    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#222222] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
       {/* Header */}
       <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
-        isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
+        isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-gradient-to-r from-sky-50/70 via-white to-purple-50/70 border-slate-200/80 shadow-xs'
       }`}>
         <div 
           onClick={() => setActiveTab('wheel')}
@@ -2815,7 +3227,15 @@ export default function App() {
           title="ត្រឡប់ទៅទំព័រដើម (Home)"
         >
           <div className="w-11 h-11 flex items-center justify-center relative drop-shadow-xs">
-            <SovannaphumiLogo className="w-11 h-11" />
+            {teacher?.schoolLogoUrl ? (
+              <img 
+                src={teacher.schoolLogoUrl} 
+                alt="School Logo" 
+                className="w-11 h-11 object-contain rounded-xl select-none" 
+              />
+            ) : (
+              <SovannaphumiLogo className="w-11 h-11" />
+            )}
           </div>
           <div>
             <div className="flex items-center gap-2">
@@ -2832,22 +3252,23 @@ export default function App() {
           </div>
         </div>
 
-        {/* Dynamic Telegram iOS Liquid Glass Water Droplet Navigation Tabs */}
+        {/* Dynamic Soft Light Pastel iOS Glass Navigation Tabs */}
         <nav className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
           isDarkMode 
-            ? 'bg-slate-900/80 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4),0_8px_30px_rgba(0,0,0,0.4)]' 
-            : 'bg-slate-200/60 border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(0,0,0,0.04)]'
+            ? 'bg-[#18181c]/90 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.6)]' 
+            : 'bg-gradient-to-r from-sky-50/90 via-indigo-50/80 to-purple-50/90 border-white/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.8)]'
         }`}>
           {[
-            { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass },
-            { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon },
-            { id: 'students', label: 'គ្រប់គ្រងសិស្ស', icon: UserCog },
-            { id: 'quiz', label: 'ក្ដារសំណួរ', icon: LayoutGrid },
-            { id: 'exams-room', label: 'បន្ទប់វិញ្ញាសា', icon: GraduationCap },
-            { id: 'student-lobby', label: 'Live Game QR', icon: Sparkles, badge: true },
+            { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass, activeBgLight: 'from-sky-100/95 via-blue-50/95 to-sky-100/95', textLight: 'text-sky-700', activeTextLight: 'text-sky-800' },
+            { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon, activeBgLight: 'from-emerald-100/95 via-teal-50/95 to-emerald-100/95', textLight: 'text-emerald-700', activeTextLight: 'text-emerald-800' },
+            { id: 'students', label: 'គ្រប់គ្រងសិស្ស', icon: UserCog, activeBgLight: 'from-violet-100/95 via-purple-50/95 to-violet-100/95', textLight: 'text-purple-700', activeTextLight: 'text-purple-800' },
+            { id: 'quiz', label: 'ក្ដារសំណួរ', icon: LayoutGrid, activeBgLight: 'from-amber-100/95 via-orange-50/95 to-amber-100/95', textLight: 'text-amber-700', activeTextLight: 'text-amber-800' },
+            { id: 'exams-room', label: 'បន្ទប់វិញ្ញាសា', icon: GraduationCap, activeBgLight: 'from-indigo-100/95 via-blue-50/95 to-indigo-100/95', textLight: 'text-indigo-700', activeTextLight: 'text-indigo-800' },
+            { id: 'student-lobby', label: 'Study game', icon: Sparkles, badge: true, activeBgLight: 'from-rose-100/95 via-pink-50/95 to-rose-100/95', textLight: 'text-rose-700', activeTextLight: 'text-rose-800' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
+            const isStudyGame = tab.id === 'student-lobby';
 
             return (
               <motion.button
@@ -2858,8 +3279,8 @@ export default function App() {
                 transition={{ type: "spring", stiffness: 500, damping: 20 }}
                 className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
                   isActive
-                    ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-extrabold'
-                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                    ? isDarkMode ? 'text-blue-400 font-extrabold' : `${tab.activeTextLight} font-black`
+                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : `${tab.textLight} hover:bg-white/70`
                 }`}
               >
                 {isActive && (
@@ -2874,24 +3295,24 @@ export default function App() {
                     className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
                       isDarkMode
                         ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
-                        : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                        : `bg-gradient-to-r ${tab.activeBgLight} border-white/95 shadow-[0_6px_20px_rgba(0,0,0,0.06),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]`
                     }`}
                   >
-                    {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                    {/* Top Specular Glare Dome Reflection */}
                     <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
                       isDarkMode 
                         ? 'from-white/50 via-white/12 to-transparent' 
                         : 'from-white/95 via-white/40 to-transparent'
                     }`} />
 
-                    {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                    {/* Central Radial Light Core */}
                     <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
                       isDarkMode
                         ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
                         : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
                     }`} />
 
-                    {/* Bottom Droplet Meniscus Light Rim (គែមពន្លឺបាតតំណក់ទឹកថ្លា) */}
+                    {/* Bottom Droplet Meniscus Light Rim */}
                     <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
                       isDarkMode ? 'via-white/50' : 'via-white/90'
                     }`} />
@@ -2908,22 +3329,27 @@ export default function App() {
                 >
                   <Icon className={`w-4 h-4 transition-all duration-300 ${
                     isActive
-                      ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-blue-600 scale-110 drop-shadow-xs'
+                      ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : `${tab.activeTextLight} scale-110 drop-shadow-xs`
                       : isDarkMode ? 'text-slate-400' : 'text-slate-500'
                   } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
                   <span className={
                     isActive 
                       ? isDarkMode 
                         ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
-                        : 'text-blue-600 font-extrabold tracking-wide' 
+                        : `${tab.activeTextLight} font-black tracking-wide` 
                       : 'font-bold'
                   }>{tab.label}</span>
-                  {tab.badge && (
-                    <span className="flex h-2 w-2 relative ml-0.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-red-500"></span>
+                  
+                  {isStudyGame && pendingStudentsCount > 0 ? (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce shadow-xs">
+                      +{pendingStudentsCount}
                     </span>
-                  )}
+                  ) : tab.badge ? (
+                    <span className="flex h-2 w-2 relative ml-0.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                    </span>
+                  ) : null}
                 </motion.span>
               </motion.button>
             );
@@ -2931,7 +3357,7 @@ export default function App() {
         </nav>
 
         {/* Action and Profile Controls */}
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 shrink-0">
           {/* Active Teacher Profile Area */}
           {teacher ? (
             <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
@@ -3019,53 +3445,94 @@ export default function App() {
 
           <div className={`h-6 w-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-0.5`} />
 
-          {/* Theme Switcher */}
+          {/* Sound Toggle */}
           <button
-            onClick={() => setIsDarkMode(!isDarkMode)}
+            onClick={toggleSound}
             className={`p-2 rounded-xl transition-all cursor-pointer ${
-              isDarkMode ? 'text-amber-400 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100'
+              !soundOn
+                ? 'text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50'
+                : (isDarkMode ? 'text-emerald-400 hover:bg-slate-800' : 'text-emerald-600 hover:bg-slate-100')
             }`}
-            title={isDarkMode ? 'ប្ដូរទៅមុខងារពន្លឺ (Light)' : 'ប្ដូរទៅមុខងារងងឹត (Dark)'}
+            title={soundOn ? 'បិទសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'បើកសំឡេងហ្គេម (គ្រាប់ចុច M)'}
           >
-            {isDarkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
+            {soundOn ? <Volume2 className="w-4.5 h-4.5" /> : <VolumeX className="w-4.5 h-4.5" />}
           </button>
 
-          {/* Reset All */}
+          {/* Fullscreen Mode */}
           <button
-            onClick={resetAll}
+            onClick={toggleFullscreen}
             className={`p-2 rounded-xl transition-all cursor-pointer ${
-              isDarkMode ? 'text-slate-400 hover:text-red-400 hover:bg-red-500/10' : 'text-slate-500 hover:text-red-600 hover:bg-red-50'
+              isFullscreen
+                ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400'
+                : (isDarkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
             }`}
-            title="កំណត់កម្មវិធីឡើងវិញ (Reset All)"
+            title={isFullscreen ? 'ចាកចេញពីអេក្រង់ពេញ (គ្រាប់ចុច F)' : 'ពង្រីកពេញអេក្រង់សម្រាប់ Projector/TV (គ្រាប់ចុច F)'}
           >
-            <RotateCcw className="w-4.5 h-4.5" />
+            {isFullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
           </button>
 
-          {/* Create Questions Button with Cloud Status at bottom right */}
-          <div className="flex flex-col items-end gap-0.5 shrink-0">
-            <button
-              onClick={() => setIsLessonModalOpen(true)}
-              className="px-4 py-2 btn-orange-gemini text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow-md shadow-orange-500/20 group cursor-pointer select-none"
-            >
-              <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform" />
-              <span className="hidden sm:inline">បង្កើតសំណួរ AI</span>
-            </button>
+          {/* iOS Settings & 100% Backup Menu Button (Icon Only) */}
+          <button
+            onClick={() => setIsSettingsDrawerOpen(true)}
+            className={`p-2 rounded-xl transition-all cursor-pointer shadow-xs select-none active:scale-95 border group ${
+              isDarkMode 
+                ? 'bg-gradient-to-tr from-blue-900/50 via-indigo-900/50 to-blue-950/50 hover:from-blue-800/80 hover:to-indigo-800/80 text-blue-300 border-blue-400/30 hover:border-blue-400/60 shadow-blue-500/10' 
+                : 'bg-gradient-to-tr from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-600 border-blue-200 hover:border-blue-300 shadow-blue-500/10'
+            }`}
+            title="ការកំណត់ & បម្រុងទុកទិន្នន័យ ១០០% (Settings & 100% Full Backup Menu)"
+            aria-label="Settings & Backup"
+          >
+            <Settings className="w-4.5 h-4.5 text-blue-500 group-hover:rotate-90 transition-transform duration-300" />
+          </button>
 
-            {/* Cloud Sync Status - very small at bottom right */}
-            <div 
-              title={teacher ? `បានភ្ជាប់គណនី ${teacher.username} ទៅកាន់ Cloud Firestore` : 'ទិន្នន័យរក្សាទុកក្នុង Local និងត្រៀម Sync ទៅកាន់ Cloud'}
-              className="inline-flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-bold text-[9px] bg-emerald-50/90 dark:bg-emerald-950/50 px-1.5 py-0.5 rounded border border-emerald-200/60 dark:border-emerald-800/40 select-none shadow-2xs leading-none mr-0.5"
-            >
-              <Cloud className={`w-2.5 h-2.5 ${loadingCloudData ? 'animate-pulse text-indigo-500' : 'text-emerald-500'}`} />
-              <span>{loadingCloudData ? 'Syncing...' : 'Cloud'}</span>
-            </div>
+          {/* Cloud Sync Status Indicator */}
+          <div 
+            title={quotaExceeded ? 'កូតា Cloud ដល់កម្រិតកំណត់ - កំពុងដំណើរការក្នុង Offline Local Mode ដោយសុវត្ថិភាព' : (teacher ? `បានភ្ជាប់គណនី ${teacher.username} ទៅកាន់ Cloud Firestore` : 'ទិន្នន័យរក្សាទុកក្នុង Local និងត្រៀម Sync ទៅកាន់ Cloud')}
+            className={`inline-flex items-center gap-1 font-bold text-[9.5px] px-2 py-1 rounded-xl border select-none shadow-2xs leading-none ${
+              quotaExceeded 
+                ? 'text-amber-600 dark:text-amber-400 bg-amber-50/90 dark:bg-amber-950/50 border-amber-200/60 dark:border-amber-800/40' 
+                : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-200/60 dark:border-emerald-800/40'
+            }`}
+          >
+            <Cloud className={`w-3 h-3 ${quotaExceeded ? 'text-amber-500' : (loadingCloudData ? 'animate-pulse text-indigo-500' : 'text-emerald-500')}`} />
+            <span className="hidden sm:inline">{quotaExceeded ? 'Offline' : (loadingCloudData ? 'Syncing...' : 'Cloud')}</span>
           </div>
         </div>
       </header>
 
+      {/* Firestore Quota Exceeded / Offline Notice Banner */}
+      {quotaExceeded && !quotaBannerDismissed && (
+        <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between text-xs text-amber-800 dark:text-amber-200 z-10 shrink-0">
+          <div className="flex items-center gap-2 flex-1 min-w-0 pr-3">
+            <span className="shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white font-bold text-[10px]">!</span>
+            <div className="truncate">
+              <span className="font-semibold">ម៉ូដក្រៅបណ្ដាញ (Offline Mode)៖</span>{' '}
+              <span>កូតាឥតគិតថ្លៃប្រចាំថ្ងៃរបស់ Firestore បានដល់កម្រិតកំណត់។ ទិន្នន័យត្រូវបានរក្សាទុកក្នុងម៉ាស៊ីននេះដោយសុវត្ថិភាព ហើយកូតានឹង reset នៅថ្ងៃស្អែក។</span>
+            </div>
+          </div>
+          <div className="flex items-center gap-2 shrink-0">
+            <a
+              href="https://console.firebase.google.com/project/elevated-timer-s8gvj/firestore/databases/ai-studio-b727153d-b991-4d5d-b685-54aeb74f5665/data?openUpgradeDialog=true"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded text-[11px] transition-colors whitespace-nowrap"
+            >
+              ដំឡើងគម្រោង (Upgrade)
+            </a>
+            <button
+              onClick={() => setQuotaBannerDismissed(true)}
+              className="p-1 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-colors"
+              title="បិទ (Dismiss)"
+            >
+              ✕
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Class Switcher & Workspace Sub-Bar */}
       <div className={`py-2.5 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b transition-colors gap-4 overflow-x-auto ${
-        isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50/90 border-slate-200'
+        isDarkMode ? 'bg-[#222222]/95 border-[#333333]' : 'bg-slate-50/90 border-slate-200'
       }`}>
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5 mr-1 text-slate-500 dark:text-slate-400 font-bold text-xs">
@@ -3288,14 +3755,24 @@ export default function App() {
             }))}
 
             {teacher && (
-              <button
-                onClick={handleOpenAddClass}
-                className="px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
-                title="បន្ថែមថ្នាក់ថ្មី"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span>បន្ថែមថ្នាក់</span>
-              </button>
+              <div className="flex items-center gap-1.5 shrink-0">
+                <button
+                  onClick={handleOpenAddClass}
+                  className="px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
+                  title="បន្ថែមថ្នាក់ថ្មី"
+                >
+                  <Plus className="w-3.5 h-3.5" />
+                  <span>បន្ថែមថ្នាក់</span>
+                </button>
+                <button
+                  onClick={() => setIsBackupModalOpen(true)}
+                  className="px-2.5 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
+                  title="បម្រុងទុក និងស្ដារទិន្នន័យ (Backup / Restore)"
+                >
+                  <Database className="w-3.5 h-3.5 text-emerald-500" />
+                  <span className="hidden sm:inline">Backup</span>
+                </button>
+              </div>
             )}
           </div>
         </div>
@@ -3343,7 +3820,7 @@ export default function App() {
       <main className="flex-1 flex overflow-hidden">
         {activeTab === 'wheel' && (
           <>
-            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
+            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#222222]">
               <SpinningWheel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
@@ -3364,7 +3841,7 @@ export default function App() {
               />
             </section>
             
-            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-slate-800">
+            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-[#333333]">
               <StudentPanel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
@@ -3388,9 +3865,9 @@ export default function App() {
 
         {activeTab === 'quiz' && (
           <>
-            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
+            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#222222]">
               {/* Quick Switcher between Spinning Wheel (Image 1 - Default) and Student List (Image 3) */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-700 dark:text-slate-200">
                     {quizLeftView === 'wheel' ? 'កងបង្វិលសិស្ស' : 'បញ្ជីឈ្មោះសិស្ស'}
@@ -3505,6 +3982,7 @@ export default function App() {
                 onCreateSubject={handleCreateSubject}
                 onRenameSubject={handleRenameSubject}
                 onDeleteSubject={handleDeleteSubject}
+                onOpenLessonModal={() => setIsLessonModalOpen(true)}
               />
             </section>
           </>
@@ -3670,6 +4148,74 @@ export default function App() {
               </div>
             </motion.div>
           </div>
+        )}
+      </AnimatePresence>
+
+      {/* iOS Settings & Menu Drawer (Slide Right-to-Left Blue Glass) */}
+      <SettingsMenuDrawer
+        isOpen={isSettingsDrawerOpen}
+        onClose={() => setIsSettingsDrawerOpen(false)}
+        isDarkMode={isDarkMode}
+        onToggleDarkMode={() => setIsDarkMode(!isDarkMode)}
+        soundOn={soundOn}
+        onToggleSound={toggleSound}
+        isFullscreen={isFullscreen}
+        onToggleFullscreen={toggleFullscreen}
+        onOpenShortcuts={() => setIsShortcutsModalOpen(true)}
+        onOpenLessonModal={() => setIsLessonModalOpen(true)}
+        onResetAll={resetAll}
+        teacher={teacher}
+        onOpenAuth={(mode) => {
+          setAuthModalMode(mode);
+          setIsAuthModalOpen(true);
+        }}
+        onLogout={() => setIsLogoutModalOpen(true)}
+        onOpenProfile={() => setIsProfileModalOpen(true)}
+        classes={classes}
+        students={students}
+        subjects={subjects}
+        cards={cards}
+        chapters={chapters}
+        activeClassId={activeClassId}
+        onRestoreFullData={handleRestoreFullData}
+        onShowToast={showToast}
+      />
+
+      {/* Backup & Restore Modal */}
+      <BackupRestoreModal
+        isOpen={isBackupModalOpen}
+        onClose={() => setIsBackupModalOpen(false)}
+        classes={classes}
+        students={students}
+        subjects={subjects}
+        cards={cards}
+        chapters={chapters}
+        activeClassId={activeClassId}
+        teacher={teacher}
+        onRestoreData={handleRestoreFullData}
+        onShowToast={showToast}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Keyboard Shortcuts Guide Modal */}
+      <ShortcutsHelpModal
+        isOpen={isShortcutsModalOpen}
+        onClose={() => setIsShortcutsModalOpen(false)}
+        isDarkMode={isDarkMode}
+      />
+
+      {/* Floating Toast Notification */}
+      <AnimatePresence>
+        {toastMessage && (
+          <motion.div
+            initial={{ opacity: 0, y: 30, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, scale: 1 }}
+            exit={{ opacity: 0, y: 20, scale: 0.9 }}
+            className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 px-4 py-2.5 rounded-2xl bg-slate-900/95 dark:bg-white text-white dark:text-slate-900 font-bold text-xs shadow-2xl backdrop-blur-md flex items-center gap-2.5 border border-white/20 select-none pointer-events-none"
+          >
+            <Sparkles className="w-4 h-4 text-amber-400 dark:text-amber-500" />
+            <span>{toastMessage}</span>
+          </motion.div>
         )}
       </AnimatePresence>
     </div>

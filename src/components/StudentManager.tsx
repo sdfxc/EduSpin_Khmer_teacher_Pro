@@ -6,7 +6,8 @@ import {
   UserCheck, Trophy, Medal, Star, Flame, ArrowUpDown, RotateCcw, CheckCircle2, ChevronUp, ChevronDown,
   Camera, ArrowUpAZ, Hash, UserX, Clock, FileText, Share2
 } from 'lucide-react';
-import { Student, ClassInfo, TeacherAccount, isStudentInClass } from '../types';
+import { Student, ClassInfo, TeacherAccount, isStudentInClass, QuizSubject, DEFAULT_CLOUD_TEACHER } from '../types';
+import { KHMER_MONTHS } from '../lib/scoreUtils';
 import * as XLSX from 'xlsx';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 import { StudentScoreTable, SortMode } from './StudentScoreTable';
@@ -14,6 +15,7 @@ import { StudentProfileModal } from './StudentProfileModal';
 import { GenderBadgePicker } from './GenderBadgePicker';
 import { AttendanceCategoryViews } from './AttendanceCategoryViews';
 import { db, doc, collection, safeSetDoc, safeOnSnapshot } from '../lib/firebase';
+import { safeSetJSON, safeSetItem } from '../lib/storageUtils';
 
 interface StudentManagerProps {
   students: Student[];
@@ -28,6 +30,10 @@ interface StudentManagerProps {
   onBatchSyncStudents?: (names: string[], mode: 'replace' | 'append', targetClassId?: string) => void | Promise<void>;
   onUpdateStudentDetail?: (id: string, fields: Partial<Student>) => void;
   onSwitchClass?: (classId: string) => void;
+  activeSubjectId?: string | null;
+  activeSubjectName?: string;
+  subjects?: QuizSubject[];
+  onSelectSubject?: (subjectId: string) => void;
 }
 
 export default function StudentManager({
@@ -42,28 +48,35 @@ export default function StudentManager({
   onBulkAddStudents,
   onBatchSyncStudents,
   onUpdateStudentDetail,
-  onSwitchClass
+  onSwitchClass,
+  activeSubjectId,
+  activeSubjectName,
+  subjects,
+  onSelectSubject
 }: StudentManagerProps) {
   // Main Sub-Tab: 'status' (ស្ថានភាពសិស្ស) | 'score' (ពិន្ទុសិស្ស) | 'attendance' (វត្តមានសិស្ស)
   const [activeSubTab, setActiveSubTab] = useState<'status' | 'score' | 'attendance'>('status');
 
-  const effectiveTeacher = useMemo<TeacherAccount | null>(() => {
-    if (teacher) return teacher;
+  const effectiveTeacher = useMemo<TeacherAccount>(() => {
+    if (teacher && teacher.id) return teacher;
     try {
       const saved = localStorage.getItem('logged_in_teacher');
-      return saved ? JSON.parse(saved) : null;
-    } catch {
-      return null;
-    }
+      const parsed = saved ? JSON.parse(saved) : null;
+      if (parsed && parsed.id) return parsed;
+    } catch {}
+    return DEFAULT_CLOUD_TEACHER;
   }, [teacher]);
 
   const handleExportAttendanceExcel = () => {
     const classObj = classes.find(c => c.id === currentClassIdForAttendance);
     const className = classObj ? classObj.name : 'គ្រប់ថ្នាក់';
+    const subName = activeSubjectName || 'ទូទៅ';
+    const d = new Date(attendanceDate);
+    const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : '';
 
     const worksheetData: (string | number)[][] = [
-      [`បញ្ជីវត្តមានសិស្ស - ថ្នាក់៖ ${className}`],
-      [`កាលបរិច្ឆេទ៖ ${attendanceDate}`],
+      [`បញ្ជីវត្តមានសិស្ស - មុខវិជ្ជា៖ ${subName} - ថ្នាក់៖ ${className}`],
+      [`កាលបរិច្ឆេទ៖ ${attendanceDate} (ខែ${khMonth})`],
       [],
       ['ល.រ', 'អត្តលេខ', 'ឈ្មោះសិស្ស', 'ភេទ', 'ស្ថានភាពវត្តមាន', 'មូលហេតុ / កំណត់សម្គាល់ (Reason)']
     ];
@@ -85,7 +98,8 @@ export default function StudentManager({
     const worksheet = XLSX.utils.aoa_to_sheet(worksheetData);
     const workbook = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(workbook, worksheet, "Attendance");
-    XLSX.writeFile(workbook, `attendance_${currentClassIdForAttendance}_${attendanceDate}.xlsx`);
+    const safeSub = subName.replace(/[/\\?%*:|"<>]/g, '_');
+    XLSX.writeFile(workbook, `វត្តមាន_មុខវិជ្ជា_${safeSub}_${className}_${attendanceDate}.xlsx`);
   };
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,9 +162,11 @@ export default function StudentManager({
   const effectiveClassObj = classes.find(c => c.id === effectiveClassId) || classes.find(c => c.id === activeClassId) || classes[0];
   const effectiveClassName = effectiveClassObj?.name?.trim() || effectiveClassId || 'ថ្នាក់រៀន';
   const currentClassIdForAttendance = effectiveClassId;
-  const classAttendanceKey = `${currentClassIdForAttendance}_${attendanceDate}`;
-  const currentClassAttendance = attendanceMap[classAttendanceKey] || {};
-  const currentClassReasons = attendanceReasonMap[classAttendanceKey] || {};
+  const subjectKey = activeSubjectId || 'general';
+  const classAttendanceKey = `${currentClassIdForAttendance}_${subjectKey}_${attendanceDate}`;
+  const legacyClassAttendanceKey = `${currentClassIdForAttendance}_${attendanceDate}`;
+  const currentClassAttendance = attendanceMap[classAttendanceKey] || attendanceMap[legacyClassAttendanceKey] || {};
+  const currentClassReasons = attendanceReasonMap[classAttendanceKey] || attendanceReasonMap[legacyClassAttendanceKey] || {};
 
   // 2. Real-time Firestore sync across all devices / tabs
   useEffect(() => {
@@ -174,10 +190,21 @@ export default function StudentManager({
 
         snapshot.forEach((docSnap: any) => {
           const data = docSnap.data();
-          const dateKey = docSnap.id;
-          const classKey = `${currentClassIdForAttendance}_${dateKey}`;
+          const docId = docSnap.id;
+          let parsedDateKey = docId;
+          let docSubKey = subjectKey;
+          if (data && data.subjectId && data.date) {
+            docSubKey = data.subjectId;
+            parsedDateKey = data.date;
+          } else if (docId.includes('_')) {
+            const lastIdx = docId.lastIndexOf('_');
+            docSubKey = docId.substring(0, lastIdx);
+            parsedDateKey = docId.substring(lastIdx + 1);
+          }
+          const scopedClassKey = `${currentClassIdForAttendance}_${docSubKey}_${parsedDateKey}`;
+          const rawClassKey = `${currentClassIdForAttendance}_${docId}`;
           if (data && data.records) {
-            const existing = updatedMap[classKey] || {};
+            const existing = updatedMap[scopedClassKey] || updatedMap[rawClassKey] || {};
             const incoming = data.records;
             let recordsDiff = false;
             for (const k of Object.keys(incoming)) {
@@ -187,7 +214,7 @@ export default function StudentManager({
               }
             }
             if (recordsDiff || Object.keys(incoming).length !== Object.keys(existing).length) {
-              updatedMap[classKey] = {
+              updatedMap[scopedClassKey] = {
                 ...existing,
                 ...incoming
               };
@@ -197,7 +224,7 @@ export default function StudentManager({
         });
 
         if (changed) {
-          localStorage.setItem('edu_spin_attendance_records', JSON.stringify(updatedMap));
+          safeSetJSON('edu_spin_attendance_records', updatedMap);
           return updatedMap;
         }
         return prevMap;
@@ -209,10 +236,21 @@ export default function StudentManager({
 
         snapshot.forEach((docSnap: any) => {
           const data = docSnap.data();
-          const dateKey = docSnap.id;
-          const classKey = `${currentClassIdForAttendance}_${dateKey}`;
+          const docId = docSnap.id;
+          let parsedDateKey = docId;
+          let docSubKey = subjectKey;
+          if (data && data.subjectId && data.date) {
+            docSubKey = data.subjectId;
+            parsedDateKey = data.date;
+          } else if (docId.includes('_')) {
+            const lastIdx = docId.lastIndexOf('_');
+            docSubKey = docId.substring(0, lastIdx);
+            parsedDateKey = docId.substring(lastIdx + 1);
+          }
+          const scopedClassKey = `${currentClassIdForAttendance}_${docSubKey}_${parsedDateKey}`;
+          const rawClassKey = `${currentClassIdForAttendance}_${docId}`;
           if (data && data.reasons) {
-            const existing = updatedReasonMap[classKey] || {};
+            const existing = updatedReasonMap[scopedClassKey] || updatedReasonMap[rawClassKey] || {};
             const incoming = data.reasons;
             let reasonsDiff = false;
             for (const k of Object.keys(incoming)) {
@@ -222,7 +260,7 @@ export default function StudentManager({
               }
             }
             if (reasonsDiff || Object.keys(incoming).length !== Object.keys(existing).length) {
-              updatedReasonMap[classKey] = {
+              updatedReasonMap[scopedClassKey] = {
                 ...existing,
                 ...incoming
               };
@@ -232,7 +270,7 @@ export default function StudentManager({
         });
 
         if (changed) {
-          localStorage.setItem('edu_spin_attendance_reasons', JSON.stringify(updatedReasonMap));
+          safeSetJSON('edu_spin_attendance_reasons', updatedReasonMap);
           return updatedReasonMap;
         }
         return prevReasonMap;
@@ -246,36 +284,61 @@ export default function StudentManager({
         unsubscribe();
       }
     };
-  }, [effectiveTeacher?.id, currentClassIdForAttendance]);
+  }, [effectiveTeacher?.id, currentClassIdForAttendance, subjectKey]);
+
+  const currentMonthIdx = useMemo(() => {
+    const d = new Date(attendanceDate);
+    return !isNaN(d.getTime()) ? d.getMonth() : new Date().getMonth();
+  }, [attendanceDate]);
+
+  const currentKhmerMonth = KHMER_MONTHS[currentMonthIdx] || 'កញ្ញា';
+
+  const handleAttendanceMonthChange = (khmerMonth: string) => {
+    const monthIdx = KHMER_MONTHS.indexOf(khmerMonth);
+    if (monthIdx === -1) return;
+    const currentParts = attendanceDate.split('-');
+    const year = currentParts[0] || new Date().getFullYear().toString();
+    const day = currentParts[2] || '01';
+    const monthStr = (monthIdx + 1).toString().padStart(2, '0');
+    const maxDays = new Date(parseInt(year, 10), monthIdx + 1, 0).getDate();
+    const validDay = Math.min(parseInt(day, 10) || 1, maxDays).toString().padStart(2, '0');
+    setAttendanceDate(`${year}-${monthStr}-${validDay}`);
+  };
 
   const saveAttendanceMap = (newMap: typeof attendanceMap) => {
     setAttendanceMap(newMap);
-    localStorage.setItem('edu_spin_attendance_records', JSON.stringify(newMap));
+    safeSetJSON('edu_spin_attendance_records', newMap);
   };
 
   const saveAttendanceReasonMap = (newMap: typeof attendanceReasonMap) => {
     setAttendanceReasonMap(newMap);
-    localStorage.setItem('edu_spin_attendance_reasons', JSON.stringify(newMap));
+    safeSetJSON('edu_spin_attendance_reasons', newMap);
   };
 
   const syncAttendanceDocToCloud = async (
     targetRecords = currentClassAttendance,
     targetReasons = currentClassReasons
   ) => {
-    if (effectiveTeacher?.id && currentClassIdForAttendance && currentClassIdForAttendance !== 'default') {
+    const teacherIdToUse = effectiveTeacher?.id || DEFAULT_CLOUD_TEACHER.id;
+    if (teacherIdToUse && currentClassIdForAttendance && currentClassIdForAttendance !== 'default') {
       try {
+        const d = new Date(attendanceDate);
+        const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : '';
         const attDocRef = doc(
           db,
           'teachers',
-          effectiveTeacher.id,
+          teacherIdToUse,
           'classes',
           currentClassIdForAttendance,
           'attendance',
-          attendanceDate
+          `${subjectKey}_${attendanceDate}`
         );
         await safeSetDoc(attDocRef, {
           classId: currentClassIdForAttendance,
+          subjectId: subjectKey,
+          subjectName: activeSubjectName || '',
           date: attendanceDate,
+          month: khMonth,
           records: targetRecords,
           reasons: targetReasons,
           updatedAt: new Date().toISOString()
@@ -1135,7 +1198,7 @@ export default function StudentManager({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex items-center justify-between group ${
                     isDarkMode 
-                      ? 'bg-[#1e293b] border-slate-800 hover:border-slate-700' 
+                      ? 'bg-[#222222] border-[#333333] hover:border-[#444444]' 
                       : 'bg-white border-slate-200/80 hover:border-slate-300'
                   }`}
                 >
@@ -1255,10 +1318,10 @@ export default function StudentManager({
 
           {/* Bottom Status Statistics Cards Grid Bar */}
           <div className={`grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t ${
-            isDarkMode ? 'border-slate-800' : 'border-slate-200'
+            isDarkMode ? 'border-[#333333]' : 'border-slate-200'
           }`}>
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សសរុប</p>
@@ -1272,7 +1335,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សស្រី</p>
@@ -1286,7 +1349,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedClassName}</p>
@@ -1300,7 +1363,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ឆ្នើម (Outstanding)</p>
@@ -1326,6 +1389,10 @@ export default function StudentManager({
           onUpdateStudentDetail={onUpdateStudentDetail}
           currentSortMode={studentSortMode}
           onSortModeChange={handleSortModeChange}
+          activeSubjectId={activeSubjectId}
+          activeSubjectName={activeSubjectName}
+          subjects={subjects}
+          onSelectSubject={onSelectSubject}
         />
       )}
 
@@ -1341,8 +1408,31 @@ export default function StudentManager({
                 <ClipboardList className="w-5 h-5" />
               </div>
               <div>
-                <h3 className="text-sm font-black">កត់ត្រា និងគ្រប់គ្រងវត្តមានសិស្ស</h3>
-                <p className="text-[11px] text-slate-500">ជ្រើសរើសថ្ងៃខែ និងកត់ត្រាវត្តមានប្រចាំថ្ងៃរបស់សិស្សក្នុងថ្នាក់</p>
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="text-sm font-black">កត់ត្រា និងគ្រប់គ្រងវត្តមានសិស្ស</h3>
+                  {subjects && subjects.length > 0 && onSelectSubject ? (
+                    <div className="flex items-center gap-1.5 px-3 py-1 rounded-2xl bg-indigo-50 dark:bg-indigo-950/60 border border-indigo-200 dark:border-indigo-800 text-xs font-black text-indigo-700 dark:text-indigo-300">
+                      <span className="text-[11px] text-slate-500 dark:text-slate-400">មុខវិជ្ជា៖</span>
+                      <select
+                        value={activeSubjectId || (subjects[0]?.id || '')}
+                        onChange={(e) => onSelectSubject(e.target.value)}
+                        className="bg-transparent border-none text-xs font-black text-indigo-700 dark:text-indigo-300 cursor-pointer focus:outline-none"
+                        title="ជ្រើសរើសមុខវិជ្ជាដើម្បីកត់ត្រាវត្តមាន"
+                      >
+                        {subjects.map(s => (
+                          <option key={s.id} value={s.id} className={isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}>
+                            📚 {s.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : activeSubjectName ? (
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                      📚 {activeSubjectName}
+                    </span>
+                  ) : null}
+                </div>
+                <p className="text-[11px] text-slate-500">ជ្រើសរើសមុខវិជ្ជា ថ្ងៃខែ និងកត់ត្រាវត្តមានប្រចាំថ្ងៃរបស់សិស្សក្នុងថ្នាក់</p>
               </div>
             </div>
 
@@ -1378,6 +1468,23 @@ export default function StudentManager({
                   <ArrowUpAZ className="w-3.5 h-3.5" />
                   <span>តាម ឈ្មោះ (ក-អ)</span>
                 </button>
+              </div>
+
+              {/* Month Quick Switcher */}
+              <div className="flex items-center gap-1.5 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-2xl">
+                <span className="text-xs font-bold text-slate-500 whitespace-nowrap">ខែវត្តមាន៖</span>
+                <select
+                  value={currentKhmerMonth}
+                  onChange={(e) => handleAttendanceMonthChange(e.target.value)}
+                  className="bg-transparent text-xs font-black text-indigo-600 dark:text-indigo-400 focus:outline-none cursor-pointer"
+                  title="ប្ដូរខែវត្តមាន"
+                >
+                  {KHMER_MONTHS.map(m => (
+                    <option key={m} value={m} className={isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}>
+                      ខែ {m}
+                    </option>
+                  ))}
+                </select>
               </div>
 
               <div className="flex items-center gap-2 bg-slate-100 dark:bg-slate-800 px-3 py-2 rounded-2xl">
@@ -1877,6 +1984,8 @@ export default function StudentManager({
             onSetReason={handleSetStudentReason}
             isDarkMode={isDarkMode}
             onCountsChange={() => setDroppedUpdateTick(prev => prev + 1)}
+            activeSubjectName={activeSubjectName}
+            activeSubjectId={activeSubjectId || undefined}
           />
         )}
       </div>

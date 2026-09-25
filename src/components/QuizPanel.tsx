@@ -8,6 +8,7 @@ import confetti from 'canvas-confetti';
 import { Question, QuizCard, Student, QuizRoom, QuizChapter, QuizSubject } from '../types';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
+import { GlassLiquidOverlay } from './GlassLiquidCapsule';
 import { 
   Document, 
   Packer, 
@@ -51,6 +52,7 @@ interface QuizPanelProps {
   onCreateSubject?: (name: string) => void;
   onRenameSubject?: (subjectId: string, name: string) => void;
   onDeleteSubject?: (subjectId: string) => void;
+  onOpenLessonModal?: () => void;
 }
 
 export const AVAILABLE_FONTS = [
@@ -107,7 +109,8 @@ export default function QuizPanel({
   onSelectSubject,
   onCreateSubject,
   onRenameSubject,
-  onDeleteSubject
+  onDeleteSubject,
+  onOpenLessonModal
 }: QuizPanelProps) {
   const { confirmAction } = useConfirm();
 
@@ -118,7 +121,21 @@ export default function QuizPanel({
 
   const activeChapter = chapters.find(ch => ch.rooms?.some(r => r.id === activeRoomId));
 
-  const [timeLeft, setTimeLeft] = useState(25);
+  const [questionTimerLimit, setQuestionTimerLimit] = useState<number>(() => {
+    const saved = localStorage.getItem('khmer_quiz_timer_limit');
+    return saved ? parseInt(saved, 10) || 25 : 25;
+  });
+  const [timeLeft, setTimeLeft] = useState<number>(questionTimerLimit);
+  const [isSetTimerModalOpen, setIsSetTimerModalOpen] = useState(false);
+
+  const updateTimerLimit = (sec: number) => {
+    const newSec = Math.max(5, Math.min(300, sec));
+    setQuestionTimerLimit(newSec);
+    localStorage.setItem('khmer_quiz_timer_limit', String(newSec));
+    if (activeCard && activeCard.status === 'idle' && !showResult) {
+      setTimeLeft(newSec);
+    }
+  };
   const [shuffledOptions, setShuffledOptions] = useState<string[]>([]);
   const [correctIndex, setCorrectIndex] = useState<number>(0);
   const [showResult, setShowResult] = useState<'correct' | 'wrong' | null>(null);
@@ -233,6 +250,21 @@ export default function QuizPanel({
       onConfirm: () => {
         setLocalEditCards([]);
         setSelectedEditIndex(0);
+      }
+    });
+  };
+
+  const handleDeleteAllMainQuestions = () => {
+    confirmAction({
+      title: 'លុបសំណួរទាំងអស់?',
+      message: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបសំណួរទាំងអស់ក្នុងមេរៀននេះមែនទេ? សំណួរដែលបានលុបមិនអាចទាញយកមកវិញបានទេ។',
+      confirmText: 'លុបសំណួរទាំងអស់',
+      cancelText: 'បោះបង់',
+      variant: 'danger',
+      onConfirm: () => {
+        if (onUpdateCards) {
+          onUpdateCards([]);
+        }
       }
     });
   };
@@ -2026,7 +2058,7 @@ export default function QuizPanel({
       const newCorrectIdx = items.findIndex(item => item.isCorrect);
       setCorrectIndex(newCorrectIdx >= 0 ? newCorrectIdx : 0);
       
-      setTimeLeft(25);
+      setTimeLeft(questionTimerLimit);
       setShowResult(null);
       setShowCorrectFullScreenPopup(false);
     }
@@ -2251,7 +2283,18 @@ export default function QuizPanel({
               </p>
             </div>
 
-            <div className="flex items-center gap-2 shrink-0">
+            <div className="flex items-center gap-2 shrink-0 flex-wrap sm:flex-nowrap">
+              {/* Small tab for setting question remaining time limit */}
+              <button
+                type="button"
+                onClick={() => setIsSetTimerModalOpen(true)}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-600 hover:from-sky-600 hover:to-purple-700 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-500/20 cursor-pointer active:scale-95 transition-all shrink-0"
+                title="កំណត់រយ:ពេលឆ្លើយសំណួរនីមួយៗ (Set Question Time Limit)"
+              >
+                <Timer className="w-3.5 h-3.5 text-sky-200 animate-pulse" />
+                <span>កំណត់ពេលនៅសល់ ({questionTimerLimit}វ)</span>
+              </button>
+
               {cards.filter(c => c.question).length > 0 && (
                 <>
                   <button
@@ -2269,6 +2312,15 @@ export default function QuizPanel({
                   >
                     <Printer className="w-3.5 h-3.5" />
                     <span>នាំចេញវិញ្ញាសា (PDF/Word)</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteAllMainQuestions}
+                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md shadow-rose-600/10 cursor-pointer active:scale-95 transition-all"
+                    title="លុបសំណួរទាំងអស់ក្នុងមេរៀននេះ"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>លុបសំណួរទាំងអស់</span>
                   </button>
                 </>
               )}
@@ -2302,6 +2354,16 @@ export default function QuizPanel({
               </div>
               
               <div className="flex items-center gap-2 relative z-10 select-none shrink-0">
+                <button
+                  type="button"
+                  onClick={() => setIsSetTimerModalOpen(true)}
+                  className="flex items-center gap-1.5 px-2.5 py-1 bg-white/90 dark:bg-slate-900/90 hover:bg-sky-50 dark:hover:bg-indigo-950/60 border border-sky-200 dark:border-indigo-800 text-sky-700 dark:text-indigo-300 rounded-lg text-[10px] font-black shadow-xs transition-all cursor-pointer active:scale-95"
+                  title="ចុចដើម្បីកំណត់ពេលនៅសល់សំណួរ"
+                >
+                  <Timer className="w-3 h-3 text-sky-500 dark:text-indigo-400" />
+                  <span>ពេលកំណត់៖ {questionTimerLimit}វ</span>
+                  <span className="bg-sky-500 dark:bg-indigo-600 text-white text-[9px] px-1 rounded font-bold">កែ</span>
+                </button>
                 <span className="text-[10px] font-black text-slate-500 dark:text-slate-400 bg-white/80 dark:bg-slate-900/60 shadow-sm border border-slate-100 dark:border-slate-800/80 px-2 py-1 rounded-lg">
                   នៅសល់ {remainingCount}/{totalCount} សំណួរ
                 </span>
@@ -2360,6 +2422,16 @@ export default function QuizPanel({
                 <Info className="w-16 h-16 text-indigo-300 dark:text-indigo-400 mx-auto mb-6" />
                 <h3 className="text-lg font-bold text-slate-800 dark:text-slate-200 mb-2">មិនទាន់មានសំណួរនៅឡើយទេ</h3>
                 <p className="text-slate-500 dark:text-slate-400 text-xs mb-6 italic leading-relaxed">លោកគ្រូ អ្នកគ្រូ សូមប្រើប្រាស់ឧបករណ៍ AI ដើម្បីបង្កើតសំណួរចេញពីអត្ថបទមេរៀន!</p>
+                {onOpenLessonModal && (
+                  <button
+                    type="button"
+                    onClick={onOpenLessonModal}
+                    className="inline-flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-amber-500 hover:from-orange-600 hover:to-amber-600 text-white font-black rounded-xl text-xs shadow-lg shadow-orange-500/20 transition-all cursor-pointer active:scale-95"
+                  >
+                    <Sparkles className="w-4 h-4" />
+                    <span>បង្កើតសំណួរ AI ឥឡូវនេះ</span>
+                  </button>
+                )}
               </div>
             </div>
           )}
@@ -2442,17 +2514,34 @@ export default function QuizPanel({
               </div>
 
               {!isCreatingSubject ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setIsCreatingSubject(true);
-                    setNewSubjectName('');
-                  }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 flex items-center gap-1.5 shrink-0 self-start md:self-auto"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>បន្ថែមមុខវិជ្ជា</span>
-                </button>
+                <div className="flex items-center gap-2 shrink-0 self-start md:self-auto">
+                  {onOpenLessonModal && (
+                    <motion.button
+                      type="button"
+                      onClick={onOpenLessonModal}
+                      whileHover={{ scale: 1.04, y: -1 }}
+                      whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
+                      transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                      className="relative px-3.5 py-2 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-all duration-200 focus:outline-none text-white isolate overflow-hidden group shrink-0 shadow-[0_6px_20px_rgba(249,115,22,0.45)] border border-orange-300/40 active:scale-95"
+                      title="បង្កើតសំណួរដោយស្វ័យប្រវត្តពីមេរៀនដោយប្រើ AI (Gemini AI Question Generator)"
+                    >
+                      <GlassLiquidOverlay isDarkMode={isDarkMode} variant="orange-glass" className="rounded-xl" />
+                      <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform duration-300 shrink-0 relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]" />
+                      <span className="font-extrabold tracking-wide text-white relative z-10 drop-shadow-[0_1px_2px_rgba(0,0,0,0.4)]">បង្កើតសំណួរ AI</span>
+                    </motion.button>
+                  )}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsCreatingSubject(true);
+                      setNewSubjectName('');
+                    }}
+                    className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 flex items-center gap-1.5 shrink-0"
+                  >
+                    <Plus className="w-3.5 h-3.5" />
+                    <span>បន្ថែមមុខវិជ្ជា</span>
+                  </button>
+                </div>
               ) : (
                 <div className="flex items-center gap-1.5 p-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs animate-in fade-in-25 duration-100 shrink-0">
                   <input
@@ -2687,7 +2776,21 @@ export default function QuizPanel({
                     </div>
 
                     {/* Actions for Chapter */}
-                    <div className="flex items-center gap-1 shrink-0">
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      {onOpenLessonModal && (
+                        <motion.button
+                          type="button"
+                          onClick={onOpenLessonModal}
+                          whileHover={{ scale: 1.04 }}
+                          whileTap={{ scale: 0.95 }}
+                          className="relative px-2.5 py-1 rounded-lg text-[10px] font-black flex items-center gap-1 cursor-pointer select-none whitespace-nowrap text-white isolate overflow-hidden group shrink-0 shadow-sm border border-orange-300/40 active:scale-95"
+                          title="បង្កើតសំណួរ AI សម្រាប់ជំពូកនេះ"
+                        >
+                          <GlassLiquidOverlay isDarkMode={isDarkMode} variant="orange-glass" className="rounded-lg" />
+                          <Sparkles className="w-3 h-3 text-orange-100 relative z-10" />
+                          <span className="font-extrabold text-white relative z-10">បង្កើតសំណួរ AI</span>
+                        </motion.button>
+                      )}
                       {chapters.length > 1 && (
                         <button
                           type="button"
@@ -4198,11 +4301,37 @@ export default function QuizPanel({
                 <div className="w-32 sm:w-44 h-1.5 bg-white/10 rounded-full overflow-hidden mt-1">
                   <motion.div 
                     initial={{ width: '100%' }}
-                    animate={{ width: `${(timeLeft / 25) * 100}%` }}
+                    animate={{ width: `${Math.min(100, Math.max(0, (timeLeft / questionTimerLimit) * 100))}%` }}
                     className={`h-full transition-all duration-300 ${
                       timeLeft <= 5 ? 'bg-red-500' : 'bg-gradient-to-r from-indigo-500 to-emerald-400'
                     }`}
                   />
+                </div>
+                <div className="flex items-center gap-1 mt-1">
+                  <button
+                    type="button"
+                    onClick={() => setTimeLeft(prev => prev + 10)}
+                    className="px-1.5 py-0.5 bg-indigo-500/30 hover:bg-indigo-500/50 border border-indigo-400/30 text-indigo-200 text-[9px] font-bold rounded cursor-pointer transition-all active:scale-90"
+                    title="បន្ថែម ១០វិនាទី"
+                  >
+                    +10s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTimeLeft(prev => Math.max(1, prev - 5))}
+                    className="px-1.5 py-0.5 bg-rose-500/30 hover:bg-rose-500/50 border border-rose-400/30 text-rose-200 text-[9px] font-bold rounded cursor-pointer transition-all active:scale-90"
+                    title="បន្ថយ ៥វិនាទី"
+                  >
+                    -5s
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setIsSetTimerModalOpen(true)}
+                    className="px-1.5 py-0.5 bg-sky-500/30 hover:bg-sky-500/50 border border-sky-400/30 text-sky-200 text-[9px] font-bold rounded cursor-pointer transition-all active:scale-90"
+                    title="កំណត់ពេលដើមសំណួរ"
+                  >
+                    ⚙️ {questionTimerLimit}s
+                  </button>
                 </div>
               </div>
 
@@ -4500,6 +4629,110 @@ export default function QuizPanel({
       </AnimatePresence>,
       document.body
     )}
+
+    {/* Question Timer Setting Modal */}
+    <AnimatePresence>
+      {isSetTimerModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md">
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 10 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 10 }}
+            className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 max-w-md w-full shadow-2xl relative overflow-hidden"
+          >
+            {/* Header */}
+            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-4 mb-5">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-2xl bg-gradient-to-tr from-sky-500 to-indigo-600 text-white flex items-center justify-center shadow-md shadow-indigo-500/20">
+                  <Timer className="w-5 h-5 animate-pulse" />
+                </div>
+                <div>
+                  <h3 className="text-base font-black text-slate-800 dark:text-white">កំណត់រយ:ពេលនៅសល់សំណួរ</h3>
+                  <p className="text-xs text-slate-400 dark:text-slate-500">កំណត់ចំនួនវិនាទីរាប់ថយក្រោយសម្រាប់សំណួរនីមួយៗ</p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setIsSetTimerModalOpen(false)}
+                className="w-8 h-8 rounded-full bg-slate-100 dark:bg-slate-800 text-slate-500 hover:text-slate-800 dark:hover:text-white flex items-center justify-center cursor-pointer transition-colors"
+              >
+                <X className="w-4 h-4" />
+              </button>
+            </div>
+
+            {/* Current Active Timer Display */}
+            <div className="mb-6 p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-sky-50 dark:from-indigo-950/40 dark:to-sky-950/30 border border-indigo-100 dark:border-indigo-900/50 text-center relative overflow-hidden">
+              <div className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mb-1">រយ:ពេលដែលបានកំណត់បច្ចុប្បន្ន</div>
+              <div className="text-4xl font-black font-mono text-indigo-700 dark:text-indigo-300 tracking-tight">
+                {questionTimerLimit} <span className="text-base font-bold text-slate-500">វិនាទី</span>
+              </div>
+            </div>
+
+            {/* Quick Presets Grid */}
+            <div className="mb-5">
+              <label className="block text-xs font-bold text-slate-600 dark:text-slate-400 mb-2">
+                ជ្រើសរើសរយ:ពេលរហ័ស (Preset Seconds)
+              </label>
+              <div className="grid grid-cols-4 gap-2">
+                {[5, 10, 15, 20, 25, 30, 45, 60, 90, 120].map((sec) => (
+                  <button
+                    key={sec}
+                    type="button"
+                    onClick={() => updateTimerLimit(sec)}
+                    className={`py-2 px-1 rounded-xl text-xs font-black transition-all cursor-pointer active:scale-95 ${
+                      questionTimerLimit === sec
+                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/30 scale-105 ring-2 ring-indigo-400'
+                        : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                    }`}
+                  >
+                    {sec >= 60 ? `${sec / 60} នាទី` : `${sec} វិនាទី`}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* Custom Seconds Slider & Input */}
+            <div className="mb-6">
+              <div className="flex items-center justify-between mb-2">
+                <label className="text-xs font-bold text-slate-600 dark:text-slate-400">
+                  កំណត់វិនាទីផ្ទាល់ខ្លួន (Custom Input)
+                </label>
+                <span className="text-xs font-black text-indigo-600 dark:text-indigo-400">{questionTimerLimit}s</span>
+              </div>
+              <div className="flex items-center gap-3">
+                <input
+                  type="range"
+                  min="5"
+                  max="180"
+                  step="5"
+                  value={questionTimerLimit}
+                  onChange={(e) => updateTimerLimit(parseInt(e.target.value, 10) || 25)}
+                  className="flex-1 accent-indigo-600 cursor-pointer h-2 bg-slate-200 dark:bg-slate-700 rounded-lg"
+                />
+                <input
+                  type="number"
+                  min="5"
+                  max="300"
+                  value={questionTimerLimit}
+                  onChange={(e) => updateTimerLimit(parseInt(e.target.value, 10) || 5)}
+                  className="w-20 px-2.5 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 text-slate-800 dark:text-white font-black text-xs text-center focus:ring-2 focus:ring-indigo-500 outline-none"
+                />
+              </div>
+            </div>
+
+            {/* Close / Done Button */}
+            <button
+              type="button"
+              onClick={() => setIsSetTimerModalOpen(false)}
+              className="w-full py-3 rounded-2xl bg-gradient-to-r from-sky-500 to-indigo-600 hover:from-sky-600 hover:to-indigo-700 text-white font-black text-sm shadow-lg shadow-indigo-500/20 active:scale-98 transition-all cursor-pointer flex items-center justify-center gap-2"
+            >
+              <Check className="w-4 h-4" />
+              <span>រក្សាទុក និងបញ្ចប់</span>
+            </button>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
     </>
   );
 }

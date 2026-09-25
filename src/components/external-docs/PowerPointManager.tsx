@@ -43,7 +43,7 @@ export default function PowerPointManager({
 
   // Upload Form State
   const [formTitle, setFormTitle] = useState('');
-  const [formSubject, setFormSubject] = useState('រូបវិទ្យា');
+  const [formSubject, setFormSubject] = useState('ភាសាខ្មែរ');
   const [formGrade, setFormGrade] = useState(activeClassName || 'ថ្នាក់ទី៩');
   const [formDescription, setFormDescription] = useState('');
   const [formEmbedUrl, setFormEmbedUrl] = useState('');
@@ -181,7 +181,7 @@ export default function PowerPointManager({
   const handleCloseModal = () => {
     setIsUploadModalOpen(false);
     setFormTitle('');
-    setFormSubject('រូបវិទ្យា');
+    setFormSubject('ភាសាខ្មែរ');
     setFormDescription('');
     setFormEmbedUrl('');
     setFormFileName('');

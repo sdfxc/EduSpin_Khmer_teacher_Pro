@@ -35,10 +35,31 @@ export function getCurrentDateScoreSlot(date: Date = new Date()): {
   return { month, weekKey, weekLabel, day };
 }
 
+export function getStudentMonthlyScoresForSubject(
+  student: Student,
+  subjectId?: string
+): Record<string, MonthlyDetailedScore> {
+  if (subjectId && student.subjectScores?.[subjectId]?.monthlyScores) {
+    return student.subjectScores[subjectId].monthlyScores || {};
+  }
+  return student.monthlyScores || {};
+}
+
+export function getStudentTotalScoreForSubject(
+  student: Student,
+  subjectId?: string
+): number {
+  if (subjectId && student.subjectScores?.[subjectId]?.score !== undefined) {
+    return Number(student.subjectScores[subjectId].score) || 0;
+  }
+  return Number(student.score) || 0;
+}
+
 export function addActivityPointsToStudent(
   student: Student,
   points: number = 5,
-  date: Date = new Date()
+  date: Date = new Date(),
+  subjectId?: string
 ): {
   updatedStudent: Student;
   month: string;
@@ -47,7 +68,7 @@ export function addActivityPointsToStudent(
   newActivityScore: number;
 } {
   const { month, weekKey, weekLabel } = getCurrentDateScoreSlot(date);
-  const currentMonthScores = student.monthlyScores || {};
+  const currentMonthScores = getStudentMonthlyScoresForSubject(student, subjectId);
   const existingMonthData: MonthlyDetailedScore = currentMonthScores[month] || {};
   const updatedMonthData: MonthlyDetailedScore = JSON.parse(JSON.stringify(existingMonthData));
 
@@ -76,13 +97,23 @@ export function addActivityPointsToStudent(
   const groupWork = Number(updatedMonthData.groupWork) || 0;
 
   const newTotal = mExam + w1 + w2 + w3 + w4 + groupWork + quiz + notebook;
+  const updatedMonthlyMap = {
+    ...currentMonthScores,
+    [month]: updatedMonthData
+  };
+
+  const updatedSubjectScores = { ...(student.subjectScores || {}) };
+  if (subjectId) {
+    updatedSubjectScores[subjectId] = {
+      score: newTotal,
+      monthlyScores: updatedMonthlyMap
+    };
+  }
 
   const updatedStudent: Student = {
     ...student,
-    monthlyScores: {
-      ...currentMonthScores,
-      [month]: updatedMonthData
-    },
+    monthlyScores: updatedMonthlyMap,
+    subjectScores: updatedSubjectScores,
     score: newTotal
   };
 
@@ -98,7 +129,8 @@ export function addActivityPointsToStudent(
 export function setActivityScoreForStudent(
   student: Student,
   exactScore: number,
-  date: Date = new Date()
+  date: Date = new Date(),
+  subjectId?: string
 ): {
   updatedStudent: Student;
   month: string;
@@ -107,7 +139,7 @@ export function setActivityScoreForStudent(
   newActivityScore: number;
 } {
   const { month, weekKey, weekLabel } = getCurrentDateScoreSlot(date);
-  const currentMonthScores = student.monthlyScores || {};
+  const currentMonthScores = getStudentMonthlyScoresForSubject(student, subjectId);
   const existingMonthData: MonthlyDetailedScore = currentMonthScores[month] || {};
   const updatedMonthData: MonthlyDetailedScore = JSON.parse(JSON.stringify(existingMonthData));
 
@@ -133,13 +165,23 @@ export function setActivityScoreForStudent(
   const groupWork = Number(updatedMonthData.groupWork) || 0;
 
   const newTotal = mExam + w1 + w2 + w3 + w4 + groupWork + quiz + notebook;
+  const updatedMonthlyMap = {
+    ...currentMonthScores,
+    [month]: updatedMonthData
+  };
+
+  const updatedSubjectScores = { ...(student.subjectScores || {}) };
+  if (subjectId) {
+    updatedSubjectScores[subjectId] = {
+      score: newTotal,
+      monthlyScores: updatedMonthlyMap
+    };
+  }
 
   const updatedStudent: Student = {
     ...student,
-    monthlyScores: {
-      ...currentMonthScores,
-      [month]: updatedMonthData
-    },
+    monthlyScores: updatedMonthlyMap,
+    subjectScores: updatedSubjectScores,
     score: newTotal
   };
 
@@ -155,14 +197,15 @@ export function setActivityScoreForStudent(
 export function addGroupWorkPointsToStudent(
   student: Student,
   points: number,
-  date: Date = new Date()
+  date: Date = new Date(),
+  subjectId?: string
 ): {
   updatedStudent: Student;
   month: string;
   newGroupWorkScore: number;
 } {
   const { month } = getCurrentDateScoreSlot(date);
-  const currentMonthScores = student.monthlyScores || {};
+  const currentMonthScores = getStudentMonthlyScoresForSubject(student, subjectId);
   const existingMonthData: MonthlyDetailedScore = currentMonthScores[month] || {};
   const updatedMonthData: MonthlyDetailedScore = JSON.parse(JSON.stringify(existingMonthData));
 
@@ -185,13 +228,23 @@ export function addGroupWorkPointsToStudent(
   const groupWork = Number(updatedMonthData.groupWork) || 0;
 
   const newTotal = mExam + w1 + w2 + w3 + w4 + groupWork + quiz + notebook;
+  const updatedMonthlyMap = {
+    ...currentMonthScores,
+    [month]: updatedMonthData
+  };
+
+  const updatedSubjectScores = { ...(student.subjectScores || {}) };
+  if (subjectId) {
+    updatedSubjectScores[subjectId] = {
+      score: newTotal,
+      monthlyScores: updatedMonthlyMap
+    };
+  }
 
   const updatedStudent: Student = {
     ...student,
-    monthlyScores: {
-      ...currentMonthScores,
-      [month]: updatedMonthData
-    },
+    monthlyScores: updatedMonthlyMap,
+    subjectScores: updatedSubjectScores,
     score: newTotal
   };
 
@@ -205,14 +258,15 @@ export function addGroupWorkPointsToStudent(
 export function setGroupWorkScoreForStudent(
   student: Student,
   exactScore: number,
-  date: Date = new Date()
+  date: Date = new Date(),
+  subjectId?: string
 ): {
   updatedStudent: Student;
   month: string;
   newGroupWorkScore: number;
 } {
   const { month } = getCurrentDateScoreSlot(date);
-  const currentMonthScores = student.monthlyScores || {};
+  const currentMonthScores = getStudentMonthlyScoresForSubject(student, subjectId);
   const existingMonthData: MonthlyDetailedScore = currentMonthScores[month] || {};
   const updatedMonthData: MonthlyDetailedScore = JSON.parse(JSON.stringify(existingMonthData));
 
@@ -233,13 +287,23 @@ export function setGroupWorkScoreForStudent(
   const groupWork = Number(updatedMonthData.groupWork) || 0;
 
   const newTotal = mExam + w1 + w2 + w3 + w4 + groupWork + quiz + notebook;
+  const updatedMonthlyMap = {
+    ...currentMonthScores,
+    [month]: updatedMonthData
+  };
+
+  const updatedSubjectScores = { ...(student.subjectScores || {}) };
+  if (subjectId) {
+    updatedSubjectScores[subjectId] = {
+      score: newTotal,
+      monthlyScores: updatedMonthlyMap
+    };
+  }
 
   const updatedStudent: Student = {
     ...student,
-    monthlyScores: {
-      ...currentMonthScores,
-      [month]: updatedMonthData
-    },
+    monthlyScores: updatedMonthlyMap,
+    subjectScores: updatedSubjectScores,
     score: newTotal
   };
 
@@ -250,14 +314,19 @@ export function setGroupWorkScoreForStudent(
   };
 }
 
-export function getStudentCurrentWeekActivityScore(student: Student, date: Date = new Date()): {
+export function getStudentCurrentWeekActivityScore(
+  student: Student,
+  date: Date = new Date(),
+  subjectId?: string
+): {
   activityScore: number;
   month: string;
   weekKey: WeekKey;
   weekLabel: string;
 } {
   const { month, weekKey, weekLabel } = getCurrentDateScoreSlot(date);
-  const monthData = student.monthlyScores?.[month];
+  const monthScores = getStudentMonthlyScoresForSubject(student, subjectId);
+  const monthData = monthScores[month];
   const weekData = monthData?.[weekKey];
   const activityScore = Number(weekData?.activity) || 0;
   return { activityScore, month, weekKey, weekLabel };
