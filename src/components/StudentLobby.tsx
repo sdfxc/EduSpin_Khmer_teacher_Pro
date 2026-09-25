@@ -689,7 +689,7 @@ export default function StudentLobby({
     const isRevealed = activeCardState === 'revealed';
     
     return (
-      <div className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#222222] relative transition-colors duration-300">
+      <div className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#0b0f19] relative transition-colors duration-300">
         {/* Host Control Deck Header */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
@@ -902,7 +902,7 @@ export default function StudentLobby({
 
   return (
     <div className={`flex-1 flex flex-col p-4 md:p-6 overflow-y-auto custom-scrollbar relative transition-colors duration-300 ${
-      isDarkMode ? 'bg-[#222222] text-white' : 'bg-slate-50 text-slate-800'
+      isDarkMode ? 'bg-[#0b0f19] text-white' : 'bg-slate-50 text-slate-800'
     }`}>
       {/* Background visual effects for game feel */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08)_0%,transparent_50%)] pointer-events-none" />
@@ -1208,19 +1208,18 @@ export default function StudentLobby({
                       <button
                         type="button"
                         onClick={() => handleApproveStudent(student.id)}
-                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center gap-1 cursor-pointer transition-all border-none font-black text-[11px] shadow-sm active:scale-95"
-                        title="ចុចទទួលសិស្ស (Approve Student)"
+                        className="w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all border-none"
+                        title="អនុញ្ញាត (Approve)"
                       >
                         <Check className="w-3.5 h-3.5 text-white" />
-                        <span>ទទួល</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeclineStudent(student.id)}
-                        className="p-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-xl flex items-center justify-center cursor-pointer transition-all border border-red-500/30"
+                        className="w-7 h-7 bg-red-650 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all border-none"
                         title="បដិសេធ (Decline)"
                       >
-                        <XCircle className="w-3.5 h-3.5" />
+                        <XCircle className="w-3.5 h-3.5 text-white" />
                       </button>
                     </div>
                   </div>

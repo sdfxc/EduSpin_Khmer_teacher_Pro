@@ -40,38 +40,6 @@ const toKhmerNum = (num: number): string => {
   return num.toString().replace(/[0-9]/g, (d) => khmerDigits[parseInt(d, 10)]);
 };
 
-// Format Date YYYY-MM-DD into Khmer Long Format (e.g. ថ្ងៃទី 23 ខែកញ្ញា ឆ្នាំ 2026)
-export const formatKhmerDateLong = (dateStr: string, useKhmerNum = false): string => {
-  if (!dateStr) return '';
-  const khmerMonths = [
-    'មករា', 'កុម្ភៈ', 'មីនា', 'មេសា', 'ឧសភា', 'មិថុនា',
-    'កក្កដា', 'សីហា', 'កញ្ញា', 'តុលា', 'វិច្ឆិកា', 'ធ្នូ'
-  ];
-  try {
-    const parts = dateStr.split('-');
-    if (parts.length === 3) {
-      const year = parseInt(parts[0], 10);
-      const month = parseInt(parts[1], 10);
-      const day = parseInt(parts[2], 10);
-      if (!isNaN(year) && !isNaN(month) && !isNaN(day) && month >= 1 && month <= 12) {
-        const dStr = useKhmerNum ? toKhmerNum(day) : day.toString();
-        const yStr = useKhmerNum ? toKhmerNum(year) : year.toString();
-        return `ថ្ងៃទី ${dStr} ខែ${khmerMonths[month - 1]} ឆ្នាំ ${yStr}`;
-      }
-    }
-    const d = new Date(dateStr);
-    if (!isNaN(d.getTime())) {
-      const day = d.getDate();
-      const month = d.getMonth();
-      const year = d.getFullYear();
-      const dStr = useKhmerNum ? toKhmerNum(day) : day.toString();
-      const yStr = useKhmerNum ? toKhmerNum(year) : year.toString();
-      return `ថ្ងៃទី ${dStr} ខែ${khmerMonths[month]} ឆ្នាំ ${yStr}`;
-    }
-  } catch {}
-  return dateStr;
-};
-
 // Sort strictly by Khmer alphabet (ក-អ)
 const sortKhmer = (a: Student, b: Student): number => {
   return a.name.trim().localeCompare(b.name.trim(), 'km');
@@ -96,8 +64,6 @@ interface AttendanceCategoryViewsProps {
   onSetReason: (studentId: string, reason: string) => void;
   isDarkMode?: boolean;
   onCountsChange?: () => void;
-  activeSubjectName?: string;
-  activeSubjectId?: string;
 }
 
 export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = ({
@@ -113,42 +79,12 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
   onSetReason,
   isDarkMode = false,
   onCountsChange,
-  activeSubjectName = '',
-  activeSubjectId = '',
 }) => {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const [useKhmerNumerals, setUseKhmerNumerals] = useState<boolean>(true);
   const [includeHeader, setIncludeHeader] = useState<boolean>(true);
   // Prefix bullet style: '-' (ត្រេ) | '.' (ចុច) | '•' (ចុចមូល) | 'none' (គ្មាន)
   const [bulletStyle, setBulletStyle] = useState<'dash' | 'dot' | 'bullet' | 'none'>('dash');
-
-  // Study hours configuration state (e.g. "(7-9)")
-  const [studyTime, setStudyTime] = useState<string>(() => {
-    return localStorage.getItem(`study_time_${classId || 'default'}`) || '(7-9)';
-  });
-  const [customSubjectInput, setCustomSubjectInput] = useState<string>(() => {
-    return activeSubjectName || localStorage.getItem(`attendance_custom_subject_${classId || 'default'}`) || '';
-  });
-
-  useEffect(() => {
-    if (activeSubjectName) {
-      setCustomSubjectInput(activeSubjectName);
-    }
-  }, [activeSubjectName]);
-
-  const handleStudyTimeChange = (val: string) => {
-    setStudyTime(val);
-    try {
-      localStorage.setItem(`study_time_${classId || 'default'}`, val);
-    } catch {}
-  };
-
-  const handleCustomSubjectChange = (val: string) => {
-    setCustomSubjectInput(val);
-    try {
-      localStorage.setItem(`attendance_custom_subject_${classId || 'default'}`, val);
-    } catch {}
-  };
 
   // Class student demographic statistics
   const totalStudentsCount = students.length;
@@ -331,7 +267,7 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
     }
 
     if (list.length === 0) {
-      return `ពុំមានសិស្ស${statusLabel} សម្រាប់កាលបរិច្ឆេទ ${attendanceDate} ទេ`;
+      return `ពុំមានសិស្ស${statusLabel}សម្រាប់ថ្ងៃទី ${attendanceDate} ទេ`;
     }
 
     const lines = list.map((s, idx) => formatStudentLine(s, category, idx));
@@ -342,52 +278,25 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
 
     const prefix = getPrefix();
     const fmt = (n: number) => (useKhmerNumerals ? toKhmerNum(n) : n.toString());
-    const displayClassGrade = className ? (className.replace(/^ថ្នាក់(ទី)?\s*/, '') || className) : 'មិនបានបញ្ជាក់';
-    const effectiveSubject = customSubjectInput.trim() || activeSubjectName || '......វិទ្យា';
-    const effectiveStudyTime = studyTime.trim() || '(7-9)';
-    const khmerDateLine = `* ${formatKhmerDateLong(attendanceDate, useKhmerNumerals)}`;
-
     const header = [
-      khmerDateLine,
-      `-មុខវិជ្ជា៖ ${effectiveSubject}`,
-      `-ម៉ោងសិក្សា៖ ${effectiveStudyTime}`,
-      `- ថ្នាក់ទី: ${displayClassGrade}`,
+      `${prefix}${title}`,
+      `${prefix}ថ្នាក់៖ ${className || 'មិនបានបញ្ជាក់'}`,
+      `${prefix}កាលបរិច្ឆេទ៖ ${attendanceDate}`,
       `${prefix}សិស្សចាស់ ៖ ${fmt(effectiveOldCount)} នាក់`,
       `${prefix}សិស្សចូលថ្មី ៖ ${fmt(effectiveNewCount)} នាក់`,
       `${prefix}សិស្សចេញ ៖ ${fmt(effectiveDroppedCount)} នាក់`,
       `${prefix}សិស្សសរុប ៖ ${fmt(effectiveTotalStudentsCount)} នាក់`,
       `${prefix}សិស្សស្រី ៖ ${fmt(femaleStudentsCount)} នាក់`,
       `${prefix}សិស្សមករៀន ៖ ${fmt(effectivePresentCount)} នាក់`,
+      `${prefix}ចំនួន${statusLabel}៖ ${fmt(list.length)} នាក់`,
       '---------------------------------',
-      `${prefix}ចំនួនសិស្ស${statusLabel}សរុប៖ ${fmt(list.length)} នាក់`,
-      '',
-      `${prefix}បញ្ជីសិស្ស${statusLabel} (${fmt(list.length)} នាក់)៖`,
       ...lines,
     ];
 
     return header.join('\n');
   };
 
-  // Generate Combined Permission + Absent Text:
-  // Layout matching user prompt:
-  // * ថ្ងៃទី 23 ខែកញ្ញា ឆ្នាំ 2026
-  // -មុខវិជ្ជា៖ ....វិទ្យា  
-  // -ម៉ោងសិក្សា៖ (7-9)
-  // - ថ្នាក់ទី: ៩ក
-  // - សិស្សចាស់ ៖ ២១ នាក់
-  // - សិស្សចូលថ្មី ៖ ៩ នាក់
-  // - សិស្សចេញ ៖ ៤ នាក់
-  // - សិស្សសរុប ៖ ២៦ នាក់
-  // - សិស្សស្រី ៖ ១៥ នាក់
-  // - សិស្សមករៀន ៖ ២៤ នាក់
-  // ---------------------------------
-  // - អវត្តមានសរុប៖ ២ នាក់ (ច្បាប់: ១ | អវត្តមាន: ១)
-  //
-  // - សិស្សសុំច្បាប់ (១ នាក់)៖
-  // ១. ស៊ុន សុជាតា - ច្បាប់ (ទៅសៀមរាប)
-  //
-  // - សិស្សអវត្តមាន (១ នាក់)៖
-  // ១. យូ ស៊ូចិន - អវត្តមាន
+  // Generate Combined Permission + Absent Text: Permission on TOP (លើ), Absent BELOW (ក្រោម), sorted ก-अ
   const generatePermissionAbsentText = () => {
     const totalCount = permissionStudents.length + absentStudents.length;
     if (totalCount === 0) {
@@ -396,33 +305,27 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
 
     const prefix = getPrefix();
     const fmt = (n: number) => (useKhmerNumerals ? toKhmerNum(n) : n.toString());
-    const displayClassGrade = className ? (className.replace(/^ថ្នាក់(ទី)?\s*/, '') || className) : 'មិនបានបញ្ជាក់';
-    const effectiveSubject = customSubjectInput.trim() || activeSubjectName || '....វិទ្យា';
-    const effectiveStudyTime = studyTime.trim() || '(7-9)';
-    const khmerDateLine = `* ${formatKhmerDateLong(attendanceDate, useKhmerNumerals)}`;
     const sections: string[] = [];
 
     if (includeHeader) {
-      sections.push(khmerDateLine);
-      sections.push(`-មុខវិជ្ជា៖ ${effectiveSubject}`);
-      sections.push(`-ម៉ោងសិក្សា៖ ${effectiveStudyTime}`);
-      sections.push(`- ថ្នាក់ទី: ${displayClassGrade}`);
+      sections.push(`${prefix}បញ្ជីសិស្សសុំច្បាប់ និងអវត្តមាន`);
+      sections.push(`${prefix}ថ្នាក់៖ ${className || 'មិនបានបញ្ជាក់'}`);
+      sections.push(`${prefix}កាលបរិច្ឆេទ៖ ${attendanceDate}`);
       sections.push(`${prefix}សិស្សចាស់ ៖ ${fmt(effectiveOldCount)} នាក់`);
       sections.push(`${prefix}សិស្សចូលថ្មី ៖ ${fmt(effectiveNewCount)} នាក់`);
       sections.push(`${prefix}សិស្សចេញ ៖ ${fmt(effectiveDroppedCount)} នាក់`);
       sections.push(`${prefix}សិស្សសរុប ៖ ${fmt(effectiveTotalStudentsCount)} នាក់`);
       sections.push(`${prefix}សិស្សស្រី ៖ ${fmt(femaleStudentsCount)} នាក់`);
       sections.push(`${prefix}សិស្សមករៀន ៖ ${fmt(effectivePresentCount)} នាក់`);
-      sections.push('---------------------------------');
       sections.push(
         `${prefix}អវត្តមានសរុប៖ ${fmt(totalCount)} នាក់ (ច្បាប់: ${fmt(permissionStudents.length)} | អវត្តមាន: ${fmt(absentStudents.length)})`
       );
-      sections.push(''); // blank line before lists
+      sections.push('---------------------------------');
     }
 
     // 1. អ្នកមានច្បាប់លើ (Permission on top)
     if (permissionStudents.length > 0) {
-      sections.push(`${prefix}សិស្សសុំច្បាប់ (${fmt(permissionStudents.length)} នាក់)៖`);
+      sections.push(`${prefix}សិស្សសុំច្បាប់ (${useKhmerNumerals ? toKhmerNum(permissionStudents.length) : permissionStudents.length} នាក់)៖`);
       permissionStudents.forEach((s, idx) => {
         sections.push(formatStudentLine(s, 'permission', idx));
       });
@@ -434,7 +337,7 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
 
     // 2. អវត្តមានក្រោម (Absent below)
     if (absentStudents.length > 0) {
-      sections.push(`${prefix}សិស្សអវត្តមាន (${fmt(absentStudents.length)} នាក់)៖`);
+      sections.push(`${prefix}សិស្សអវត្តមាន (${useKhmerNumerals ? toKhmerNum(absentStudents.length) : absentStudents.length} នាក់)៖`);
       absentStudents.forEach((s, idx) => {
         sections.push(formatStudentLine(s, 'absent', idx));
       });
@@ -466,26 +369,18 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
 
     const prefix = getPrefix();
     const fmt = (n: number) => (useKhmerNumerals ? toKhmerNum(n) : n.toString());
-    const displayClassGrade = className ? (className.replace(/^ថ្នាក់(ទី)?\s*/, '') || className) : 'មិនបានបញ្ជាក់';
-    const effectiveSubject = customSubjectInput.trim() || activeSubjectName || '....វិទ្យា';
-    const effectiveStudyTime = studyTime.trim() || '(7-9)';
-    const khmerDateLine = `* ${formatKhmerDateLong(attendanceDate, useKhmerNumerals)}`;
-
     const header = [
-      khmerDateLine,
-      `-មុខវិជ្ជា៖ ${effectiveSubject}`,
-      `-ម៉ោងសិក្សា៖ ${effectiveStudyTime}`,
-      `- ថ្នាក់ទី: ${displayClassGrade}`,
+      `${prefix}របាយការណ៍អវត្តមានសិស្សប្រចាំថ្ងៃ`,
+      `${prefix}ថ្នាក់៖ ${className || 'មិនបានបញ្ជាក់'}`,
+      `${prefix}កាលបរិច្ឆេទ៖ ${attendanceDate}`,
       `${prefix}សិស្សចាស់ ៖ ${fmt(effectiveOldCount)} នាក់`,
       `${prefix}សិស្សចូលថ្មី ៖ ${fmt(effectiveNewCount)} នាក់`,
       `${prefix}សិស្សចេញ ៖ ${fmt(effectiveDroppedCount)} នាក់`,
       `${prefix}សិស្សសរុប ៖ ${fmt(effectiveTotalStudentsCount)} នាក់`,
       `${prefix}សិស្សស្រី ៖ ${fmt(femaleStudentsCount)} នាក់`,
       `${prefix}សិស្សមករៀន ៖ ${fmt(effectivePresentCount)} នាក់`,
-      '---------------------------------',
       `${prefix}អវត្តមានសរុប៖ ${fmt(totalAbsentee)} នាក់ (ច្បាប់: ${fmt(permissionStudents.length)} | អវត្តមាន: ${fmt(absentStudents.length)} | យឺត: ${fmt(lateStudents.length)})`,
-      '',
-      `${prefix}បញ្ជីសិស្សអវត្តមាន និងច្បាប់៖`,
+      '---------------------------------',
       ...lines,
     ];
 
@@ -805,46 +700,19 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
         </div>
 
         {/* Class Student Statistics (សិស្សចាស់ / សិស្សថ្មី / សិស្សឈប់ / សរុប / ស្រី / សិស្សមករៀន) */}
-        <div className={`p-3.5 md:p-4 rounded-2xl border flex flex-col gap-3 text-xs ${
+        <div className={`p-3.5 md:p-4 rounded-2xl border flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs ${
           isDarkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'
         }`}>
-          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-            <div className="flex items-center gap-2 flex-wrap">
-              <Users className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span className="font-black text-slate-700 dark:text-slate-200">ស្ថិតិសិស្សក្នុងថ្នាក់៖</span>
-              <span className="text-slate-500 dark:text-slate-400">
-                សរុប <strong className="text-indigo-600 dark:text-indigo-400">{useKhmerNumerals ? toKhmerNum(effectiveTotalStudentsCount) : effectiveTotalStudentsCount}</strong> នាក់ 
-                (ស្រី <strong className="text-pink-600 dark:text-pink-400">{useKhmerNumerals ? toKhmerNum(femaleStudentsCount) : femaleStudentsCount}</strong> នាក់)
-              </span>
-            </div>
-
-            {/* Subject & Study Hours Inputs */}
-            <div className="flex items-center gap-2 flex-wrap">
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-                <span className="text-[11px] font-bold text-slate-500">មុខវិជ្ជា៖</span>
-                <input
-                  type="text"
-                  value={customSubjectInput}
-                  onChange={(e) => handleCustomSubjectChange(e.target.value)}
-                  placeholder="ឧ. រូបវិទ្យា, គណិត..."
-                  className="w-24 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-transparent focus:outline-none"
-                />
-              </div>
-
-              <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-                <span className="text-[11px] font-bold text-slate-500">ម៉ោងសិក្សា៖</span>
-                <input
-                  type="text"
-                  value={studyTime}
-                  onChange={(e) => handleStudyTimeChange(e.target.value)}
-                  placeholder="(7-9)"
-                  className="w-16 text-center text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-transparent focus:outline-none"
-                />
-              </div>
-            </div>
+          <div className="flex items-center gap-2 flex-wrap">
+            <Users className="w-4 h-4 text-indigo-500 shrink-0" />
+            <span className="font-black text-slate-700 dark:text-slate-200">ស្ថិតិសិស្សក្នុងថ្នាក់៖</span>
+            <span className="text-slate-500 dark:text-slate-400">
+              សរុប <strong className="text-indigo-600 dark:text-indigo-400">{useKhmerNumerals ? toKhmerNum(effectiveTotalStudentsCount) : effectiveTotalStudentsCount}</strong> នាក់ 
+              (ស្រី <strong className="text-pink-600 dark:text-pink-400">{useKhmerNumerals ? toKhmerNum(femaleStudentsCount) : femaleStudentsCount}</strong> នាក់)
+            </span>
           </div>
 
-          <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+          <div className="flex items-center gap-2 flex-wrap">
             {/* សិស្សចាស់ */}
             <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
               <span className="text-[11px] font-bold text-slate-500">សិស្សចាស់៖</span>
@@ -1313,46 +1181,19 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
       </div>
 
       {/* Class Student Statistics (សិស្សចាស់ / សិស្សថ្មី / សិស្សឈប់ / សរុប / ស្រី / សិស្សមករៀន) */}
-      <div className={`p-3.5 md:p-4 rounded-2xl border flex flex-col gap-3 text-xs ${
+      <div className={`p-3.5 md:p-4 rounded-2xl border flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3 text-xs ${
         isDarkMode ? 'bg-slate-900/40 border-slate-800' : 'bg-slate-50 border-slate-200'
       }`}>
-        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-3">
-          <div className="flex items-center gap-2 flex-wrap">
-            <Users className="w-4 h-4 text-indigo-500 shrink-0" />
-            <span className="font-black text-slate-700 dark:text-slate-200">ស្ថិតិសិស្សក្នុងថ្នាក់៖</span>
-            <span className="text-slate-500 dark:text-slate-400">
-              សរុប <strong className="text-indigo-600 dark:text-indigo-400">{useKhmerNumerals ? toKhmerNum(effectiveTotalStudentsCount) : effectiveTotalStudentsCount}</strong> នាក់ 
-              (ស្រី <strong className="text-pink-600 dark:text-pink-400">{useKhmerNumerals ? toKhmerNum(femaleStudentsCount) : femaleStudentsCount}</strong> នាក់)
-            </span>
-          </div>
-
-          {/* Subject & Study Hours Inputs */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[11px] font-bold text-slate-500">មុខវិជ្ជា៖</span>
-              <input
-                type="text"
-                value={customSubjectInput}
-                onChange={(e) => handleCustomSubjectChange(e.target.value)}
-                placeholder="ឧ. រូបវិទ្យា, គណិត..."
-                className="w-24 text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-transparent focus:outline-none"
-              />
-            </div>
-
-            <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
-              <span className="text-[11px] font-bold text-slate-500">ម៉ោងសិក្សា៖</span>
-              <input
-                type="text"
-                value={studyTime}
-                onChange={(e) => handleStudyTimeChange(e.target.value)}
-                placeholder="(7-9)"
-                className="w-16 text-center text-xs font-bold text-indigo-600 dark:text-indigo-400 bg-transparent focus:outline-none"
-              />
-            </div>
-          </div>
+        <div className="flex items-center gap-2 flex-wrap">
+          <Users className="w-4 h-4 text-indigo-500 shrink-0" />
+          <span className="font-black text-slate-700 dark:text-slate-200">ស្ថិតិសិស្សក្នុងថ្នាក់៖</span>
+          <span className="text-slate-500 dark:text-slate-400">
+            សរុប <strong className="text-indigo-600 dark:text-indigo-400">{useKhmerNumerals ? toKhmerNum(effectiveTotalStudentsCount) : effectiveTotalStudentsCount}</strong> នាក់ 
+            (ស្រី <strong className="text-pink-600 dark:text-pink-400">{useKhmerNumerals ? toKhmerNum(femaleStudentsCount) : femaleStudentsCount}</strong> នាក់)
+          </span>
         </div>
 
-        <div className="flex items-center gap-2 flex-wrap pt-2 border-t border-slate-200/60 dark:border-slate-800/60">
+        <div className="flex items-center gap-2 flex-wrap">
           {/* សិស្សចាស់ */}
           <div className="flex items-center gap-1.5 bg-white dark:bg-slate-950 px-2.5 py-1 rounded-xl border border-slate-200 dark:border-slate-800 shadow-2xs">
             <span className="text-[11px] font-bold text-slate-500">សិស្សចាស់៖</span>

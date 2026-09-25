@@ -3,10 +3,9 @@ import { motion } from 'motion/react';
 import { 
   Download, Printer, RotateCcw, Plus, Search, Star, 
   Award, Trophy, Table, LayoutGrid, Sparkles, ArrowUpDown, 
-  ArrowUpAZ, Hash, ArrowDownUp, RefreshCw, BookOpen
+  ArrowUpAZ, Hash, ArrowDownUp, RefreshCw
 } from 'lucide-react';
-import { Student, ClassInfo, MonthlyDetailedScore, WeeklyScoreBreakdown, QuizSubject } from '../types';
-import { getStudentMonthlyScoresForSubject, getStudentTotalScoreForSubject } from '../lib/scoreUtils';
+import { Student, ClassInfo, MonthlyDetailedScore, WeeklyScoreBreakdown } from '../types';
 import * as XLSX from 'xlsx';
 import SovannaphumiLogo from './SovannaphumiLogo';
 import { GenderBadgePicker } from './GenderBadgePicker';
@@ -21,10 +20,6 @@ interface StudentScoreTableProps {
   onUpdateStudentDetail?: (id: string, fields: Partial<Student>) => void;
   currentSortMode?: SortMode;
   onSortModeChange?: (mode: SortMode) => void;
-  activeSubjectId?: string | null;
-  activeSubjectName?: string;
-  subjects?: QuizSubject[];
-  onSelectSubject?: (subjectId: string) => void;
 }
 
 const KHMER_MONTHS = [
@@ -39,11 +34,7 @@ export function StudentScoreTable({
   isDarkMode = false,
   onUpdateStudentDetail,
   currentSortMode,
-  onSortModeChange,
-  activeSubjectId,
-  activeSubjectName,
-  subjects,
-  onSelectSubject
+  onSortModeChange
 }: StudentScoreTableProps) {
   // Current active month
   const currentMonthIndex = new Date().getMonth();
@@ -70,20 +61,18 @@ export function StudentScoreTable({
 
   // Average divisor state (e.g. ÷2, ÷10, ÷1)
   const [averageDivisor, setAverageDivisor] = useState<number>(() => {
-    const saved = localStorage.getItem(`avg_divisor_${activeClassId}_${activeSubjectId || 'general'}`) || localStorage.getItem(`avg_divisor_${activeClassId}`);
+    const saved = localStorage.getItem(`avg_divisor_${activeClassId}`);
     return saved ? parseFloat(saved) || 2 : 2;
   });
 
   const handleDivisorChange = (newDiv: number) => {
     setAverageDivisor(newDiv);
-    localStorage.setItem(`avg_divisor_${activeClassId}_${activeSubjectId || 'general'}`, newDiv.toString());
     localStorage.setItem(`avg_divisor_${activeClassId}`, newDiv.toString());
   };
 
   // Helper to calculate subtotal WITHOUT monthly exam
   const calculateSubTotalNoExam = (student: Student, month: string): number => {
-    const monthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
-    const monthData = monthScores?.[month];
+    const monthData = student.monthlyScores?.[month];
     if (monthData?.manualSubTotalNoExam !== undefined && monthData?.manualSubTotalNoExam !== null) {
       return Number(monthData.manualSubTotalNoExam) || 0;
     }
@@ -102,21 +91,19 @@ export function StudentScoreTable({
 
   // Helper to calculate grand total for the month (monthly exam + subtotal)
   const calculateStudentMonthTotal = (student: Student, month: string): number => {
-    const monthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
-    const monthData = monthScores?.[month];
+    const monthData = student.monthlyScores?.[month];
     if (monthData?.manualTotal !== undefined && monthData?.manualTotal !== null) {
       return Number(monthData.manualTotal) || 0;
     }
     const mExam = Number(monthData?.monthlyExam) || 0;
     const subTotal = calculateSubTotalNoExam(student, month);
     const sum = mExam + subTotal;
-    return sum > 0 ? sum : getStudentTotalScoreForSubject(student, activeSubjectId || undefined);
+    return sum > 0 ? sum : (student.score || 0);
   };
 
   // Helper to calculate average for the month
   const calculateStudentMonthAverage = (student: Student, month: string): number => {
-    const monthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
-    const monthData = monthScores?.[month];
+    const monthData = student.monthlyScores?.[month];
     if (monthData?.manualAverage !== undefined && monthData?.manualAverage !== null) {
       return Number(monthData.manualAverage) || 0;
     }
@@ -146,7 +133,7 @@ export function StudentScoreTable({
       }
     }
     return ranks;
-  }, [students, selectedMonth, activeSubjectId]);
+  }, [students, selectedMonth]);
 
   // Helper to update specific score sub-field (resets manual total overrides so formula stays sync)
   const handleScoreFieldChange = (
@@ -157,7 +144,7 @@ export function StudentScoreTable({
     if (!onUpdateStudentDetail) return;
     const val = rawVal === '' ? undefined : Math.max(0, parseFloat(rawVal) || 0);
 
-    const currentMonthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
+    const currentMonthScores = student.monthlyScores || {};
     const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
 
     const updatedMonthData: MonthlyDetailedScore = JSON.parse(JSON.stringify(existingMonthData));
@@ -199,22 +186,12 @@ export function StudentScoreTable({
     const notebook = Number(updatedMonthData.notebook) || 0;
 
     const newTotal = mExam + w1 + w2 + w3 + w4 + groupWork + quiz + notebook;
-    const updatedMonthlyMap = {
-      ...currentMonthScores,
-      [selectedMonth]: updatedMonthData
-    };
-
-    const updatedSubjectScores = { ...(student.subjectScores || {}) };
-    if (activeSubjectId) {
-      updatedSubjectScores[activeSubjectId] = {
-        score: newTotal,
-        monthlyScores: updatedMonthlyMap
-      };
-    }
 
     onUpdateStudentDetail(student.id, {
-      monthlyScores: updatedMonthlyMap,
-      subjectScores: updatedSubjectScores,
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      },
       score: newTotal
     });
   };
@@ -222,7 +199,7 @@ export function StudentScoreTable({
   // Manual direct override for SubTotal without Exam
   const handleManualSubTotalChange = (student: Student, rawVal: string) => {
     if (!onUpdateStudentDetail) return;
-    const currentMonthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
+    const currentMonthScores = student.monthlyScores || {};
     const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
     const updatedMonthData: MonthlyDetailedScore = { ...existingMonthData };
 
@@ -237,22 +214,12 @@ export function StudentScoreTable({
     }
 
     const calculatedTotal = calculateStudentMonthTotal({ ...student, monthlyScores: { ...currentMonthScores, [selectedMonth]: updatedMonthData } }, selectedMonth);
-    const updatedMonthlyMap = {
-      ...currentMonthScores,
-      [selectedMonth]: updatedMonthData
-    };
-
-    const updatedSubjectScores = { ...(student.subjectScores || {}) };
-    if (activeSubjectId) {
-      updatedSubjectScores[activeSubjectId] = {
-        score: calculatedTotal,
-        monthlyScores: updatedMonthlyMap
-      };
-    }
 
     onUpdateStudentDetail(student.id, {
-      monthlyScores: updatedMonthlyMap,
-      subjectScores: updatedSubjectScores,
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      },
       score: calculatedTotal
     });
   };
@@ -260,7 +227,7 @@ export function StudentScoreTable({
   // Manual direct override for Grand Total
   const handleManualGrandTotalChange = (student: Student, rawVal: string) => {
     if (!onUpdateStudentDetail) return;
-    const currentMonthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
+    const currentMonthScores = student.monthlyScores || {};
     const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
     const updatedMonthData: MonthlyDetailedScore = { ...existingMonthData };
 
@@ -272,22 +239,12 @@ export function StudentScoreTable({
     }
 
     const calculatedTotal = calculateStudentMonthTotal({ ...student, monthlyScores: { ...currentMonthScores, [selectedMonth]: updatedMonthData } }, selectedMonth);
-    const updatedMonthlyMap = {
-      ...currentMonthScores,
-      [selectedMonth]: updatedMonthData
-    };
-
-    const updatedSubjectScores = { ...(student.subjectScores || {}) };
-    if (activeSubjectId) {
-      updatedSubjectScores[activeSubjectId] = {
-        score: calculatedTotal,
-        monthlyScores: updatedMonthlyMap
-      };
-    }
 
     onUpdateStudentDetail(student.id, {
-      monthlyScores: updatedMonthlyMap,
-      subjectScores: updatedSubjectScores,
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      },
       score: calculatedTotal
     });
   };
@@ -295,7 +252,7 @@ export function StudentScoreTable({
   // Manual direct override for Average
   const handleManualAverageChange = (student: Student, rawVal: string) => {
     if (!onUpdateStudentDetail) return;
-    const currentMonthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
+    const currentMonthScores = student.monthlyScores || {};
     const existingMonthData: MonthlyDetailedScore = currentMonthScores[selectedMonth] || {};
     const updatedMonthData: MonthlyDetailedScore = { ...existingMonthData };
 
@@ -306,22 +263,11 @@ export function StudentScoreTable({
       updatedMonthData.manualAverage = parsed;
     }
 
-    const updatedMonthlyMap = {
-      ...currentMonthScores,
-      [selectedMonth]: updatedMonthData
-    };
-
-    const updatedSubjectScores = { ...(student.subjectScores || {}) };
-    if (activeSubjectId) {
-      updatedSubjectScores[activeSubjectId] = {
-        score: student.score || 0,
-        monthlyScores: updatedMonthlyMap
-      };
-    }
-
     onUpdateStudentDetail(student.id, {
-      monthlyScores: updatedMonthlyMap,
-      subjectScores: updatedSubjectScores
+      monthlyScores: {
+        ...currentMonthScores,
+        [selectedMonth]: updatedMonthData
+      }
     });
   };
 
@@ -478,8 +424,7 @@ export function StudentScoreTable({
 
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `ពិន្ទុ_${selectedMonth}`);
-    const safeSubName = (activeSubjectName || 'ទូទៅ').replace(/[/\\?%*:|"<>]/g, '_');
-    XLSX.writeFile(wb, `តារាងពិន្ទុសិស្ស_មុខវិជ្ជា_${safeSubName}_ខែ${selectedMonth}_${currentClassName}.xlsx`);
+    XLSX.writeFile(wb, `តារាងពិន្ទុសិស្ស_ខែ${selectedMonth}_${currentClassName}.xlsx`);
 
     // Also download the official school logo image file to go together with the Excel file
     const link = document.createElement('a');
@@ -494,22 +439,13 @@ export function StudentScoreTable({
   // Reset scores for active month
   const handleResetMonthScores = () => {
     if (!onUpdateStudentDetail || students.length === 0) return;
-    const subLabel = activeSubjectName ? `សម្រាប់មុខវិជ្ជា «${activeSubjectName}» ` : '';
-    if (window.confirm(`តើអ្នកពិតជាចង់កំណត់ពិន្ទុខែ «${selectedMonth}» ${subLabel}ទាំងអស់ឡើងវិញទៅ 0 មែនទេ?`)) {
+    if (window.confirm(`តើអ្នកពិតជាចង់កំណត់ពិន្ទុខែ «${selectedMonth}» ទាំងអស់ឡើងវិញទៅ 0 មែនទេ?`)) {
       students.forEach(s => {
-        const currentMonthScores = getStudentMonthlyScoresForSubject(s, activeSubjectId || undefined);
+        const currentMonthScores = s.monthlyScores || {};
         const updated = { ...currentMonthScores };
         delete updated[selectedMonth];
-        const updatedSubjectScores = { ...(s.subjectScores || {}) };
-        if (activeSubjectId) {
-          updatedSubjectScores[activeSubjectId] = {
-            score: 0,
-            monthlyScores: updated
-          };
-        }
         onUpdateStudentDetail(s.id, {
           monthlyScores: updated,
-          subjectScores: updatedSubjectScores,
           score: 0
         });
       });
@@ -527,45 +463,8 @@ export function StudentScoreTable({
         isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200/80'
       }`}>
         
-        {/* Left: Subject Switcher/Badge, Month Selector & Sort Dropdown */}
+        {/* Left: Month Selector & Sort Dropdown */}
         <div className="flex flex-wrap items-center gap-3">
-          {/* Active Subject Selector / Badge */}
-          {subjects && subjects.length > 0 && onSelectSubject ? (
-            <div className="flex items-center gap-1.5">
-              <span className="text-xs font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">
-                មុខវិជ្ជា៖
-              </span>
-              <div className={`flex items-center gap-1.5 px-3 py-1 rounded-2xl border ${
-                isDarkMode 
-                  ? 'bg-indigo-950/60 border-indigo-800/80 text-indigo-300' 
-                  : 'bg-indigo-50/90 border-indigo-200 text-indigo-800 shadow-xs'
-              }`}>
-                <BookOpen className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-                <select
-                  value={activeSubjectId || (subjects[0]?.id || '')}
-                  onChange={(e) => onSelectSubject(e.target.value)}
-                  className="bg-transparent border-none text-xs font-black text-indigo-700 dark:text-indigo-300 cursor-pointer focus:outline-none pr-1"
-                  title="ជ្រើសរើសមុខវិជ្ជាដើម្បីបញ្ចូល និងមើលពិន្ទុ"
-                >
-                  {subjects.map(sub => (
-                    <option key={sub.id} value={sub.id} className={isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}>
-                      {sub.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          ) : activeSubjectName ? (
-            <div className={`flex items-center gap-1.5 px-3 py-1.5 rounded-2xl border ${
-              isDarkMode 
-                ? 'bg-indigo-950/60 border-indigo-800/80 text-indigo-300 shadow-[inset_0_1px_2px_rgba(255,255,255,0.1)]' 
-                : 'bg-indigo-50/90 border-indigo-200 text-indigo-800 shadow-xs'
-            }`}>
-              <BookOpen className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
-              <span className="text-xs font-black">មុខវិជ្ជា៖ {activeSubjectName}</span>
-            </div>
-          ) : null}
-
           {/* Month Selector */}
           <div className="flex items-center gap-2">
             <span className="text-xs font-black text-slate-500 dark:text-slate-400 whitespace-nowrap">
@@ -826,7 +725,7 @@ export function StudentScoreTable({
       {/* ===================== VIEW 1: OFFICIAL TABLE SHEET VIEW WITH SCROLL ===================== */}
       {activeViewMode === 'table' && (
         <div className={`border rounded-3xl overflow-hidden shadow-lg flex flex-col ${
-          isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200/90'
+          isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-white border-slate-200/90'
         }`}>
           
           {/* Official MoEYS / Sovannaphumi School Header Banner */}
@@ -1027,8 +926,7 @@ export function StudentScoreTable({
               <tbody className="divide-y divide-slate-200 dark:divide-slate-800">
                 {processedStudents.length > 0 ? (
                   processedStudents.map((student, idx) => {
-                    const monthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
-                    const monthData = monthScores?.[selectedMonth] || {};
+                    const monthData = student.monthlyScores?.[selectedMonth] || {};
                     const subTotalNoExam = calculateSubTotalNoExam(student, selectedMonth);
                     const grandTotal = calculateStudentMonthTotal(student, selectedMonth);
                     const average = calculateStudentMonthAverage(student, selectedMonth);
@@ -1397,8 +1295,7 @@ export function StudentScoreTable({
               const subTotalNoExam = calculateSubTotalNoExam(student, selectedMonth);
               const averageScore = calculateStudentMonthAverage(student, selectedMonth);
               const rankNumber = studentRanks[student.id] || (idx + 1);
-              const monthScores = getStudentMonthlyScoresForSubject(student, activeSubjectId || undefined);
-              const monthData = monthScores?.[selectedMonth] || {};
+              const monthData = student.monthlyScores?.[selectedMonth] || {};
 
               let rankBadge = (
                 <span className={`w-7 h-7 rounded-lg flex items-center justify-center text-xs font-black shrink-0 ${
@@ -1436,7 +1333,7 @@ export function StudentScoreTable({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3 ${
                     isDarkMode 
-                      ? 'bg-[#222222] border-[#333333]' 
+                      ? 'bg-[#1e293b] border-slate-800' 
                       : 'bg-white border-slate-200/80'
                   }`}
                 >

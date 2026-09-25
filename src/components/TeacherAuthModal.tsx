@@ -1,98 +1,40 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle, Loader2, Mail, ArrowLeft, Send } from 'lucide-react';
+import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle, Loader2 } from 'lucide-react';
 import { TeacherAccount } from '../types';
 import { doc } from 'firebase/firestore';
-import { GlassLiquidOverlay } from './GlassLiquidCapsule';
-import { 
-  db, 
-  auth, 
-  signInWithPopup, 
-  GoogleAuthProvider, 
-  FacebookAuthProvider, 
-  signInWithEmailAndPassword, 
-  createUserWithEmailAndPassword,
-  handleFirestoreError, 
-  OperationType, 
-  safeSetDoc, 
-  safeGetDoc,
-  saveTeacherToLocalRegistry,
-  getTeacherFromLocalRegistry
-} from '../lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeGetDoc } from '../lib/firebase';
 
 interface TeacherAuthModalProps {
   isOpen: boolean;
   onClose: () => void;
   onLoginSuccess: (account: TeacherAccount) => void;
   initialMode?: 'login' | 'register';
-  isDarkMode?: boolean;
 }
 
-// Brand SVG Icons
-const GoogleIcon = () => (
-  <svg className="w-5 h-5 shrink-0" viewBox="0 0 24 24">
-    <path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/>
-    <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/>
-    <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z"/>
-    <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z"/>
-  </svg>
-);
-
-const FacebookIcon = () => (
-  <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 24 24">
-    <path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/>
-  </svg>
-);
-
-const TelegramIcon = () => (
-  <svg className="w-5 h-5 shrink-0 fill-current" viewBox="0 0 24 24">
-    <path d="M12 0C5.37 0 0 5.37 0 12s5.37 12 12 12 12-5.37 12-12S18.63 0 12 0zm5.562 8.161c-.18 1.897-.962 6.502-1.359 8.627-.168.9-.5 1.201-.82 1.23-.697.064-1.226-.461-1.901-.903-1.056-.692-1.653-1.123-2.678-1.799-1.185-.781-.417-1.21.258-1.911.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.139-5.062 3.345-.479.329-.913.489-1.302.481-.428-.008-1.252-.241-1.865-.44-.752-.244-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.831-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635.099-.002.321.023.465.141.119.098.152.228.166.331.016.115.023.233.003.364z"/>
-  </svg>
-);
-
-export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, initialMode = 'login', isDarkMode }: TeacherAuthModalProps) {
+export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, initialMode = 'login' }: TeacherAuthModalProps) {
   const [isLoginView, setIsLoginView] = useState(initialMode === 'login');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeSubModal, setActiveSubModal] = useState<'none' | 'email' | 'google' | 'facebook' | 'telegram'>('none');
-
+  
   useEffect(() => {
     if (isOpen) {
       setIsLoginView(initialMode === 'login');
-      setActiveSubModal('none');
     }
   }, [initialMode, isOpen]);
-
-  // Standard Login fields
+  
+  // Login fields
   const [loginUsername, setLoginUsername] = useState('');
   const [loginPassword, setLoginPassword] = useState('');
   const [showLoginPassword, setShowLoginPassword] = useState(false);
-
-  // Standard Register fields
+  
+  // Register fields
   const [regName, setRegName] = useState('');
   const [regSchool, setRegSchool] = useState('');
   const [regSubject, setRegSubject] = useState('');
   const [regUsername, setRegUsername] = useState('');
   const [regPassword, setRegPassword] = useState('');
   const [showRegPassword, setShowRegPassword] = useState(false);
-
-  // Email SubModal fields
-  const [emailAddress, setEmailAddress] = useState('');
-  const [emailPassword, setEmailPassword] = useState('');
-  const [emailTeacherName, setEmailTeacherName] = useState('');
-  const [emailSchoolName, setEmailSchoolName] = useState('សាលារៀនសុវណ្ណភូមិ');
-
-  // Google SubModal fields
-  const [googleEmail, setGoogleEmail] = useState('');
-  const [googleName, setGoogleName] = useState('');
-
-  // Facebook SubModal fields
-  const [facebookEmail, setFacebookEmail] = useState('');
-  const [facebookName, setFacebookName] = useState('');
-
-  // Telegram SubModal fields
-  const [telegramUsername, setTelegramUsername] = useState('');
-  const [telegramName, setTelegramName] = useState('');
-
+  
   const [errorMsg, setErrorMsg] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
 
@@ -103,322 +45,8 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
     setIsLoading(false);
     setShowLoginPassword(false);
     setShowRegPassword(false);
-  }, [isLoginView, activeSubModal]);
+  }, [isLoginView]);
 
-  // ----------------------- GOOGLE AUTHENTICATION -----------------------
-  const handleGoogleAuth = async () => {
-    setIsLoading(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      const provider = new GoogleAuthProvider();
-      provider.setCustomParameters({ prompt: 'select_account' });
-      const authPromise = signInWithPopup(auth, provider);
-      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Popup timeout')), 8000));
-      const result: any = await Promise.race([authPromise, timeoutPromise]);
-      const user = result.user;
-
-      if (user) {
-        const email = user.email || '';
-        const cleanId = email ? `email_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : `google_${user.uid}`;
-        const teacherDocRef = doc(db, 'teachers', cleanId);
-        const teacherSnap = await safeGetDoc(teacherDocRef);
-
-        let teacherData: TeacherAccount;
-        if (teacherSnap && teacherSnap.exists()) {
-          teacherData = teacherSnap.data() as TeacherAccount;
-        } else {
-          teacherData = {
-            id: cleanId,
-            name: user.displayName || 'លោកគ្រូ/អ្នកគ្រូ Google',
-            schoolName: 'សាលារៀនសុវណ្ណភូមិ',
-            username: email ? email.split('@')[0] : `google_${user.uid.slice(0, 6)}`,
-            email: email,
-            avatarUrl: user.photoURL || undefined,
-            authProvider: 'google'
-          };
-          safeSetDoc(teacherDocRef, teacherData).catch(() => {});
-        }
-
-        localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
-        saveTeacherToLocalRegistry(teacherData);
-        onLoginSuccess(teacherData);
-        setSuccessMsg(`ចូលប្រើប្រាស់ជាមួយ Google Account (${email || user.displayName}) ជោគជ័យ!`);
-        setTimeout(() => {
-          onClose();
-          setIsLoading(false);
-        }, 800);
-        return;
-      }
-    } catch (err: any) {
-      console.warn('Google Popup notice, opening account sync form:', err?.message);
-      setActiveSubModal('google');
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleDirectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!googleEmail.trim()) {
-      setErrorMsg('សូមបំពេញ Email Google របស់អ្នក!');
-      return;
-    }
-    setIsLoading(true);
-    setErrorMsg('');
-
-    const cleanEmail = googleEmail.trim().toLowerCase();
-    const cleanId = `email_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
-
-    try {
-      const teacherDocRef = doc(db, 'teachers', cleanId);
-      const teacherSnap = await safeGetDoc(teacherDocRef);
-
-      let teacherData: TeacherAccount;
-      if (teacherSnap && teacherSnap.exists()) {
-        teacherData = teacherSnap.data() as TeacherAccount;
-      } else {
-        teacherData = {
-          id: cleanId,
-          name: googleName.trim() || `លោកគ្រូ (${cleanEmail.split('@')[0]})`,
-          schoolName: 'សាលារៀនសុវណ្ណភូមិ',
-          username: cleanEmail.split('@')[0],
-          email: cleanEmail,
-          authProvider: 'google'
-        };
-        safeSetDoc(teacherDocRef, teacherData).catch(() => {});
-      }
-
-      localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
-      saveTeacherToLocalRegistry(teacherData);
-      onLoginSuccess(teacherData);
-      setSuccessMsg(`ចូលប្រើប្រាស់ជាមួយ Google Account (${cleanEmail}) ជោគជ័យ!`);
-      setTimeout(() => {
-        onClose();
-        setIsLoading(false);
-        setActiveSubModal('none');
-      }, 800);
-    } catch (err) {
-      setErrorMsg('មានបញ្ហាភ្ជាប់ទៅកាន់ Cloud internet ។');
-      setIsLoading(false);
-    }
-  };
-
-  // ----------------------- FACEBOOK AUTHENTICATION -----------------------
-  const handleFacebookAuth = async () => {
-    setIsLoading(true);
-    setErrorMsg('');
-    setSuccessMsg('');
-    try {
-      const provider = new FacebookAuthProvider();
-      const authPromise = signInWithPopup(auth, provider);
-      const timeoutPromise = new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Popup timeout')), 8000));
-      const result: any = await Promise.race([authPromise, timeoutPromise]);
-      const user = result.user;
-
-      if (user) {
-        const email = user.email || '';
-        const cleanId = email ? `fb_${email.toLowerCase().replace(/[^a-z0-9]/g, '_')}` : `fb_${user.uid}`;
-        const teacherDocRef = doc(db, 'teachers', cleanId);
-        const teacherSnap = await safeGetDoc(teacherDocRef);
-
-        let teacherData: TeacherAccount;
-        if (teacherSnap && teacherSnap.exists()) {
-          teacherData = teacherSnap.data() as TeacherAccount;
-        } else {
-          teacherData = {
-            id: cleanId,
-            name: user.displayName || 'លោកគ្រូ/អ្នកគ្រូ Facebook',
-            schoolName: 'សាលារៀនសុវណ្ណភូមិ',
-            username: email ? email.split('@')[0] : `fb_${user.uid.slice(0, 6)}`,
-            email: email,
-            avatarUrl: user.photoURL || undefined,
-            authProvider: 'facebook'
-          };
-          safeSetDoc(teacherDocRef, teacherData).catch(() => {});
-        }
-
-        localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
-        saveTeacherToLocalRegistry(teacherData);
-        onLoginSuccess(teacherData);
-        setSuccessMsg(`ចូលប្រើប្រាស់ជាមួយ Facebook (${user.displayName || email}) ជោគជ័យ!`);
-        setTimeout(() => {
-          onClose();
-          setIsLoading(false);
-        }, 800);
-        return;
-      }
-    } catch (err: any) {
-      console.warn('Facebook Popup notice, opening account sync form:', err?.message);
-      setActiveSubModal('facebook');
-      setIsLoading(false);
-    }
-  };
-
-  const handleFacebookDirectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!facebookEmail.trim()) {
-      setErrorMsg('សូមបំពេញ ឈ្មោះគណនី ឬ Email Facebook របស់អ្នក!');
-      return;
-    }
-    setIsLoading(true);
-    setErrorMsg('');
-
-    const cleanInput = facebookEmail.trim().toLowerCase();
-    const cleanId = `fb_${cleanInput.replace(/[^a-z0-9]/g, '_')}`;
-
-    try {
-      const teacherDocRef = doc(db, 'teachers', cleanId);
-      const teacherSnap = await safeGetDoc(teacherDocRef);
-
-      let teacherData: TeacherAccount;
-      if (teacherSnap && teacherSnap.exists()) {
-        teacherData = teacherSnap.data() as TeacherAccount;
-      } else {
-        teacherData = {
-          id: cleanId,
-          name: facebookName.trim() || `លោកគ្រូ/អ្នកគ្រូ Facebook (${cleanInput})`,
-          schoolName: 'សាលារៀនសុវណ្ណភូមិ',
-          username: cleanInput.includes('@') ? cleanInput.split('@')[0] : cleanInput,
-          email: cleanInput.includes('@') ? cleanInput : undefined,
-          authProvider: 'facebook'
-        };
-        safeSetDoc(teacherDocRef, teacherData).catch(() => {});
-      }
-
-      localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
-      saveTeacherToLocalRegistry(teacherData);
-      onLoginSuccess(teacherData);
-      setSuccessMsg(`ចូលប្រើប្រាស់ជាមួយ Facebook Account (${cleanInput}) ជោគជ័យ!`);
-      setTimeout(() => {
-        onClose();
-        setIsLoading(false);
-        setActiveSubModal('none');
-      }, 800);
-    } catch (err) {
-      setErrorMsg('មានបញ្ហាភ្ជាប់ទៅកាន់ Cloud internet ។');
-      setIsLoading(false);
-    }
-  };
-
-  // ----------------------- TELEGRAM AUTHENTICATION -----------------------
-  const handleTelegramAuth = () => {
-    setErrorMsg('');
-    setSuccessMsg('');
-    setActiveSubModal('telegram');
-  };
-
-  const handleTelegramDirectSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!telegramUsername.trim()) {
-      setErrorMsg('សូមបំពេញ Telegram Username (ឧ. @teacher_kh) ឬលេខទូរស័ព្ទ!');
-      return;
-    }
-    setIsLoading(true);
-    setErrorMsg('');
-
-    const rawTg = telegramUsername.trim().replace(/^@/, '').toLowerCase();
-    const cleanId = `tg_${rawTg.replace(/[^a-z0-9]/g, '_')}`;
-
-    try {
-      const teacherDocRef = doc(db, 'teachers', cleanId);
-      const teacherSnap = await safeGetDoc(teacherDocRef);
-
-      let teacherData: TeacherAccount;
-      if (teacherSnap && teacherSnap.exists()) {
-        teacherData = teacherSnap.data() as TeacherAccount;
-      } else {
-        teacherData = {
-          id: cleanId,
-          name: telegramName.trim() || `លោកគ្រូ Telegram (@${rawTg})`,
-          schoolName: 'សាលារៀនសុវណ្ណភូមិ',
-          username: rawTg,
-          telegramUsername: `@${rawTg}`,
-          authProvider: 'telegram'
-        };
-        safeSetDoc(teacherDocRef, teacherData).catch(() => {});
-      }
-
-      localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
-      saveTeacherToLocalRegistry(teacherData);
-      onLoginSuccess(teacherData);
-      setSuccessMsg(`ចូលប្រើប្រាស់ជាមួយ Telegram Account (@${rawTg}) ជោគជ័យ!`);
-      setTimeout(() => {
-        onClose();
-        setIsLoading(false);
-        setActiveSubModal('none');
-      }, 800);
-    } catch (err) {
-      setErrorMsg('មានបញ្ហាភ្ជាប់ទៅកាន់ Cloud internet ។');
-      setIsLoading(false);
-    }
-  };
-
-  // ----------------------- EMAIL AUTHENTICATION -----------------------
-  const handleEmailAuthSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!emailAddress.trim() || !emailPassword.trim()) {
-      setErrorMsg('សូមបំពេញ អ៊ីមែល និងលេខសម្ងាត់!');
-      return;
-    }
-    setIsLoading(true);
-    setErrorMsg('');
-
-    const cleanEmail = emailAddress.trim().toLowerCase();
-    const cleanId = `email_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
-
-    try {
-      // 1. Firebase Auth Attempt (non-blocking)
-      try {
-        if (isLoginView) {
-          await signInWithEmailAndPassword(auth, cleanEmail, emailPassword);
-        } else {
-          await createUserWithEmailAndPassword(auth, cleanEmail, emailPassword);
-        }
-      } catch (fbAuthErr: any) {
-        console.warn('Firebase Email Auth Notice:', fbAuthErr?.message);
-      }
-
-      // 2. Fetch / Create teacher doc
-      const teacherDocRef = doc(db, 'teachers', cleanId);
-      const teacherSnap = await safeGetDoc(teacherDocRef);
-
-      let teacherData: TeacherAccount;
-      if (teacherSnap && teacherSnap.exists()) {
-        teacherData = teacherSnap.data() as TeacherAccount;
-        if (teacherData.password && teacherData.password !== emailPassword) {
-          setErrorMsg('លេខសម្ងាត់មិនត្រឹមត្រូវឡើយ។ សូមព្យាយាមម្ដងទៀត!');
-          setIsLoading(false);
-          return;
-        }
-      } else {
-        teacherData = {
-          id: cleanId,
-          name: emailTeacherName.trim() || `លោកគ្រូ/អ្នកគ្រូ (${cleanEmail.split('@')[0]})`,
-          schoolName: emailSchoolName.trim() || 'សាលារៀនសុវណ្ណភូមិ',
-          username: cleanEmail.split('@')[0],
-          email: cleanEmail,
-          password: emailPassword,
-          authProvider: 'email'
-        };
-        safeSetDoc(teacherDocRef, teacherData).catch(() => {});
-      }
-
-      localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
-      saveTeacherToLocalRegistry(teacherData);
-      onLoginSuccess(teacherData);
-      setSuccessMsg(`ចូលប្រើប្រាស់ជាមួយ Email (${cleanEmail}) ជោគជ័យ!`);
-      setTimeout(() => {
-        onClose();
-        setIsLoading(false);
-        setActiveSubModal('none');
-      }, 800);
-    } catch (err) {
-      setErrorMsg('ការភ្ជាប់អ៊ីមែលបរាជ័យ សូមពិនិត្យព័ត៌មានម្តងទៀត។');
-      setIsLoading(false);
-    }
-  };
-
-  // ----------------------- USERNAME / PASSWORD STANDARD LOGIN -----------------------
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMsg('');
@@ -433,33 +61,30 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
     const cleanUsername = loginUsername.trim().toLowerCase();
 
     try {
+      // 1. Fetch teacher from cloud Firestore
       const teacherDocRef = doc(db, 'teachers', cleanUsername);
       const teacherSnap = await safeGetDoc(teacherDocRef);
 
-      let found: TeacherAccount | null = null;
-      if (teacherSnap && teacherSnap.exists()) {
-        found = teacherSnap.data() as TeacherAccount;
-      } else {
-        found = getTeacherFromLocalRegistry(cleanUsername);
-      }
-
-      if (!found) {
+      if (!teacherSnap.exists()) {
         setErrorMsg('រកមិនឃើញគណនីនេះក្នុងប្រព័ន្ធឡើយ។ សូមពិនិត្យឈ្មោះម្តងទៀត!');
         setIsLoading(false);
         return;
       }
 
-      if (!found.password || found.password === loginPassword) {
+      const found = teacherSnap.data() as TeacherAccount;
+
+      // 2. Validate password
+      if (found.password === loginPassword) {
         localStorage.setItem('logged_in_teacher', JSON.stringify(found));
-        saveTeacherToLocalRegistry(found);
         onLoginSuccess(found);
-        setSuccessMsg('ការចូលប្រើប្រាស់ជោគជ័យ!');
+        setSuccessMsg('ការចូលប្រើប្រាស់ជោគជ័យ និងបានទាញយកទិន្នន័យពី Cloud!');
         setTimeout(() => {
           onClose();
+          // Clear forms
           setLoginUsername('');
           setLoginPassword('');
           setIsLoading(false);
-        }, 800);
+        }, 1200);
       } else {
         setErrorMsg('លេខសម្ងាត់មិនត្រឹមត្រូវឡើយ។ សូមព្យាយាមម្ដងទៀត!');
         setIsLoading(false);
@@ -485,42 +110,43 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
     const cleanUsername = regUsername.trim().toLowerCase();
 
     try {
+      // 1. Check if username exists on Firestore cloud
       const teacherDocRef = doc(db, 'teachers', cleanUsername);
       const teacherSnap = await safeGetDoc(teacherDocRef);
 
-      if (teacherSnap && teacherSnap.exists()) {
+      if (teacherSnap.exists()) {
         setErrorMsg('ឈ្មោះគណនីនេះមានរួចហើយនៅលើ Cloud។ សូមជ្រើសរើសឈ្មោះគណនីផ្សេង!');
         setIsLoading(false);
         return;
       }
 
+      // 2. Create new teacher entity
       const newTeacher: TeacherAccount = {
-        id: cleanUsername,
+        id: cleanUsername, // Use lowercase username as the cloud ID
         name: regName.trim(),
         schoolName: regSchool.trim(),
         subjects: regSubject.trim(),
         username: regUsername.trim(),
-        password: regPassword,
-        authProvider: 'username'
+        password: regPassword
       };
 
+      // 3. Write to Firestore cloud
+      await safeSetDoc(teacherDocRef, newTeacher);
+
       localStorage.setItem('logged_in_teacher', JSON.stringify(newTeacher));
-      saveTeacherToLocalRegistry(newTeacher);
-
-      safeSetDoc(teacherDocRef, newTeacher).catch(() => {});
-
       onLoginSuccess(newTeacher);
-      setSuccessMsg('បង្កើតគណនីគ្រូបង្រៀនជោគជ័យ!');
+      setSuccessMsg('បង្កើតគណនេយ្យគ្រូបង្រៀននៅលើ Cloud និងចូលប្រើប្រាស់ជោគជ័យ!');
       
       setTimeout(() => {
         onClose();
+        // Clear forms
         setRegName('');
         setRegSchool('');
         setRegSubject('');
         setRegUsername('');
         setRegPassword('');
         setIsLoading(false);
-      }, 800);
+      }, 1500);
     } catch (err) {
       setErrorMsg('ការចុះឈ្មោះបរាជ័យ សូមពិនិត្យការតភ្ជាប់អ៊ីនធឺណិត។');
       setIsLoading(false);
@@ -531,718 +157,262 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
   return (
     <AnimatePresence>
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-4 md:p-6 overflow-y-auto">
-          {/* Backdrop with enhanced blur */}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          {/* Backdrop */}
           <motion.div 
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
             onClick={onClose}
-            className="absolute inset-0 bg-slate-950/70 backdrop-blur-2xl"
+            className="absolute inset-0 bg-slate-950/60 backdrop-blur-sm"
           />
 
-          {/* Modal Content: 3D Glass Liquid Card with perfect viewport adaptation */}
+          {/* Modal Content */}
           <motion.div 
             initial={{ scale: 0.95, opacity: 0, y: 15 }}
             animate={{ scale: 1, opacity: 1, y: 0 }}
             exit={{ scale: 0.95, opacity: 0, y: 15 }}
-            className="relative bg-white/95 dark:bg-slate-900/95 backdrop-blur-2xl text-slate-900 dark:text-slate-100 w-full max-w-md max-h-[92dvh] sm:max-h-[88vh] rounded-[24px] sm:rounded-[32px] overflow-hidden shadow-[0_25px_60px_-15px_rgba(0,0,0,0.3)] dark:shadow-[0_25px_60px_-15px_rgba(0,0,0,0.8)] border border-white/80 dark:border-white/10 z-10 flex flex-col my-auto"
+            className="relative bg-white text-slate-900 w-full max-w-md rounded-3xl overflow-hidden shadow-2xl border border-slate-200 z-10 flex flex-col"
           >
-            {/* Liquid Gloss Header with 3D Specular Arc & Continuous Liquid Wave */}
-            <div className="p-4 sm:p-6 bg-gradient-to-r from-indigo-600 via-blue-600 to-indigo-700 relative overflow-hidden text-white flex items-center justify-between shrink-0 before:absolute before:inset-0 before:bg-gradient-to-b before:from-white/30 before:via-white/10 before:to-transparent before:pointer-events-none">
-              {/* Continuous Liquid Light Wave across header */}
-              <motion.div
-                className="absolute inset-y-0 w-1/3 -skew-x-20 bg-gradient-to-r from-transparent via-white/25 to-transparent pointer-events-none"
-                animate={{ x: ['-120%', '400%'] }}
-                transition={{
-                  repeat: Infinity,
-                  duration: 3.2,
-                  ease: [0.4, 0, 0.2, 1],
-                  repeatDelay: 1.2,
-                }}
-              />
-
-              <div className="flex items-center gap-3 relative z-10">
-                <div className="w-10 h-10 sm:w-11 sm:h-11 bg-white/15 backdrop-blur-xl rounded-2xl border border-white/35 shadow-[inset_0_1px_2px_rgba(255,255,255,0.6)] flex items-center justify-center text-white shrink-0">
-                  {activeSubModal !== 'none' ? (
-                    <button 
-                      type="button" 
-                      onClick={() => setActiveSubModal('none')}
-                      className="hover:scale-110 transition-transform cursor-pointer"
-                    >
-                      <ArrowLeft className="w-5 h-5" />
-                    </button>
-                  ) : isLoginView ? (
-                    <LogIn className="w-5 h-5 drop-shadow" />
-                  ) : (
-                    <UserPlus className="w-5 h-5 drop-shadow" />
-                  )}
+            {/* Header */}
+            <div className="p-6 bg-gradient-to-r from-indigo-600 to-blue-600 text-white flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 bg-white/10 rounded-xl flex items-center justify-center text-white">
+                  {isLoginView ? <LogIn className="w-5 h-5" /> : <UserPlus className="w-5 h-5" />}
                 </div>
                 <div>
-                  <h2 className="text-base sm:text-lg font-bold tracking-tight line-clamp-1">
-                    {activeSubModal === 'email' && 'ចូល / ចុះឈ្មោះជាមួយ Email'}
-                    {activeSubModal === 'google' && 'ចូលប្រើប្រាស់ជាមួយ Google'}
-                    {activeSubModal === 'facebook' && 'ចូលប្រើប្រាស់ជាមួយ Facebook'}
-                    {activeSubModal === 'telegram' && 'ចូលប្រើប្រាស់ជាមួយ Telegram'}
-                    {activeSubModal === 'none' && (isLoginView ? 'ចូលប្រើប្រាស់គណនីគ្រូ' : 'បង្កើតគណនីគ្រូ')}
+                  <h2 className="text-lg font-bold">
+                    {isLoginView ? 'ចូលប្រើប្រាស់គណនីគ្រូ' : 'បង្កើតគណនេយ្យគ្រូបង្រៀន'}
                   </h2>
-                  <p className="text-[9px] sm:text-[10px] text-indigo-100 uppercase tracking-widest font-bold">
+                  <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">
                     Teacher EduSpin Auth
                   </p>
                 </div>
               </div>
               <button 
                 onClick={onClose}
-                className="p-1.5 sm:p-2 hover:bg-white/15 rounded-xl text-indigo-100 hover:text-white transition-colors cursor-pointer relative z-10"
+                className="p-2 hover:bg-white/10 rounded-lg text-indigo-100 hover:text-white transition-colors"
                 id="close-auth-modal"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            {/* Form Container - Scrollable on mobile and desktop */}
-            <div className="p-4 sm:p-6 overflow-y-auto flex-1 overscroll-contain">
+            {/* Form Container */}
+            <div className="p-6">
               {errorMsg && (
-                <div className="mb-4 p-3.5 bg-red-50/90 dark:bg-red-950/60 border border-red-200 dark:border-red-900/60 text-red-800 dark:text-red-300 rounded-2xl text-xs font-semibold flex items-start gap-2.5 animate-pulse backdrop-blur-md">
+                <div className="mb-4 p-3.5 bg-red-50 border border-red-200 text-red-800 rounded-xl text-xs font-semibold flex items-start gap-2 animate-pulse">
                   <span className="shrink-0 text-red-500">⚠️</span>
                   <p>{errorMsg}</p>
                 </div>
               )}
 
               {successMsg && (
-                <div className="mb-4 p-3.5 bg-emerald-50/90 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-900/60 text-emerald-800 dark:text-emerald-300 rounded-2xl text-xs font-semibold flex items-start gap-2.5 backdrop-blur-md">
+                <div className="mb-4 p-3.5 bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl text-xs font-semibold flex items-start gap-2">
                   <CheckCircle className="shrink-0 text-emerald-500 w-4 h-4" />
                   <p>{successMsg}</p>
                 </div>
               )}
 
-              {/* ----------------------- SUB-MODAL 1: WITH EMAIL ----------------------- */}
-              {activeSubModal === 'email' && (
-                <form onSubmit={handleEmailAuthSubmit} className="space-y-3.5">
+              {isLoginView ? (
+                /* LOGIN FORM */
+                <form onSubmit={handleLogin} className="space-y-4">
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      អាសយដ្ឋាន Email *
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                      ឈ្មោះគណនីប្រើប្រាស់ *
                     </label>
                     <div className="relative">
-                      <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                       <input
-                        type="email"
-                        value={emailAddress}
-                        onChange={(e) => setEmailAddress(e.target.value)}
-                        placeholder="ឧ. teacher@school.edu.kh"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
+                        type="text"
+                        value={loginUsername}
+                        onChange={(e) => setLoginUsername(e.target.value)}
+                        placeholder="ឧ. steve_123"
+                        className="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                         required
                       />
                     </div>
                   </div>
 
                   <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      លេខសម្ងាត់ (Password) *
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1.5">
+                      លេខសម្ងាត់ *
                     </label>
                     <div className="relative">
-                      <Key className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
+                      <Key className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
                       <input
-                        type="password"
-                        value={emailPassword}
-                        onChange={(e) => setEmailPassword(e.target.value)}
+                        type={showLoginPassword ? "text" : "password"}
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
                         placeholder="••••••••"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
+                        className="w-full pl-10 pr-12 py-2.5 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
                         required
                       />
-                    </div>
-                  </div>
-
-                  {!isLoginView && (
-                    <>
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          ឈ្មោះគ្រូបង្រៀន (មិនបាច់បំពេញក៏បាន)
-                        </label>
-                        <div className="relative">
-                          <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type="text"
-                            value={emailTeacherName}
-                            onChange={(e) => setEmailTeacherName(e.target.value)}
-                            placeholder="ឧ. លោកគ្រូ ស្ទីវ ចប"
-                            className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          ឈ្មោះសាលារៀន
-                        </label>
-                        <div className="relative">
-                          <School className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type="text"
-                            value={emailSchoolName}
-                            onChange={(e) => setEmailSchoolName(e.target.value)}
-                            placeholder="ឧ. សាលារៀនសុវណ្ណភូមិ"
-                            className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                          />
-                        </div>
-                      </div>
-                    </>
-                  )}
-
-                  {/* 💧 3D Glass Liquid Capsule Submit Button: Email */}
-                  <motion.button
-                    type="submit"
-                    disabled={isLoading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.96 }}
-                    className="relative w-full py-3.5 px-6 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 shadow-[0_12px_28px_-6px_rgba(99,102,241,0.65),0_0_20px_rgba(168,85,247,0.4)] disabled:opacity-50 mt-2 cursor-pointer overflow-hidden isolate"
-                  >
-                    <GlassLiquidOverlay isDarkMode={isDarkMode} variant="indigo-glass" />
-                    <span className="relative z-10 flex items-center justify-center gap-2 drop-shadow-md">
-                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Mail className="w-5 h-5 drop-shadow" />}
-                      <span>{isLoading ? 'កំពុងភ្ជាប់អ៊ីមែល...' : 'ចូលប្រើប្រាស់ជាមួយ Email'}</span>
-                    </span>
-                  </motion.button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubModal('none')}
-                    className="w-full py-2.5 px-4 rounded-full border border-slate-200/80 dark:border-white/10 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 text-xs text-slate-500 dark:text-slate-400 font-bold text-center transition-all cursor-pointer"
-                  >
-                    ← ត្រឡប់ទៅជម្រើសដើមវិញ
-                  </button>
-                </form>
-              )}
-
-              {/* ----------------------- SUB-MODAL 2: WITH GOOGLE ----------------------- */}
-              {activeSubModal === 'google' && (
-                <form onSubmit={handleGoogleDirectSubmit} className="space-y-3.5">
-                  <div className="p-3.5 bg-blue-50/90 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/50 rounded-2xl text-xs text-blue-800 dark:text-blue-300 font-medium backdrop-blur-md">
-                    សូមបំពេញ Google Email របស់អ្នក ដើម្បីភ្ជាប់គណនី Google សំខាន់ និងរក្សាទុកទិន្នន័យលើ Cloud!
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      Google Account Email *
-                    </label>
-                    <div className="relative">
-                      <Mail className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="email"
-                        value={googleEmail}
-                        onChange={(e) => setGoogleEmail(e.target.value)}
-                        placeholder="ឧ. teacher.khmer@gmail.com"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      ឈ្មោះគ្រូបង្រៀន (Google Display Name)
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="text"
-                        value={googleName}
-                        onChange={(e) => setGoogleName(e.target.value)}
-                        placeholder="ឧ. លោកគ្រូ Google"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 💧 3D Glass Liquid Capsule Submit Button: Google */}
-                  <motion.button
-                    type="submit"
-                    disabled={isLoading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.96 }}
-                    className={`relative w-full py-3.5 px-6 rounded-full font-bold text-sm flex items-center justify-center gap-2 shadow-[0_8px_25px_rgba(0,0,0,0.15)] disabled:opacity-50 mt-2 cursor-pointer overflow-hidden isolate ${
-                      isDarkMode ? 'text-white' : 'text-slate-800'
-                    }`}
-                  >
-                    <GlassLiquidOverlay isDarkMode={isDarkMode} variant="google-glass" />
-                    <span className="relative z-10 flex items-center justify-center gap-2 drop-shadow-sm">
-                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <GoogleIcon />}
-                      <span>{isLoading ? 'កំពុងភ្ជាប់ Google Account...' : 'ចូលប្រើប្រាស់ជាមួយ Google Account'}</span>
-                    </span>
-                  </motion.button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubModal('none')}
-                    className="w-full py-2.5 px-4 rounded-full border border-slate-200/80 dark:border-white/10 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 text-xs text-slate-500 dark:text-slate-400 font-bold text-center transition-all cursor-pointer"
-                  >
-                    ← ត្រឡប់ទៅជម្រើសដើមវិញ
-                  </button>
-                </form>
-              )}
-
-              {/* ----------------------- SUB-MODAL 3: WITH FACEBOOK ----------------------- */}
-              {activeSubModal === 'facebook' && (
-                <form onSubmit={handleFacebookDirectSubmit} className="space-y-3.5">
-                  <div className="p-3.5 bg-blue-50/90 dark:bg-blue-950/50 border border-blue-100 dark:border-blue-900/50 rounded-2xl text-xs text-blue-800 dark:text-blue-300 font-medium backdrop-blur-md">
-                    សូមបំពេញ ឈ្មោះ ឬ Email / ID គណនី Facebook របស់អ្នក ដើម្បីភ្ជាប់ និងរក្សាទុកទិន្នន័យលើ Cloud!
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      Facebook Email ឬ Username *
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="text"
-                        value={facebookEmail}
-                        onChange={(e) => setFacebookEmail(e.target.value)}
-                        placeholder="ឧ. teacher.facebook ឬ fb_teacher@gmail.com"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 focus:border-blue-500 transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      ឈ្មោះបង្ហាញលើគណនីគ្រូ (Display Name)
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="text"
-                        value={facebookName}
-                        onChange={(e) => setFacebookName(e.target.value)}
-                        placeholder="ឧ. លោកគ្រូ Facebook"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-blue-500/30 dark:focus:ring-blue-400/30 focus:border-blue-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 💧 3D Glass Liquid Capsule Submit Button: Facebook */}
-                  <motion.button
-                    type="submit"
-                    disabled={isLoading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.96 }}
-                    className="relative w-full py-3.5 px-6 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 shadow-[0_12px_28px_-6px_rgba(24,119,242,0.65),0_0_20px_rgba(59,130,246,0.4)] disabled:opacity-50 mt-2 cursor-pointer overflow-hidden isolate"
-                  >
-                    <GlassLiquidOverlay isDarkMode={isDarkMode} variant="blue-glass" />
-                    <span className="relative z-10 flex items-center justify-center gap-2 drop-shadow-md">
-                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <FacebookIcon />}
-                      <span>{isLoading ? 'កំពុងភ្ជាប់ Facebook...' : 'ចូលប្រើប្រាស់ជាមួយ Facebook Account'}</span>
-                    </span>
-                  </motion.button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubModal('none')}
-                    className="w-full py-2.5 px-4 rounded-full border border-slate-200/80 dark:border-white/10 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 text-xs text-slate-500 dark:text-slate-400 font-bold text-center transition-all cursor-pointer"
-                  >
-                    ← ត្រឡប់ទៅជម្រើសដើមវិញ
-                  </button>
-                </form>
-              )}
-
-              {/* ----------------------- SUB-MODAL 4: WITH TELEGRAM ----------------------- */}
-              {activeSubModal === 'telegram' && (
-                <form onSubmit={handleTelegramDirectSubmit} className="space-y-3.5">
-                  <div className="p-3.5 bg-sky-50/90 dark:bg-sky-950/50 border border-sky-100 dark:border-sky-900/50 rounded-2xl text-xs text-sky-800 dark:text-sky-300 font-medium backdrop-blur-md">
-                    សូមបំពេញ Telegram Username (ឧ. @khmer_teacher) ឬ លេខទូរស័ព្ទ ដើម្បីភ្ជាប់គណនី Telegram របស់អ្នក!
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      Telegram Username / Phone *
-                    </label>
-                    <div className="relative">
-                      <Send className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="text"
-                        value={telegramUsername}
-                        onChange={(e) => setTelegramUsername(e.target.value)}
-                        placeholder="ឧ. @teacher_khmer ឬ 012345678"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30 dark:focus:ring-sky-400/30 focus:border-sky-500 transition-all"
-                        required
-                      />
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                      ឈ្មោះបង្ហាញលើគណនីគ្រូ (Display Name)
-                    </label>
-                    <div className="relative">
-                      <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                      <input
-                        type="text"
-                        value={telegramName}
-                        onChange={(e) => setTelegramName(e.target.value)}
-                        placeholder="ឧ. លោកគ្រូ Telegram"
-                        className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-sky-500/30 dark:focus:ring-sky-400/30 focus:border-sky-500 transition-all"
-                      />
-                    </div>
-                  </div>
-
-                  {/* 💧 3D Glass Liquid Capsule Submit Button: Telegram */}
-                  <motion.button
-                    type="submit"
-                    disabled={isLoading}
-                    whileHover={{ scale: 1.02 }}
-                    whileTap={{ scale: 0.96 }}
-                    className="relative w-full py-3.5 px-6 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2 shadow-[0_12px_28px_-6px_rgba(2,132,199,0.65),0_0_20px_rgba(56,189,248,0.4)] disabled:opacity-50 mt-2 cursor-pointer overflow-hidden isolate"
-                  >
-                    <GlassLiquidOverlay isDarkMode={isDarkMode} variant="sky-glass" />
-                    <span className="relative z-10 flex items-center justify-center gap-2 drop-shadow-md">
-                      {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <TelegramIcon />}
-                      <span>{isLoading ? 'កំពុងភ្ជាប់ Telegram...' : 'ចូលប្រើប្រាស់ជាមួយ Telegram Account'}</span>
-                    </span>
-                  </motion.button>
-
-                  <button
-                    type="button"
-                    onClick={() => setActiveSubModal('none')}
-                    className="w-full py-2.5 px-4 rounded-full border border-slate-200/80 dark:border-white/10 hover:bg-slate-100/70 dark:hover:bg-slate-800/70 text-xs text-slate-500 dark:text-slate-400 font-bold text-center transition-all cursor-pointer"
-                  >
-                    ← ត្រឡប់ទៅជម្រើសដើមវិញ
-                  </button>
-                </form>
-              )}
-
-              {/* ----------------------- DEFAULT MAIN SOCIAL & FORM VIEW ----------------------- */}
-              {activeSubModal === 'none' && (
-                <>
-                  {/* 💧 Interactive 3D Glass Liquid Segmented Capsule Switcher (Login vs Register) */}
-                  <div className="flex items-center justify-center mb-5">
-                    <div className="p-1 rounded-full bg-slate-200/60 dark:bg-slate-950/80 border border-slate-300/60 dark:border-white/10 shadow-[inset_0_2px_4px_rgba(0,0,0,0.06)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.5)] backdrop-blur-2xl flex items-center gap-1 relative max-w-xs w-full">
                       <button
                         type="button"
-                        onClick={() => setIsLoginView(true)}
-                        className={`relative flex-1 py-2 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none isolate ${
-                          isLoginView ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
+                        onClick={() => setShowLoginPassword(!showLoginPassword)}
+                        className="absolute right-3.5 top-2 hover:bg-slate-100 p-1 rounded-lg transition-transform text-xl select-none active:scale-90"
+                        title={showLoginPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
                       >
-                        {isLoginView && (
-                          <GlassLiquidOverlay
-                            layoutId="authModalTabDroplet"
-                            isDarkMode={isDarkMode}
-                            variant="indigo-glass"
-                          />
-                        )}
-                        <LogIn className="w-3.5 h-3.5 relative z-10" />
-                        <span className="relative z-10">ចូលប្រើប្រាស់</span>
+                        {showLoginPassword ? '🙈' : '🙉'}
                       </button>
+                    </div>
+                  </div>
 
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-indigo-600 text-white rounded-xl font-bold text-sm hover:bg-indigo-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <LogIn className="w-4 h-4" />
+                    )}
+                    {isLoading ? 'កំពុងភ្ជាប់ទៅប្រព័ន្ធ...' : 'ចូលប្រើប្រាស់ឥឡូវនេះ'}
+                  </button>
+
+                  <div className="text-center mt-6">
+                    <p className="text-xs text-slate-500">
+                      មិនទាន់មានគណនីមែនទេ?{' '}
                       <button
                         type="button"
                         onClick={() => setIsLoginView(false)}
-                        className={`relative flex-1 py-2 px-3 rounded-full text-xs font-bold flex items-center justify-center gap-1.5 transition-colors cursor-pointer select-none isolate ${
-                          !isLoginView ? 'text-white' : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white'
-                        }`}
+                        className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
                       >
-                        {!isLoginView && (
-                          <GlassLiquidOverlay
-                            layoutId="authModalTabDroplet"
-                            isDarkMode={isDarkMode}
-                            variant="emerald-glass"
-                          />
-                        )}
-                        <UserPlus className="w-3.5 h-3.5 relative z-10" />
-                        <span className="relative z-10">បង្កើតគណនីគ្រូថ្មី</span>
+                        បង្កើតគណនីគ្រូថ្មីនៅទីនេះ
+                      </button>
+                    </p>
+                  </div>
+                </form>
+              ) : (
+                /* REGISTER FORM */
+                <form onSubmit={handleRegister} className="space-y-3.5 max-h-[60vh] overflow-y-auto pr-1">
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      ឈ្មោះគ្រូបង្រៀន *
+                    </label>
+                    <div className="relative">
+                      <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={regName}
+                        onChange={(e) => setRegName(e.target.value)}
+                        placeholder="ឧ. លោកគ្រូ ស្ទីវ ចប"
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      ឈ្មោះសាលារៀន *
+                    </label>
+                    <div className="relative">
+                      <School className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                      <input
+                        type="text"
+                        value={regSchool}
+                        onChange={(e) => setRegSchool(e.target.value)}
+                        placeholder="ឧ. សាលារៀនសុវណ្ណភូមិ សាខាផ្សារដីហុយ"
+                        className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                        required
+                      />
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        មុខវិជ្ជា/ឯកទេស
+                      </label>
+                      <div className="relative">
+                        <BookOpen className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={regSubject}
+                          onChange={(e) => setRegSubject(e.target.value)}
+                          placeholder="ឧ. រូបវិទ្យា"
+                          className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                        />
+                      </div>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                        ឈ្មោះគណនីប្រើប្រាស់ *
+                      </label>
+                      <div className="relative">
+                        <User className="absolute left-3.5 top-3 w-4 h-4 text-slate-400" />
+                        <input
+                          type="text"
+                          value={regUsername}
+                          onChange={(e) => setRegUsername(e.target.value)}
+                          placeholder="ឧ. steve_123"
+                          className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                          required
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                      លេខសម្ងាត់សម្រាប់ឡុកអ៊ីន *
+                    </label>
+                    <div className="relative">
+                      <Key className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+                      <input
+                        type={showRegPassword ? "text" : "password"}
+                        value={regPassword}
+                        onChange={(e) => setRegPassword(e.target.value)}
+                        placeholder="យ៉ាងតិច ៤ តួអក្សរ"
+                        className="w-full pl-10 pr-12 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                        required
+                        minLength={4}
+                      />
+                      <button
+                        type="button"
+                        onClick={() => setShowRegPassword(!showRegPassword)}
+                        className="absolute right-3.5 top-1.5 hover:bg-slate-100 p-1 rounded-lg transition-transform text-xl select-none active:scale-90"
+                        title={showRegPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
+                      >
+                        {showRegPassword ? '🙈' : '🙉'}
                       </button>
                     </div>
                   </div>
 
-                  {/* Provider Grid Buttons: 💧 Animated 3D Glass Liquid Capsule Pills */}
-                  <div className="space-y-2 mb-5">
-                    <p className="text-[11px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider text-center mb-2.5">
-                      ចូលប្រើប្រាស់ជាមួយគណនី / Quick Auth
+                  <button
+                    type="submit"
+                    disabled={isLoading}
+                    className="w-full py-3 bg-emerald-600 text-white rounded-xl font-bold text-sm hover:bg-emerald-700 transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 active:scale-95 mt-2 disabled:opacity-50"
+                  >
+                    {isLoading ? (
+                      <Loader2 className="w-4 h-4 animate-spin" />
+                    ) : (
+                      <UserPlus className="w-4 h-4" />
+                    )}
+                    {isLoading ? 'កំពុងបង្កើតគណនីរក្សាទុក...' : 'ចុះឈ្មោះគ្រូ និងចូលប្រើ'}
+                  </button>
+
+                  <div className="text-center mt-4">
+                    <p className="text-xs text-slate-500">
+                      មានគណនីរួចហើយ?{' '}
+                      <button
+                        type="button"
+                        onClick={() => setIsLoginView(true)}
+                        className="text-indigo-600 hover:text-indigo-800 font-bold hover:underline"
+                      >
+                        ចូលប្រើប្រាស់គណនីដែលមានស្រាប់
+                      </button>
                     </p>
-                    
-                    <div className="grid grid-cols-2 gap-2.5">
-                      {/* With Google */}
-                      <motion.button
-                        type="button"
-                        onClick={handleGoogleAuth}
-                        disabled={isLoading}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.95 }}
-                        className={`relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs shadow-md transition-all disabled:opacity-50 cursor-pointer overflow-hidden isolate ${
-                          isDarkMode ? 'text-slate-100' : 'text-slate-700'
-                        }`}
-                      >
-                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant="google-glass" />
-                        <span className="relative z-10 flex items-center gap-2">
-                          <GoogleIcon />
-                          <span>With Google</span>
-                        </span>
-                      </motion.button>
-
-                      {/* With Email */}
-                      <motion.button
-                        type="button"
-                        onClick={() => setActiveSubModal('email')}
-                        disabled={isLoading}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs text-white shadow-md transition-all disabled:opacity-50 cursor-pointer overflow-hidden isolate"
-                      >
-                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant="indigo-glass" />
-                        <span className="relative z-10 flex items-center gap-2 drop-shadow-sm">
-                          <Mail className="w-4 h-4 text-white shrink-0 drop-shadow" />
-                          <span>With Email</span>
-                        </span>
-                      </motion.button>
-
-                      {/* With Facebook */}
-                      <motion.button
-                        type="button"
-                        onClick={handleFacebookAuth}
-                        disabled={isLoading}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs text-white shadow-md transition-all disabled:opacity-50 shrink-0 cursor-pointer overflow-hidden isolate"
-                      >
-                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant="blue-glass" />
-                        <span className="relative z-10 flex items-center gap-2 drop-shadow-sm">
-                          <FacebookIcon />
-                          <span>With Facebook</span>
-                        </span>
-                      </motion.button>
-
-                      {/* With Telegram */}
-                      <motion.button
-                        type="button"
-                        onClick={handleTelegramAuth}
-                        disabled={isLoading}
-                        whileHover={{ scale: 1.03 }}
-                        whileTap={{ scale: 0.95 }}
-                        className="relative flex items-center justify-center gap-2 px-4 py-2.5 rounded-full font-bold text-xs text-white shadow-md transition-all disabled:opacity-50 shrink-0 cursor-pointer overflow-hidden isolate"
-                      >
-                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant="sky-glass" />
-                        <span className="relative z-10 flex items-center gap-2 drop-shadow-sm">
-                          <TelegramIcon />
-                          <span>With Telegram</span>
-                        </span>
-                      </motion.button>
-                    </div>
                   </div>
-
-                  <div className="relative flex items-center justify-center my-4">
-                    <div className="border-t border-slate-200 dark:border-slate-800 w-full" />
-                    <span className="bg-white/95 dark:bg-slate-900/95 border border-slate-200/50 dark:border-white/10 rounded-full px-3 py-0.5 text-[10px] font-extrabold text-slate-400 dark:text-slate-400 uppercase tracking-widest whitespace-nowrap shrink-0 shadow-xs">
-                      ឬ ប្រើប្រាស់ឈ្មោះគណនី (Username)
-                    </span>
-                  </div>
-
-                  {isLoginView ? (
-                    /* LOGIN FORM: 💧 Figure 2 & Figure 4 */
-                    <form onSubmit={handleLogin} className="space-y-3.5">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          ឈ្មោះគណនីប្រើប្រាស់ *
-                        </label>
-                        <div className="relative">
-                          <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type="text"
-                            value={loginUsername}
-                            onChange={(e) => setLoginUsername(e.target.value)}
-                            placeholder="ឧ. steve_123"
-                            className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          លេខសម្ងាត់ *
-                        </label>
-                        <div className="relative">
-                          <Key className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type={showLoginPassword ? "text" : "password"}
-                            value={loginPassword}
-                            onChange={(e) => setLoginPassword(e.target.value)}
-                            placeholder="••••••••"
-                            className="w-full pl-11 pr-12 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                            required
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowLoginPassword(!showLoginPassword)}
-                            className="absolute right-3.5 top-2 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 p-1.5 rounded-full transition-transform text-lg select-none active:scale-90 cursor-pointer"
-                            title={showLoginPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
-                          >
-                            {showLoginPassword ? '🙈' : '🙉'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* 💧 Animated 3D Glass Liquid Capsule Submit Button: Login (Figure 2 & Figure 4) */}
-                      <motion.button
-                        type="submit"
-                        disabled={isLoading}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.96 }}
-                        className="relative w-full py-3.5 px-6 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2.5 shadow-[0_12px_28px_-6px_rgba(99,102,241,0.65),0_0_24px_rgba(168,85,247,0.45)] disabled:opacity-50 mt-3 cursor-pointer overflow-hidden isolate"
-                      >
-                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant="indigo-glass" />
-                        <span className="relative z-10 flex items-center justify-center gap-2.5 drop-shadow-md">
-                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <LogIn className="w-5 h-5 drop-shadow" />}
-                          <span className="drop-shadow-sm">{isLoading ? 'កំពុងភ្ជាប់ទៅប្រព័ន្ធ...' : 'ចូលប្រើប្រាស់ឥឡូវនេះ'}</span>
-                        </span>
-                      </motion.button>
-
-                      <div className="text-center mt-4">
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                          មិនទាន់មានគណនីមែនទេ?{' '}
-                          <button
-                            type="button"
-                            onClick={() => setIsLoginView(false)}
-                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold hover:underline transition-colors cursor-pointer"
-                          >
-                            បង្កើតគណនីគ្រូថ្មីនៅទីនេះ
-                          </button>
-                        </p>
-                      </div>
-                    </form>
-                  ) : (
-                    /* REGISTER FORM: 💧 Figure 1 & Figure 3 */
-                    <form onSubmit={handleRegister} className="space-y-3">
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          ឈ្មោះគ្រូបង្រៀន *
-                        </label>
-                        <div className="relative">
-                          <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type="text"
-                            value={regName}
-                            onChange={(e) => setRegName(e.target.value)}
-                            placeholder="ឧ. លោកគ្រូ ស្ទីវ ចប"
-                            className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          ឈ្មោះសាលារៀន *
-                        </label>
-                        <div className="relative">
-                          <School className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type="text"
-                            value={regSchool}
-                            onChange={(e) => setRegSchool(e.target.value)}
-                            placeholder="ឧ. សាលារៀនសុវណ្ណភូមិ សាខាផ្សារដីហុយ"
-                            className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                            required
-                          />
-                        </div>
-                      </div>
-
-                      <div className="grid grid-cols-2 gap-2.5">
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                            មុខវិជ្ជា/ឯកទេស
-                          </label>
-                          <div className="relative">
-                            <BookOpen className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            <input
-                              type="text"
-                              value={regSubject}
-                              onChange={(e) => setRegSubject(e.target.value)}
-                              placeholder="ឧ. រូបវិទ្យា"
-                              className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                            />
-                          </div>
-                        </div>
-
-                        <div>
-                          <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                            ឈ្មោះគណនី *
-                          </label>
-                          <div className="relative">
-                            <User className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                            <input
-                              type="text"
-                              value={regUsername}
-                              onChange={(e) => setRegUsername(e.target.value)}
-                              placeholder="ឧ. steve_123"
-                              className="w-full pl-11 pr-5 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                              required
-                            />
-                          </div>
-                        </div>
-                      </div>
-
-                      <div>
-                        <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 uppercase mb-1">
-                          លេខសម្ងាត់សម្រាប់ឡុកអ៊ីន *
-                        </label>
-                        <div className="relative">
-                          <Key className="absolute left-4 top-3.5 w-4 h-4 text-slate-400 dark:text-slate-500" />
-                          <input
-                            type={showRegPassword ? "text" : "password"}
-                            value={regPassword}
-                            onChange={(e) => setRegPassword(e.target.value)}
-                            placeholder="យ៉ាងតិច ៤ តួអក្សរ"
-                            className="w-full pl-11 pr-12 py-2.5 bg-slate-100/75 dark:bg-slate-800/75 backdrop-blur-2xl border border-slate-200/90 dark:border-white/10 rounded-full text-sm font-semibold text-slate-900 dark:text-white placeholder-slate-400 dark:placeholder-slate-500 shadow-[inset_0_2px_4px_rgba(0,0,0,0.04),0_1px_2px_rgba(255,255,255,0.8)] dark:shadow-[inset_0_2px_4px_rgba(0,0,0,0.3)] focus:bg-white dark:focus:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 dark:focus:ring-indigo-400/30 focus:border-indigo-500 transition-all"
-                            required
-                            minLength={4}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowRegPassword(!showRegPassword)}
-                            className="absolute right-3.5 top-2 hover:bg-slate-200/60 dark:hover:bg-slate-700/60 p-1.5 rounded-full transition-transform text-lg select-none active:scale-90 cursor-pointer"
-                            title={showRegPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
-                          >
-                            {showRegPassword ? '🙈' : '🙉'}
-                          </button>
-                        </div>
-                      </div>
-
-                      {/* 💧 Animated 3D Glass Liquid Capsule Submit Button: Register (Figure 1 & Figure 3) */}
-                      <motion.button
-                        type="submit"
-                        disabled={isLoading}
-                        whileHover={{ scale: 1.02 }}
-                        whileTap={{ scale: 0.96 }}
-                        className="relative w-full py-3.5 px-6 rounded-full font-bold text-sm text-white flex items-center justify-center gap-2.5 shadow-[0_12px_28px_-6px_rgba(16,185,129,0.65),0_0_24px_rgba(52,211,153,0.45)] disabled:opacity-50 mt-3 cursor-pointer overflow-hidden isolate"
-                      >
-                        <GlassLiquidOverlay isDarkMode={isDarkMode} variant="emerald-glass" />
-                        <span className="relative z-10 flex items-center justify-center gap-2.5 drop-shadow-md">
-                          {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <UserPlus className="w-5 h-5 drop-shadow" />}
-                          <span className="drop-shadow-sm">{isLoading ? 'កំពុងបង្កើតគណនី...' : 'ចុះឈ្មោះគ្រូ និងចូលប្រើ'}</span>
-                        </span>
-                      </motion.button>
-
-                      <div className="text-center mt-4">
-                        <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                          មានគណនីរួចហើយ?{' '}
-                          <button
-                            type="button"
-                            onClick={() => setIsLoginView(true)}
-                            className="text-indigo-600 dark:text-indigo-400 hover:text-indigo-800 dark:hover:text-indigo-300 font-bold hover:underline transition-colors cursor-pointer"
-                          >
-                            ចូលប្រើប្រាស់គណនីដែលមានស្រាប់
-                          </button>
-                        </p>
-                      </div>
-                    </form>
-                  )}
-                </>
+                </form>
               )}
             </div>
             
-            {/* Modal Bottom Glass Footer */}
-            <div className="px-4 sm:px-6 py-2.5 sm:py-3.5 bg-slate-50/80 dark:bg-slate-950/70 border-t border-slate-100 dark:border-white/5 flex items-center justify-center text-[10px] sm:text-[11px] text-slate-400 dark:text-slate-500 font-medium text-center shrink-0">
+            <div className="px-6 py-4 bg-slate-50 border-t border-slate-100 flex items-center justify-center text-[11px] text-slate-400">
               រក្សាទុកដោយមានសុវត្ថិភាពខ្ពស់នៅលើ Cloud Internet សម្រាប់គ្រប់ឧបករណ៍ទាំងអស់
             </div>
           </motion.div>

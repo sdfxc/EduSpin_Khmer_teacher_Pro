@@ -246,7 +246,7 @@ export const ExamPaperView: React.FC<ExamPaperViewProps> = ({
       {/* Exam Title & Instructions Header */}
       <div className="text-center my-4" style={bodyInlineStyle}>
         <div className="font-bold text-[13pt] text-slate-950 tracking-wide underline underline-offset-4" style={headerInlineStyle}>
-          វិញ្ញាសា៖ {subject?.name || 'ភាសាខ្មែរ'}
+          វិញ្ញាសា៖ {subject?.name || 'រូបវិទ្យា'}
         </div>
         <div className="text-[10.5pt] font-bold text-slate-900 mt-2">
           សេចក្តីណែនាំ៖ ចូរអានសំណួរ និងឆ្លើយ ឬគូសរង្វង់លើចម្លើយត្រឹមត្រូវខាងក្រោម
@@ -586,7 +586,7 @@ export const ExamPaperView: React.FC<ExamPaperViewProps> = ({
         {/* Page Footer Indicator */}
         <div className="mt-6 text-center text-[9pt] text-slate-500 border-t border-dotted border-slate-300 pt-2 flex justify-between items-center">
           <span>{examCenter || logoText1}</span>
-          <span>វិញ្ញាសា៖ {subject?.name || 'ភាសាខ្មែរ'} ({examName || 'ប្រឡង'})</span>
+          <span>វិញ្ញាសា៖ {subject?.name || 'រូបវិទ្យា'} ({examName || 'ប្រឡង'})</span>
           <span>ទំព័រទី ១</span>
         </div>
       </div>

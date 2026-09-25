@@ -41,7 +41,7 @@ export default function PdfManager({
 
   // Form State for Upload
   const [formTitle, setFormTitle] = useState('');
-  const [formSubject, setFormSubject] = useState('ភាសាខ្មែរ');
+  const [formSubject, setFormSubject] = useState('រូបវិទ្យា');
   const [formGrade, setFormGrade] = useState(activeClassName || 'ថ្នាក់ទី៩');
   const [formCategory, setFormCategory] = useState<'curriculum' | 'exam_past' | 'guideline' | 'other'>('curriculum');
   const [formDescription, setFormDescription] = useState('');
@@ -139,7 +139,7 @@ export default function PdfManager({
   const handleCloseModal = () => {
     setIsUploadModalOpen(false);
     setFormTitle('');
-    setFormSubject('ភាសាខ្មែរ');
+    setFormSubject('រូបវិទ្យា');
     setFormDescription('');
     setFormFileUrl('');
     setFormFileName('');

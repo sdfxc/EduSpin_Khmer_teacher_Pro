@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, LayoutGrid, RotateCcw, User, UserPlus, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, X, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera, Pin, PinOff } from 'lucide-react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera, Pin, PinOff } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
@@ -15,27 +15,22 @@ import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
 import StopwatchPanel from './components/StopwatchPanel';
 import StudentManager from './components/StudentManager';
-import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass, DEFAULT_CLOUD_TEACHER } from './types';
+import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass } from './types';
 import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs, saveTeacherToLocalRegistry, getTeacherFromLocalRegistry } from './lib/firebase';
+import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
 import ExamsPanel from './components/ExamsPanel';
 import SovannaphumiLogo from './components/SovannaphumiLogo';
-import { GlassLiquidOverlay, GlassLiquidButton } from './components/GlassLiquidCapsule';
 import { useConfirm } from './context/ConfirmContext.tsx';
 import { ClassModal } from './components/ClassModal';
 import SmartNotesApp from './components/smart-notes/SmartNotesApp';
 import { BookOpen } from 'lucide-react';
 import { addActivityPointsToStudent, setActivityScoreForStudent, addGroupWorkPointsToStudent, getCurrentDateScoreSlot } from './lib/scoreUtils';
-import { safeSetItem, safeSetJSON, safeRemoveItem } from './lib/storageUtils';
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
-function getMigratedSubjects(
-  loadedChapters: QuizChapter[],
-  teacherObj?: TeacherAccount | null
-): { subjects: QuizSubject[], activeSubjectId: string } {
+function getMigratedSubjects(loadedChapters: QuizChapter[]): { subjects: QuizSubject[], activeSubjectId: string } {
   const chaptersToUse = loadedChapters.length > 0 ? loadedChapters : [
     {
       id: `chapter-default-${Date.now()}`,
@@ -53,65 +48,18 @@ function getMigratedSubjects(
     }
   ];
 
-  const rawTeacherSubjects = teacherObj?.subjects && teacherObj.subjects.trim();
-  const parsedNames = rawTeacherSubjects
-    ? rawTeacherSubjects.split(/[,,\n፤]/).map(s => s.trim()).filter(Boolean)
-    : [];
-
-  const uniqueNames = Array.from(new Set(parsedNames.length > 0 ? parsedNames : ['ភាសាខ្មែរ']));
-
-  const defaultSubjects: QuizSubject[] = uniqueNames.map((subjName, idx) => ({
-    id: `subj-${Date.now()}-${idx}`,
-    name: subjName,
-    chapters: idx === 0 ? chaptersToUse : [
-      {
-        id: `chapter-default-${Date.now()}-${idx}`,
-        name: 'ជំពូកទី១',
-        rooms: [
-          {
-            id: `room-default-${Date.now()}-${idx}`,
-            name: 'មេរៀនទី១',
-            cards: [],
-            pickedIds: [],
-            createdAt: Date.now()
-          }
-        ],
-        createdAt: Date.now()
-      }
-    ],
-    createdAt: Date.now()
-  }));
-
-  return { subjects: defaultSubjects, activeSubjectId: defaultSubjects[0].id };
+  const defaultSubjects: QuizSubject[] = [
+    {
+      id: 'subj-physics',
+      name: 'រូបវិទ្យា',
+      chapters: chaptersToUse,
+      createdAt: Date.now()
+    }
+  ];
+  return { subjects: defaultSubjects, activeSubjectId: 'subj-physics' };
 }
 
 const SAMPLE_STUDENTS: Record<string, Student[]> = {};
-
-const isSampleDemoClass = (clsId: string, clsName?: string): boolean => {
-  if (!clsId && !clsName) return false;
-
-  const sampleBaseIds = [
-    'class-7a', 'class-8a', 'class-9a', 
-    'class-7a1', 'class-8a1', 'class-9a1', 'class-10a1'
-  ];
-
-  const sampleNames = [
-    'ថ្នាក់ទី៧ក', 'ថ្នាក់ទី៨ក', 'ថ្នាក់ទី៩ក', 
-    'ថ្នាក់ទី៧ក១', 'ថ្នាក់ទី៨ក១', 'ថ្នាក់ទី៩ក១', 'ថ្នាក់ទី១០ក១'
-  ];
-
-  if (clsId) {
-    if (sampleBaseIds.includes(clsId)) return true;
-    if (sampleBaseIds.some(base => clsId.startsWith(`${base}-`))) return true;
-  }
-
-  if (clsName) {
-    const trimmed = clsName.trim();
-    if (sampleNames.includes(trimmed)) return true;
-  }
-
-  return false;
-};
 
 const DEFAULT_CLASSES: ClassInfo[] = [
   { id: 'class-7a', name: 'ថ្នាក់ទី៧ក', order: 0 },
@@ -151,39 +99,31 @@ function getInitialActiveTeacherAndClass() {
   let teacherId = '';
   if (savedTeacherObj) {
     try {
-      const parsed = JSON.parse(savedTeacherObj);
-      if (parsed && parsed.id) {
-        teacherObj = parsed;
-        teacherId = parsed.id;
-      }
+      teacherObj = JSON.parse(savedTeacherObj);
+      teacherId = teacherObj?.id || '';
     } catch {}
   }
-
-  if (!teacherObj) {
-    return {
-      teacher: null,
-      activeClassId: '',
-      classes: []
-    };
-  }
-
-  const savedActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) || '';
-  const savedClassesRaw = localStorage.getItem(`khmer_teacher_classes_${teacherId}`);
+  const savedActiveId = (teacherId ? localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) : null)
+    || localStorage.getItem('khmer_teacher_active_class_id')
+    || '';
+  const savedClassesRaw = (teacherId ? localStorage.getItem(`khmer_teacher_classes_${teacherId}`) : null)
+    || localStorage.getItem('khmer_teacher_classes');
   let effectiveClassId = savedActiveId;
   let parsedClasses: ClassInfo[] = [];
   if (savedClassesRaw) {
     try {
       const raw = JSON.parse(savedClassesRaw) as ClassInfo[];
-      parsedClasses = (raw || []).filter(c => c && c.name && c.name.trim() !== '' && !isSampleDemoClass(c.id, c.name));
+      parsedClasses = (raw || []).filter(c => c && c.name && c.name.trim() !== '');
+      if (savedActiveId && parsedClasses.some(c => c.id === savedActiveId)) {
+        effectiveClassId = savedActiveId;
+      } else if (parsedClasses.length > 0) {
+        effectiveClassId = parsedClasses[0].id;
+      }
     } catch {}
   }
-
-  if (savedActiveId && parsedClasses.some(c => c.id === savedActiveId)) {
-    effectiveClassId = savedActiveId;
-  } else if (parsedClasses.length > 0) {
+  if (!effectiveClassId && parsedClasses.length > 0) {
     effectiveClassId = parsedClasses[0].id;
   }
-
   return {
     teacher: teacherObj,
     activeClassId: effectiveClassId,
@@ -231,8 +171,8 @@ export default function App() {
   });
 
   const [students, setStudents] = useState<Student[]>(() => {
-    const { teacher, activeClassId: currentActiveId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !currentActiveId) return [];
+    const { activeClassId: currentActiveId } = getInitialActiveTeacherAndClass();
+    if (!currentActiveId) return [];
     try {
       const raw = localStorage.getItem(`students_class_${currentActiveId}`);
       if (raw) {
@@ -246,8 +186,8 @@ export default function App() {
   });
   
   const [cards, setCards] = useState<QuizCard[]>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return [];
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return [];
     try {
       // 1. Direct class card cache
       const saved = localStorage.getItem(`quiz_cards_class_${activeId}`);
@@ -283,8 +223,8 @@ export default function App() {
   });
 
   const [pickedIds, setPickedIds] = useState<string[]>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return [];
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return [];
     try {
       const saved = localStorage.getItem(`picked_students_class_${activeId}`);
       return saved ? JSON.parse(saved) : [];
@@ -295,8 +235,8 @@ export default function App() {
 
   // State សម្រាប់សិស្សដែលគ្រូបានហៅផ្ទាល់ (Teacher manually called)
   const [manualCalledIds, setManualCalledIds] = useState<string[]>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return [];
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return [];
     try {
       const saved = localStorage.getItem(`manual_called_students_class_${activeId}`);
       return saved ? JSON.parse(saved) : [];
@@ -306,8 +246,8 @@ export default function App() {
   });
 
   const [subjects, setSubjects] = useState<QuizSubject[]>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return [];
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return [];
     try {
       const saved = localStorage.getItem(`subjects_class_${activeId}`);
       if (saved) {
@@ -321,8 +261,8 @@ export default function App() {
   });
 
   const [activeSubjectId, setActiveSubjectId] = useState<string | null>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return null;
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return null;
     try {
       return localStorage.getItem(`active_subject_id_${activeId}`);
     } catch {
@@ -331,8 +271,8 @@ export default function App() {
   });
 
   const [chapters, setChapters] = useState<QuizChapter[]>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return [];
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return [];
     try {
       const saved = localStorage.getItem(`chapters_class_${activeId}`);
       if (saved) {
@@ -353,8 +293,8 @@ export default function App() {
   });
 
   const [activeRoomId, setActiveRoomId] = useState<string | null>(() => {
-    const { teacher, activeClassId: activeId } = getInitialActiveTeacherAndClass();
-    if (!teacher || !activeId) return null;
+    const { activeClassId: activeId } = getInitialActiveTeacherAndClass();
+    if (!activeId) return null;
     try {
       return localStorage.getItem(`active_room_id_${activeId}`);
     } catch {
@@ -386,23 +326,12 @@ export default function App() {
     currentName: ''
   });
 
-  const [isAddingSubjectTop, setIsAddingSubjectTop] = useState(false);
-  const [newSubjectNameTop, setNewSubjectNameTop] = useState('');
-  const [editingSubjectIdTop, setEditingSubjectIdTop] = useState<string | null>(null);
-  const [tempSubjectNameTop, setTempSubjectNameTop] = useState('');
-
   const [teacher, setTeacher] = useState<TeacherAccount | null>(() => {
     const saved = localStorage.getItem('logged_in_teacher');
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        if (parsed && parsed.id) {
-          if (parsed.name === 'លោកគ្រូ/អ្នកគ្រូ សុវណ្ណភូមិ') {
-            parsed.name = 'បង្កើតគណនីគ្រូ';
-            localStorage.setItem('logged_in_teacher', JSON.stringify(parsed));
-          }
-          return parsed;
-        }
+        return parsed;
       } catch (e) {
         console.error(e);
       }
@@ -410,11 +339,7 @@ export default function App() {
     return null;
   });
 
-  const effectiveTeacher = teacher;
-  const effectiveTeacherId = teacher?.id || '';
-
   const lastSubjectsStrRef = useRef<string>('');
-  const lastCardsStrRef = useRef<string>('');
   const activeSubjectIdRef = useRef<string | null>(activeSubjectId);
   const activeRoomIdRef = useRef<string | null>(activeRoomId);
   const lastPickedStrRef = useRef<string>('');
@@ -482,9 +407,9 @@ export default function App() {
 
     setClasses(prevClasses => {
       const finalizedClasses = prevClasses.map((c, idx) => ({ ...c, order: idx }));
-      const currentTeacherId = effectiveTeacherId;
+      const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
-        safeSetJSON(`khmer_teacher_classes_${currentTeacherId}`, finalizedClasses);
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
         (async () => {
           try {
             for (let i = 0; i < finalizedClasses.length; i++) {
@@ -499,7 +424,7 @@ export default function App() {
           }
         })();
       } else {
-        safeSetJSON('khmer_teacher_classes', finalizedClasses);
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
       return finalizedClasses;
     });
@@ -517,9 +442,9 @@ export default function App() {
         c.id === classId ? { ...c, isPinned: newPinnedState } : c
       );
       const finalizedClasses = sortClasses(updated);
-      const currentTeacherId = effectiveTeacherId;
+      const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
-        safeSetJSON(`khmer_teacher_classes_${currentTeacherId}`, finalizedClasses);
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
         (async () => {
           try {
             for (let i = 0; i < finalizedClasses.length; i++) {
@@ -534,7 +459,7 @@ export default function App() {
           }
         })();
       } else {
-        safeSetJSON('khmer_teacher_classes', finalizedClasses);
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
       return finalizedClasses;
     });
@@ -554,9 +479,9 @@ export default function App() {
       updated[targetIndex] = temp;
 
       const finalizedClasses = updated.map((c, idx) => ({ ...c, order: idx }));
-      const currentTeacherId = effectiveTeacherId;
+      const currentTeacherId = teacher?.id || null;
       if (currentTeacherId) {
-        safeSetJSON(`khmer_teacher_classes_${currentTeacherId}`, finalizedClasses);
+        localStorage.setItem(`khmer_teacher_classes_${currentTeacherId}`, JSON.stringify(finalizedClasses));
         (async () => {
           try {
             for (let i = 0; i < finalizedClasses.length; i++) {
@@ -571,7 +496,7 @@ export default function App() {
           }
         })();
       } else {
-        safeSetJSON('khmer_teacher_classes', finalizedClasses);
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(finalizedClasses));
       }
       return finalizedClasses;
     });
@@ -579,23 +504,26 @@ export default function App() {
 
   // Real-Time Cross-Device Synchronization for Teacher Profile and Classes
   useEffect(() => {
-    if (!effectiveTeacherId) {
+    if (!teacher) {
+      setClasses([]);
+      setActiveClassId('');
+      setStudents([]);
+      setSubjects([]);
+      setChapters([]);
+      setCards([]);
+      setPickedIds([]);
       setLoadingCloudData(false);
       return;
     }
 
     let unsubTeacher: (() => void) | null = null;
     let unsubClasses: (() => void) | null = null;
-    let safetyTimer: any = null;
 
     try {
       setLoadingCloudData(true);
-      safetyTimer = setTimeout(() => {
-        setLoadingCloudData(false);
-      }, 2000);
 
       // 1. Real-time Teacher Profile sync across devices
-      const teacherDocRef = doc(db, 'teachers', effectiveTeacherId);
+      const teacherDocRef = doc(db, 'teachers', teacher.id);
       unsubTeacher = safeOnSnapshot(teacherDocRef, (teacherSnap: any) => {
         if (teacherSnap && teacherSnap.exists && teacherSnap.exists()) {
           const cloudTeacher = teacherSnap.data() as TeacherAccount;
@@ -621,14 +549,14 @@ export default function App() {
       });
 
       // 2. Real-time Classes List sync across devices
-      const classesCollRef = collection(db, 'teachers', effectiveTeacherId, 'classes');
+      const classesCollRef = collection(db, 'teachers', teacher.id, 'classes');
       unsubClasses = safeOnSnapshot(classesCollRef, (classesSnap: any) => {
         if (!classesSnap) return;
 
         let fetchedClasses: ClassInfo[] = [];
         const seenIds = new Set<string>();
 
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher.id;
         const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
         const deletedClassesStr = localStorage.getItem(deletedKey);
         let deletedSet = new Set<string>();
@@ -643,10 +571,6 @@ export default function App() {
           const id = clsData.id || docSnap.id;
           clsData.id = id;
           if (deletedSet.has(id)) return;
-          if (isSampleDemoClass(id, clsData.name)) {
-            safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', id)).catch(() => {});
-            return;
-          }
           if (clsData && clsData.name && clsData.name.trim() !== '') {
             if (!seenIds.has(id)) {
               seenIds.add(id);
@@ -656,13 +580,12 @@ export default function App() {
         });
 
         // Get locally saved classes fallback
-        const isDefaultTeacherAccount = effectiveTeacherId === DEFAULT_CLOUD_TEACHER.id;
-        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${effectiveTeacherId}`);
+        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
         let parsedLocals: ClassInfo[] = [];
         let localClassesMap = new Map<string, number>();
         if (localClassesStr) {
           try {
-            parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '' && !isSampleDemoClass(c.id, c.name));
+            parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
             parsedLocals.forEach((lc, index) => {
               if (lc && lc.id) {
                 localClassesMap.set(lc.id, typeof lc.order === 'number' ? lc.order : index);
@@ -671,24 +594,20 @@ export default function App() {
           } catch (e) {}
         }
 
-        // Merge local classes with fetched cloud classes
-        if (parsedLocals.length > 0) {
-          for (const lc of parsedLocals) {
-            if (deletedSet.has(lc.id) || isSampleDemoClass(lc.id, lc.name)) continue;
-            const existsInFetched = fetchedClasses.some(fc => fc.id === lc.id || fc.name.trim() === lc.name.trim());
-            if (!existsInFetched) {
-              fetchedClasses.push(lc);
-              safeSetDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', lc.id), {
-                id: lc.id,
-                name: lc.name.trim(),
-                order: typeof lc.order === 'number' ? lc.order : fetchedClasses.length,
-                createdAt: new Date().toISOString()
-              }, { merge: true }).catch(() => {});
-            }
+        // Preserve valid local classes not yet indexed
+        for (const lc of parsedLocals) {
+          if (deletedSet.has(lc.id)) continue;
+          const existsInFetched = fetchedClasses.some(fc => fc.id === lc.id || fc.name.trim() === lc.name.trim());
+          if (!existsInFetched) {
+            fetchedClasses.push(lc);
+            safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', lc.id), {
+              id: lc.id,
+              name: lc.name.trim(),
+              order: typeof lc.order === 'number' ? lc.order : fetchedClasses.length,
+              createdAt: new Date().toISOString()
+            }, { merge: true }).catch(() => {});
           }
         }
-
-        // If 0 classes for this teacher, keep fetchedClasses empty so teacher can create custom classes
 
         fetchedClasses = fetchedClasses.map((cls, idx) => {
           if (typeof cls.order === 'number') return cls;
@@ -706,15 +625,13 @@ export default function App() {
           return sortedCloudClasses;
         });
 
-        safeSetJSON(`khmer_teacher_classes_${effectiveTeacherId}`, sortedCloudClasses);
-        if (isDefaultTeacherAccount) {
-          safeSetJSON('khmer_teacher_classes', sortedCloudClasses);
-        }
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedCloudClasses));
 
         if (sortedCloudClasses.length > 0) {
           setActiveClassId(curr => {
             if (curr && sortedCloudClasses.some(c => c.id === curr)) return curr;
-            const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${effectiveTeacherId}`) || localStorage.getItem('khmer_teacher_active_class_id') || sortedCloudClasses[0].id;
+            const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || sortedCloudClasses[0].id;
             const exists = sortedCloudClasses.some(c => c.id === lastActiveId);
             return exists ? lastActiveId : sortedCloudClasses[0].id;
           });
@@ -733,36 +650,73 @@ export default function App() {
     }
 
     return () => {
-      clearTimeout(safetyTimer);
       if (typeof unsubTeacher === 'function') unsubTeacher();
       if (typeof unsubClasses === 'function') unsubClasses();
     };
-  }, [effectiveTeacherId]);
+  }, [teacher?.id]);
 
   // Load students, cards, and picked status when activeClassId shifts
   useEffect(() => {
-    if (!effectiveTeacherId) {
-      setClasses([]);
-      setActiveClassId('');
-      setStudents([]);
-      setSubjects([]);
-      setChapters([]);
-      setCards([]);
-      setPickedIds([]);
-      setManualCalledIds([]);
-      setLoadingCloudData(false);
-      return;
+    if (!activeClassId) return;
+    
+    if (teacher) {
+      localStorage.setItem(`khmer_teacher_active_class_id_${teacher.id}`, activeClassId);
+    } else {
+      localStorage.setItem('khmer_teacher_active_class_id', activeClassId);
     }
 
-    if (!activeClassId) return;
-    localStorage.setItem(`khmer_teacher_active_class_id_${effectiveTeacherId}`, activeClassId);
+    if (!teacher) {
+      if (activeClassId) {
+        const localSubStr = localStorage.getItem(`subjects_class_${activeClassId}`);
+        const localCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
+        const localStudentsStr = localStorage.getItem(`students_class_${activeClassId}`);
+        const localPickedStr = localStorage.getItem(`picked_students_class_${activeClassId}`);
+        const localSubjectId = localStorage.getItem(`active_subject_id_${activeClassId}`);
+        const localRoomId = localStorage.getItem(`active_room_id_${activeClassId}`);
+
+        let loadedSub: QuizSubject[] = [];
+        if (localSubStr) {
+          try { loadedSub = JSON.parse(localSubStr); } catch {}
+        }
+        if (loadedSub.length === 0) {
+          const mig = getMigratedSubjects([]);
+          loadedSub = mig.subjects;
+        }
+        setSubjects(loadedSub);
+        const subId = localSubjectId || loadedSub[0]?.id || null;
+        setActiveSubjectId(subId);
+        const activeSub = loadedSub.find(s => s.id === subId) || loadedSub[0];
+        const loadedChaps = activeSub?.chapters || [];
+        setChapters(loadedChaps);
+        const rmId = localRoomId || loadedChaps[0]?.rooms[0]?.id || null;
+        setActiveRoomId(rmId);
+
+        let loadedCards: QuizCard[] = [];
+        if (localCardsStr) {
+          try { loadedCards = JSON.parse(localCardsStr); } catch {}
+        }
+        if (loadedCards.length === 0 && loadedChaps[0]?.rooms[0]?.cards) {
+          loadedCards = loadedChaps[0].rooms[0].cards;
+        }
+        setCards(loadedCards);
+
+        if (localStudentsStr) {
+          try { setStudents(JSON.parse(localStudentsStr)); } catch {}
+        }
+        if (localPickedStr) {
+          try { setPickedIds(JSON.parse(localPickedStr)); } catch {}
+        }
+        lastLoadedClassId.current = activeClassId;
+      }
+      return;
+    }
 
     const loadClassDetails = async () => {
       try {
         setLoadingCloudData(true);
         
         // 1. Fetch class doc
-        const classDocRef = doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId);
+        const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         const classSnap = await safeGetDoc(classDocRef);
         
         let loadedSubjects: QuizSubject[] = [];
@@ -775,53 +729,6 @@ export default function App() {
           if (classData.subjects && classData.subjects.length > 0) {
             loadedSubjects = classData.subjects;
             loadedActiveSubjectId = classData.activeSubjectId || (loadedSubjects[0]?.id || null);
-
-            // Sync with teacher's profile subjects: ensure all subjects defined in teacher.subjects exist
-            const effectiveTeacherSubjectStr = effectiveTeacher?.subjects?.trim();
-            if (effectiveTeacherSubjectStr) {
-              const teacherSubNames = effectiveTeacherSubjectStr.split(/[,,\n፤]/).map(s => s.trim()).filter(Boolean);
-              let modified = false;
-
-              teacherSubNames.forEach((tName, idx) => {
-                const exists = loadedSubjects.some(s => s.name.trim().toLowerCase() === tName.toLowerCase());
-                if (!exists) {
-                  if (loadedSubjects.length === 1 && idx === 0 && (loadedSubjects[0].name === 'រូបវិទ្យា' || loadedSubjects[0].name === 'ភាសាខ្មែរ')) {
-                    loadedSubjects[0].name = tName;
-                    modified = true;
-                  } else {
-                    loadedSubjects.push({
-                      id: `subj-${Date.now()}-${idx}`,
-                      name: tName,
-                      chapters: [
-                        {
-                          id: `chapter-default-${Date.now()}-${idx}`,
-                          name: 'ជំពូកទី១',
-                          rooms: [
-                            {
-                              id: `room-default-${Date.now()}-${idx}`,
-                              name: 'មេរៀនទី១',
-                              cards: [],
-                              pickedIds: [],
-                              createdAt: Date.now()
-                            }
-                          ],
-                          createdAt: Date.now()
-                        }
-                      ],
-                      createdAt: Date.now()
-                    });
-                    modified = true;
-                  }
-                }
-              });
-
-              if (modified) {
-                safeSetJSON(`subjects_class_${activeClassId}`, loadedSubjects);
-                safeSetDoc(classDocRef, {
-                  subjects: loadedSubjects
-                }, { merge: true }).catch(() => {});
-              }
-            }
           } else {
             // First migrate chapters/rooms/legacy content
             let tempChapters: QuizChapter[] = [];
@@ -852,7 +759,7 @@ export default function App() {
               }];
             }
             
-            const migration = getMigratedSubjects(tempChapters, effectiveTeacher);
+            const migration = getMigratedSubjects(tempChapters);
             loadedSubjects = migration.subjects;
             loadedActiveSubjectId = migration.activeSubjectId;
             
@@ -873,12 +780,12 @@ export default function App() {
               loadedActiveRoomId = localStorage.getItem(`active_room_id_${activeClassId}`);
             } catch (err) {
               console.error('Failed to parse local subjects fallback:', err);
-              const migration = getMigratedSubjects([], effectiveTeacher);
+              const migration = getMigratedSubjects([]);
               loadedSubjects = migration.subjects;
               loadedActiveSubjectId = migration.activeSubjectId;
             }
           } else {
-            const migration = getMigratedSubjects([], effectiveTeacher);
+            const migration = getMigratedSubjects([]);
             loadedSubjects = migration.subjects;
             loadedActiveSubjectId = migration.activeSubjectId;
           }
@@ -924,49 +831,49 @@ export default function App() {
             if (activeRoom) activeRoom.cards = resolvedCards;
           }
         }
-        if ((!resolvedCards || resolvedCards.length === 0) && !classSnap.exists()) {
-          const localCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
-          if (localCardsStr) {
-            try {
-              const parsedLocals = JSON.parse(localCardsStr);
-              if (Array.isArray(parsedLocals) && parsedLocals.length > 0) {
-                resolvedCards = parsedLocals;
-                if (activeRoom) {
-                  activeRoom.cards = resolvedCards;
-                }
+        const localCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
+        if ((!resolvedCards || resolvedCards.length === 0) && localCardsStr) {
+          try {
+            const parsedLocals = JSON.parse(localCardsStr);
+            if (Array.isArray(parsedLocals) && parsedLocals.length > 0) {
+              resolvedCards = parsedLocals;
+              if (activeRoom) {
+                activeRoom.cards = resolvedCards;
               }
-            } catch {}
-          }
+              // Sync back to cloud
+              safeSetDoc(classDocRef, {
+                subjects: loadedSubjects,
+                cards: resolvedCards
+              }, { merge: true }).catch(() => {});
+            }
+          } catch {}
         }
 
         setCards(resolvedCards);
         setPickedIds(activeRoom?.pickedIds || []);
         lastLoadedClassId.current = activeClassId;
-        lastSubjectsStrRef.current = JSON.stringify(loadedSubjects);
-        lastCardsStrRef.current = JSON.stringify(resolvedCards);
-        lastPickedStrRef.current = JSON.stringify(activeRoom?.pickedIds || []);
 
         // Immediately cache to localStorage so refresh and tab switches retain the exact cloud data
-        safeSetJSON(`subjects_class_${activeClassId}`, loadedSubjects);
-        safeSetJSON(`chapters_class_${activeClassId}`, loadedChapters);
+        localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(loadedSubjects));
+        localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(loadedChapters));
         if (loadedActiveSubjectId) {
-          safeSetItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
+          localStorage.setItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
         }
         if (loadedActiveRoomId) {
-          safeSetItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
+          localStorage.setItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
         }
-        safeSetJSON(`quiz_cards_class_${activeClassId}`, resolvedCards);
-        safeSetJSON(`picked_students_class_${activeClassId}`, activeRoom?.pickedIds || []);
+        localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(resolvedCards));
+        localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(activeRoom?.pickedIds || []));
 
         if (classSnap.exists()) {
           const cData = classSnap.data();
           if (Array.isArray(cData.exams) && cData.exams.length > 0) {
-            safeSetJSON(`khmer_exams_${activeClassId}`, cData.exams);
+            localStorage.setItem(`khmer_exams_${activeClassId}`, JSON.stringify(cData.exams));
           }
         }
 
         // 2. Fetch students
-        const studentsCollRef = collection(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students');
+        const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
         const studentsSnap = await safeGetDocs(studentsCollRef);
         
         const activeCls = classes.find(c => c.id === activeClassId);
@@ -983,14 +890,14 @@ export default function App() {
             } else {
               foreignStudentsToDelete.push(data.id);
               if (data.classId) {
-                safeSetDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', data.classId, 'students', data.id), data).catch(() => {});
+                safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', data.classId, 'students', data.id), data).catch(() => {});
               }
             }
           }
         });
 
         for (const fId of foreignStudentsToDelete) {
-          safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', fId)).catch(() => {});
+          safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', fId)).catch(() => {});
         }
 
         // Merge locally saved students in case any were added before sync or offline
@@ -1005,7 +912,7 @@ export default function App() {
                     if (!loadedStudents.some(s => s.id === std.id)) {
                       const stdWithClass = std.classId ? std : { ...std, classId: activeClassId };
                       loadedStudents.push(stdWithClass);
-                      safeSetDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', std.id), stdWithClass).catch(() => {});
+                      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), stdWithClass).catch(() => {});
                     }
                   }
                 }
@@ -1016,15 +923,15 @@ export default function App() {
         
         setStudents(loadedStudents);
         if (activeClassId) {
-          safeSetJSON(`subjects_class_${activeClassId}`, loadedSubjects);
-          safeSetJSON(`chapters_class_${activeClassId}`, loadedChapters);
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(loadedSubjects));
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(loadedChapters));
           if (loadedActiveSubjectId) {
-            safeSetItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
+            localStorage.setItem(`active_subject_id_${activeClassId}`, loadedActiveSubjectId);
           }
           if (loadedActiveRoomId) {
-            safeSetItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
+            localStorage.setItem(`active_room_id_${activeClassId}`, loadedActiveRoomId);
           }
-          safeSetJSON(`students_class_${activeClassId}`, loadedStudents);
+          localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(loadedStudents));
         }
         lastLoadedClassId.current = activeClassId;
       } catch (err) {
@@ -1035,13 +942,13 @@ export default function App() {
     };
 
     loadClassDetails();
-  }, [activeClassId, effectiveTeacherId]);
+  }, [activeClassId, teacher?.id]);
 
-  // Real-time Student Synchronization for cloud sessions (across all devices)
+  // Real-time Student Synchronization for cloud sessions (only for logged-in teachers)
   useEffect(() => {
-    if (!activeClassId || !effectiveTeacherId) return;
+    if (!activeClassId || !teacher) return;
 
-    const studentsCollRef = collection(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students');
+    const studentsCollRef = collection(db, 'teachers', teacher.id, 'classes', activeClassId, 'students');
     const unsubscribe = safeOnSnapshot(studentsCollRef, (snapshot: any) => {
       const activeCls = classes.find(c => c.id === activeClassId);
       const activeClassName = activeCls?.name;
@@ -1056,7 +963,7 @@ export default function App() {
               const validLocals = parsed.filter((std: any) => std && std.id && !std.id.startsWith('sim-') && isStudentInClass(std, activeClassId, activeClassName));
               if (validLocals.length > 0) {
                 for (const std of validLocals) {
-                  safeSetDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
+                  safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', std.id), std).catch(() => {});
                 }
                 setStudents(validLocals);
                 return;
@@ -1075,38 +982,28 @@ export default function App() {
           if (isStudentInClass(data, activeClassId, activeClassName)) {
             loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
           } else {
-            safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', data.id)).catch(() => {});
+            safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', data.id)).catch(() => {});
           }
         }
       });
       setStudents(loadedStudents);
-      safeSetJSON(`students_class_${activeClassId}`, loadedStudents);
+      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(loadedStudents));
     }, (err) => {
       console.error("Real-time snapshot error for students collection:", err);
     });
 
     return () => unsubscribe();
-  }, [activeClassId, effectiveTeacherId, classes]);
+  }, [activeClassId, teacher?.id, classes]);
 
   // Real-time Class Document Synchronization (Subjects, Rooms, Quiz Cards, Picked IDs) across devices
   useEffect(() => {
-    if (!activeClassId || !effectiveTeacherId) return;
+    if (!activeClassId || !teacher?.id) return;
 
-    // Reset sync refs on class shift so the new class document updates immediately
-    lastSubjectsStrRef.current = '';
-    lastPickedStrRef.current = '';
-    lastCardsStrRef.current = '';
-    activeRoomIdRef.current = null;
-    activeSubjectIdRef.current = null;
-
-    const classDocRef = doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId);
+    const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
     const unsubscribe = safeOnSnapshot(classDocRef, (snap: any) => {
       if (!snap || !snap.exists()) return;
       const classData = snap.data();
       if (!classData) return;
-
-      let currChapters: QuizChapter[] = [];
-      let targetRoom: QuizRoom | undefined;
 
       // 1. Subjects and Rooms
       if (Array.isArray(classData.subjects) && classData.subjects.length > 0) {
@@ -1114,23 +1011,24 @@ export default function App() {
         if (incomingSubjectsStr !== lastSubjectsStrRef.current) {
           lastSubjectsStrRef.current = incomingSubjectsStr;
           setSubjects(classData.subjects);
-          safeSetItem(`subjects_class_${activeClassId}`, incomingSubjectsStr);
+          localStorage.setItem(`subjects_class_${activeClassId}`, incomingSubjectsStr);
 
           // Update active subject and chapters
           const activeSubId = classData.activeSubjectId || activeSubjectIdRef.current || classData.subjects[0].id;
           if (activeSubId !== activeSubjectIdRef.current) {
             activeSubjectIdRef.current = activeSubId;
             setActiveSubjectId(activeSubId);
-            safeSetItem(`active_subject_id_${activeClassId}`, activeSubId);
+            localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubId);
           }
 
           const currentSub = classData.subjects.find((s: QuizSubject) => s.id === activeSubId) || classData.subjects[0];
-          currChapters = currentSub?.chapters || [];
+          const currChapters = currentSub?.chapters || [];
           setChapters(currChapters);
-          safeSetJSON(`chapters_class_${activeClassId}`, currChapters);
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(currChapters));
 
           // Find active room
           const targetRoomId = classData.activeRoomId || activeRoomIdRef.current;
+          let targetRoom: QuizRoom | undefined;
           for (const ch of currChapters) {
             targetRoom = ch.rooms.find(r => r.id === targetRoomId);
             if (targetRoom) break;
@@ -1139,51 +1037,46 @@ export default function App() {
             targetRoom = currChapters[0].rooms[0];
           }
 
-          if (targetRoom && targetRoom.id !== activeRoomIdRef.current) {
-            activeRoomIdRef.current = targetRoom.id;
-            setActiveRoomId(targetRoom.id);
-            safeSetItem(`active_room_id_${activeClassId}`, targetRoom.id);
+          if (targetRoom) {
+            if (targetRoom.id !== activeRoomIdRef.current) {
+              activeRoomIdRef.current = targetRoom.id;
+              setActiveRoomId(targetRoom.id);
+              localStorage.setItem(`active_room_id_${activeClassId}`, targetRoom.id);
+            }
+            let roomCards = targetRoom.cards || [];
+            if (roomCards.length === 0 && Array.isArray(classData.cards) && classData.cards.length > 0) {
+              roomCards = classData.cards;
+            }
+            if (roomCards.length === 0) {
+              const localCardsStr = localStorage.getItem(`quiz_cards_class_${activeClassId}`);
+              if (localCardsStr) {
+                try {
+                  const parsedLocal = JSON.parse(localCardsStr);
+                  if (Array.isArray(parsedLocal) && parsedLocal.length > 0) {
+                    roomCards = parsedLocal;
+                  }
+                } catch {}
+              }
+            }
+            setCards(roomCards);
+            localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(roomCards));
+            setPickedIds(targetRoom.pickedIds || classData.pickedIds || []);
+            localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(targetRoom.pickedIds || classData.pickedIds || []));
           }
         }
       }
 
-      // 2. Authoritative Cards for this class & room (Real-time sync across Laptop, PC, iPhone, iPad, Android)
-      let roomCards: QuizCard[] | null = null;
-      if (targetRoom && Array.isArray(targetRoom.cards)) {
-        roomCards = targetRoom.cards;
-      } else if (Array.isArray(classData.cards)) {
-        roomCards = classData.cards;
-      }
-
-      if (roomCards !== null) {
-        const incomingCardsStr = JSON.stringify(roomCards);
-        if (incomingCardsStr !== lastCardsStrRef.current) {
-          lastCardsStrRef.current = incomingCardsStr;
-          setCards(roomCards);
-          safeSetJSON(`quiz_cards_class_${activeClassId}`, roomCards);
-        }
-      }
-
-      // 3. Picked IDs on the wheel/quiz
-      const incomingPicked = (targetRoom && Array.isArray(targetRoom.pickedIds))
-        ? targetRoom.pickedIds
-        : (Array.isArray(classData.pickedIds) ? classData.pickedIds : null);
-      if (incomingPicked !== null) {
-        const incomingPickedStr = JSON.stringify(incomingPicked);
+      // 2. Picked IDs on the wheel/quiz (when someone calls a student or spins)
+      if (Array.isArray(classData.pickedIds)) {
+        const incomingPickedStr = JSON.stringify(classData.pickedIds);
         if (incomingPickedStr !== lastPickedStrRef.current) {
           lastPickedStrRef.current = incomingPickedStr;
-          setPickedIds(incomingPicked);
-          safeSetItem(`picked_students_class_${activeClassId}`, incomingPickedStr);
+          setPickedIds(classData.pickedIds);
+          localStorage.setItem(`picked_students_class_${activeClassId}`, incomingPickedStr);
         }
       }
 
-      // 4. Manually called students
-      if (Array.isArray(classData.manualCalledIds)) {
-        setManualCalledIds(classData.manualCalledIds);
-        safeSetJSON(`manual_called_students_class_${activeClassId}`, classData.manualCalledIds);
-      }
-
-      // 5. Active card & card state (answering/revealed)
+      // 3. Active card & card state (answering/revealed)
       if (classData.activeCardId !== undefined && classData.activeCardId !== activeCardIdRef.current) {
         activeCardIdRef.current = classData.activeCardId;
         setActiveCardId(classData.activeCardId);
@@ -1229,9 +1122,9 @@ export default function App() {
   // Save changes to localStorage on states update as fallback for offline use and fast initial load
   useEffect(() => {
     if (teacher) {
-      safeSetJSON(`khmer_teacher_classes_${teacher.id}`, classes);
+      localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(classes));
     } else {
-      safeSetJSON('khmer_teacher_classes', classes);
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(classes));
     }
   }, [classes, teacher]);
 
@@ -1239,22 +1132,62 @@ export default function App() {
     if (activeClassId && lastLoadedClassId.current === activeClassId) {
       const activeCls = classes.find(c => c.id === activeClassId);
       const classOnlyStudents = students.filter(s => isStudentInClass(s, activeClassId, activeCls?.name));
-      safeSetJSON(`students_class_${activeClassId}`, classOnlyStudents);
+      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(classOnlyStudents));
     }
   }, [students, activeClassId, classes]);
+
+  useEffect(() => {
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
+      localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
+    }
+  }, [cards, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
+      localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
+    }
+  }, [pickedIds, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && lastLoadedClassId.current === activeClassId && subjects.length > 0) {
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(subjects));
+    }
+  }, [subjects, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && lastLoadedClassId.current === activeClassId && chapters.length > 0) {
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(chapters));
+    }
+  }, [chapters, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && lastLoadedClassId.current === activeClassId && activeSubjectId) {
+      localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
+    }
+  }, [activeSubjectId, activeClassId]);
+
+  useEffect(() => {
+    if (activeClassId && lastLoadedClassId.current === activeClassId) {
+      if (activeRoomId) {
+        localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
+      } else if (activeRoomId === null) {
+        localStorage.removeItem(`active_room_id_${activeClassId}`);
+      }
+    }
+  }, [activeRoomId, activeClassId]);
 
   // Helper to save class-level states to Firestore
   const saveClassMetadata = useCallback(async (updatedCards: QuizCard[], updatedPickedIds: string[]) => {
     if (!activeClassId) return;
 
     // Immediately cache cards and picked IDs to localStorage for this specific class
-    safeSetJSON(`quiz_cards_class_${activeClassId}`, updatedCards);
-    safeSetJSON(`picked_students_class_${activeClassId}`, updatedPickedIds);
+    localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(updatedCards));
+    localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(updatedPickedIds));
 
     let currentSubjects = subjects;
     let currentSubId = activeSubjectId;
     if (!currentSubjects || currentSubjects.length === 0) {
-      const mig = getMigratedSubjects([], effectiveTeacher);
+      const mig = getMigratedSubjects([]);
       currentSubjects = mig.subjects;
       currentSubId = mig.activeSubjectId;
     }
@@ -1338,12 +1271,12 @@ export default function App() {
     activeRoomIdRef.current = currentRoomId;
     activeSubjectIdRef.current = currentSubId;
 
-    safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-    safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
-    safeSetItem(`active_subject_id_${activeClassId}`, currentSubId);
-    safeSetItem(`active_room_id_${activeClassId}`, currentRoomId);
+    localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+    localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+    localStorage.setItem(`active_subject_id_${activeClassId}`, currentSubId);
+    localStorage.setItem(`active_room_id_${activeClassId}`, currentRoomId);
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     try {
       await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
@@ -1356,37 +1289,28 @@ export default function App() {
     } catch (err) {
       console.error('Failed to save class metadata to cloud:', err);
     }
-  }, [effectiveTeacherId, activeClassId, activeRoomId, chapters, subjects, activeSubjectId]);
+  }, [teacher, activeClassId, activeRoomId, chapters, subjects, activeSubjectId]);
 
   // Helper to save student score updates to Firestore
   const saveStudentScore = useCallback(async (studentId: string, newScore: number) => {
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       try {
-        const student = students.find(s => s.id === studentId);
-        const updatedSubjectScores = { ...(student?.subjectScores || {}) };
-        if (activeSubjectId) {
-          updatedSubjectScores[activeSubjectId] = {
-            ...(updatedSubjectScores[activeSubjectId] || {}),
-            score: newScore
-          };
-        }
         await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', studentId), {
-          score: newScore,
-          subjectScores: updatedSubjectScores
+          score: newScore
         }, { merge: true });
       } catch (err) {
         console.error('Failed to update student score on cloud:', err);
       }
     }
-  }, [effectiveTeacherId, activeClassId, activeSubjectId, students]);
+  }, [teacher, activeClassId]);
 
   // Helper to save pickedIds updates to Firestore immediately when wheel or panel changes it
   const handleSetPickedIds = useCallback((updater: string[] | ((prev: string[]) => string[])) => {
     setPickedIds(prev => {
       const next = typeof updater === 'function' ? updater(prev) : updater;
       
-      const currentTeacherId = effectiveTeacherId;
+      const currentTeacherId = teacher?.id || 'local';
       if (activeClassId && activeRoomId && activeSubjectId) {
         const updatedChapters = chapters.map(ch => {
           const updatedRooms = ch.rooms.map(r => {
@@ -1423,23 +1347,23 @@ export default function App() {
       }
       return next;
     });
-  }, [effectiveTeacherId, activeClassId, activeRoomId, activeSubjectId, chapters, subjects]);
+  }, [teacher, activeClassId, activeRoomId, activeSubjectId, chapters, subjects]);
 
   // Helper to award date-based activity points (5 points) into monthlyScores and total score
   const awardStudentActivityPoints = useCallback((studentId: string, points: number = 5) => {
     let targetStudent: Student | null = null;
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
 
     setStudents(prev => {
       const student = prev.find(s => s.id === studentId);
       if (!student) return prev;
 
-      const { updatedStudent } = addActivityPointsToStudent(student, points, new Date(), activeSubjectId || undefined);
+      const { updatedStudent } = addActivityPointsToStudent(student, points);
       targetStudent = updatedStudent;
 
       const updatedList = prev.map(s => s.id === studentId ? updatedStudent : s);
       if (activeClassId) {
-        safeSetJSON(`students_class_${activeClassId}`, updatedList);
+        localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(updatedList));
       }
       return updatedList;
     });
@@ -1451,23 +1375,23 @@ export default function App() {
         { merge: true }
       ).catch(err => console.error("Cloud score sync error:", err));
     }
-  }, [activeClassId, effectiveTeacherId, activeSubjectId]);
+  }, [activeClassId, teacher]);
 
   // Helper to set exact activity score directly for a student
   const handleSetExactActivityScore = useCallback((studentId: string, exactScore: number) => {
     let targetStudent: Student | null = null;
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
 
     setStudents(prev => {
       const student = prev.find(s => s.id === studentId);
       if (!student) return prev;
 
-      const { updatedStudent } = setActivityScoreForStudent(student, exactScore, new Date(), activeSubjectId || undefined);
+      const { updatedStudent } = setActivityScoreForStudent(student, exactScore);
       targetStudent = updatedStudent;
 
       const updatedList = prev.map(s => s.id === studentId ? updatedStudent : s);
       if (activeClassId) {
-        safeSetJSON(`students_class_${activeClassId}`, updatedList);
+        localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(updatedList));
       }
       return updatedList;
     });
@@ -1479,17 +1403,17 @@ export default function App() {
         { merge: true }
       ).catch(err => console.error("Cloud score sync error:", err));
     }
-  }, [activeClassId, effectiveTeacherId, activeSubjectId]);
+  }, [activeClassId, teacher]);
 
   // Helper to award group work points directly to students (adds to monthlyScores.groupWork)
   const awardStudentGroupWorkPoints = useCallback((studentIds: string[], points: number) => {
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     const updatedStudentsList: Student[] = [];
 
     setStudents(prev => {
       const updatedList = prev.map(s => {
         if (studentIds.includes(s.id)) {
-          const { updatedStudent } = addGroupWorkPointsToStudent(s, points, new Date(), activeSubjectId || undefined);
+          const { updatedStudent } = addGroupWorkPointsToStudent(s, points);
           updatedStudentsList.push(updatedStudent);
           return updatedStudent;
         }
@@ -1497,7 +1421,7 @@ export default function App() {
       });
 
       if (activeClassId) {
-        safeSetJSON(`students_class_${activeClassId}`, updatedList);
+        localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(updatedList));
       }
       return updatedList;
     });
@@ -1511,7 +1435,7 @@ export default function App() {
         ).catch(err => console.error("Cloud group score sync error:", err));
       });
     }
-  }, [activeClassId, effectiveTeacherId, activeSubjectId]);
+  }, [activeClassId, teacher]);
 
   // Handler for wheel selection: ONLY selects the student (points are only awarded upon answering questions correctly)
   const handleWheelPickStudent = useCallback((chosenStudent: Student) => {
@@ -1526,7 +1450,7 @@ export default function App() {
         ? prev.filter(id => id !== studentId)
         : [...prev, studentId];
       if (activeClassId) {
-        safeSetJSON(`manual_called_students_class_${activeClassId}`, next);
+        localStorage.setItem(`manual_called_students_class_${activeClassId}`, JSON.stringify(next));
       }
       return next;
     });
@@ -1546,9 +1470,9 @@ export default function App() {
       setCards(roomCards);
       setPickedIds(roomPicked);
       if (activeClassId) {
-        safeSetItem(`active_room_id_${activeClassId}`, roomId);
-        safeSetJSON(`quiz_cards_class_${activeClassId}`, roomCards);
-        safeSetJSON(`picked_students_class_${activeClassId}`, roomPicked);
+        localStorage.setItem(`active_room_id_${activeClassId}`, roomId);
+        localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(roomCards));
+        localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(roomPicked));
       }
       if (teacher && activeClassId) {
         safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
@@ -1594,12 +1518,12 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (activeClassId) {
-      safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-      safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
-      safeSetItem(`active_room_id_${activeClassId}`, newRoom.id);
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
+      localStorage.setItem(`active_room_id_${activeClassId}`, newRoom.id);
     }
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
@@ -1675,16 +1599,16 @@ export default function App() {
         setSubjects(updatedSubjects);
 
         if (activeClassId) {
-          safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-          safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
           if (nextActiveId) {
-            safeSetItem(`active_room_id_${activeClassId}`, nextActiveId);
+            localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveId);
           } else {
-            safeRemoveItem(`active_room_id_${activeClassId}`);
+            localStorage.removeItem(`active_room_id_${activeClassId}`);
           }
         }
 
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher?.id || 'local';
         if (activeClassId) {
           safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
             subjects: updatedSubjects,
@@ -1721,11 +1645,11 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (activeClassId) {
-      safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-      safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
@@ -1756,11 +1680,11 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (activeClassId) {
-      safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-      safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
@@ -1790,11 +1714,11 @@ export default function App() {
     setSubjects(updatedSubjects);
 
     if (activeClassId) {
-      safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-      safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
     }
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
@@ -1866,16 +1790,16 @@ export default function App() {
         setSubjects(updatedSubjects);
 
         if (activeClassId) {
-          safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-          safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
           if (nextActiveRoomId) {
-            safeSetItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
+            localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
           } else {
-            safeRemoveItem(`active_room_id_${activeClassId}`);
+            localStorage.removeItem(`active_room_id_${activeClassId}`);
           }
         }
 
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher?.id || 'local';
         if (activeClassId) {
           safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
             subjects: updatedSubjects,
@@ -1890,9 +1814,9 @@ export default function App() {
   const handleSelectSubject = useCallback((subjectId: string) => {
     setActiveSubjectId(subjectId);
     if (activeClassId) {
-      safeSetItem(`active_subject_id_${activeClassId}`, subjectId);
+      localStorage.setItem(`active_subject_id_${activeClassId}`, subjectId);
     }
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         activeSubjectId: subjectId
@@ -1910,9 +1834,9 @@ export default function App() {
         setCards(firstCards);
         setPickedIds(firstPicked);
         if (activeClassId) {
-          safeSetItem(`active_room_id_${activeClassId}`, firstRoom.id);
-          safeSetJSON(`quiz_cards_class_${activeClassId}`, firstCards);
-          safeSetJSON(`picked_students_class_${activeClassId}`, firstPicked);
+          localStorage.setItem(`active_room_id_${activeClassId}`, firstRoom.id);
+          localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(firstCards));
+          localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(firstPicked));
         }
         if (activeClassId) {
           safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
@@ -1924,9 +1848,9 @@ export default function App() {
         setCards([]);
         setPickedIds([]);
         if (activeClassId) {
-          safeRemoveItem(`active_room_id_${activeClassId}`);
-          safeSetJSON(`quiz_cards_class_${activeClassId}`, []);
-          safeSetJSON(`picked_students_class_${activeClassId}`, []);
+          localStorage.removeItem(`active_room_id_${activeClassId}`);
+          localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify([]));
+          localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify([]));
         }
         if (activeClassId) {
           safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
@@ -1938,25 +1862,9 @@ export default function App() {
   }, [subjects, teacher, activeClassId]);
 
   const handleCreateSubject = useCallback((subjectName: string) => {
-    const trimmed = subjectName.trim();
-    if (!trimmed) return;
-
-    // Check if subject already exists
-    const existingSub = subjects.find(s => s.name.trim().toLowerCase() === trimmed.toLowerCase());
-    if (existingSub) {
-      setActiveSubjectId(existingSub.id);
-      if (existingSub.chapters && existingSub.chapters.length > 0) {
-        setChapters(existingSub.chapters);
-        if (existingSub.chapters[0].rooms && existingSub.chapters[0].rooms.length > 0) {
-          setActiveRoomId(existingSub.chapters[0].rooms[0].id);
-        }
-      }
-      return;
-    }
-
     const newSubject: QuizSubject = {
       id: `subject-${Date.now()}`,
-      name: trimmed,
+      name: subjectName,
       chapters: [
         {
           id: `chapter-subj-${Date.now()}`,
@@ -1986,13 +1894,13 @@ export default function App() {
     setPickedIds([]);
 
     if (activeClassId) {
-      safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
-      safeSetItem(`active_subject_id_${activeClassId}`, newSubject.id);
-      safeSetItem(`active_room_id_${activeClassId}`, defaultRoom.id);
-      safeSetJSON(`chapters_class_${activeClassId}`, newSubject.chapters);
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
+      localStorage.setItem(`active_subject_id_${activeClassId}`, newSubject.id);
+      localStorage.setItem(`active_room_id_${activeClassId}`, defaultRoom.id);
+      localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(newSubject.chapters));
     }
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects,
@@ -2001,135 +1909,28 @@ export default function App() {
         chapters: newSubject.chapters
       }, { merge: true }).catch(err => console.error('Failed to create subject in cloud:', err));
     }
-
-    // Persist new subject to teacher master profile subjects list
-    if (teacher) {
-      const currentTeacherSubs = (teacher.subjects || '').split(/[,,\n፤]/).map(s => s.trim()).filter(Boolean);
-      if (!currentTeacherSubs.some(s => s.toLowerCase() === trimmed.toLowerCase())) {
-        const updatedTeacherSubStr = [...currentTeacherSubs, trimmed].join(', ');
-        const updatedTeacher = { ...teacher, subjects: updatedTeacherSubStr };
-        setTeacher(updatedTeacher);
-        localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
-        saveTeacherToLocalRegistry(updatedTeacher);
-        safeSetDoc(doc(db, 'teachers', teacher.id), {
-          subjects: updatedTeacherSubStr
-        }, { merge: true }).catch(err => console.warn('Failed syncing new subject to teacher profile:', err));
-      }
-    }
-  }, [subjects, teacher, activeClassId, effectiveTeacherId]);
+  }, [subjects, teacher, activeClassId]);
 
   const handleRenameSubject = useCallback((subjectId: string, newName: string) => {
-    const trimmed = newName.trim();
-    if (!trimmed) return;
-
     const updatedSubjects = subjects.map(s => {
       if (s.id === subjectId) {
-        return { ...s, name: trimmed };
+        return { ...s, name: newName };
       }
       return s;
     });
     setSubjects(updatedSubjects);
 
     if (activeClassId) {
-      safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
+      localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
     }
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (activeClassId) {
       safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
         subjects: updatedSubjects
       }, { merge: true }).catch(err => console.error('Failed to rename subject in cloud:', err));
     }
-
-    if (teacher) {
-      const currentTeacherSubs = (teacher.subjects || '').split(/[,,\n፤]/).map(s => s.trim()).filter(Boolean);
-      const targetSub = subjects.find(s => s.id === subjectId);
-      const oldName = targetSub?.name?.trim();
-      let newTeacherSubStr = '';
-      if (oldName && currentTeacherSubs.some(s => s.toLowerCase() === oldName.toLowerCase())) {
-        newTeacherSubStr = currentTeacherSubs.map(s => s.toLowerCase() === oldName.toLowerCase() ? trimmed : s).join(', ');
-      } else {
-        newTeacherSubStr = Array.from(new Set([...currentTeacherSubs, trimmed])).join(', ');
-      }
-      const updatedTeacher = { ...teacher, subjects: newTeacherSubStr };
-      setTeacher(updatedTeacher);
-      localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
-      saveTeacherToLocalRegistry(updatedTeacher);
-      safeSetDoc(doc(db, 'teachers', teacher.id), {
-        subjects: newTeacherSubStr
-      }, { merge: true }).catch(err => console.warn('Failed syncing subject rename to teacher profile:', err));
-    }
-  }, [subjects, teacher, activeClassId, effectiveTeacherId]);
-
-  const handleUpdateTeacherProfile = useCallback((updatedTeacher: TeacherAccount) => {
-    setTeacher(updatedTeacher);
-
-    localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
-    saveTeacherToLocalRegistry(updatedTeacher);
-
-    // Sync current classes to this teacher account if not already saved
-    if (classes && classes.length > 0) {
-      safeSetJSON(`khmer_teacher_classes_${updatedTeacher.id}`, classes);
-      safeSetJSON('khmer_teacher_classes', classes);
-      classes.forEach(cls => {
-        safeSetDoc(doc(db, 'teachers', updatedTeacher.id, 'classes', cls.id), {
-          id: cls.id,
-          name: cls.name,
-          order: typeof cls.order === 'number' ? cls.order : 0,
-          createdAt: new Date().toISOString()
-        }, { merge: true }).catch(() => {});
-      });
-    }
-
-    const newSubjectName = updatedTeacher.subjects?.trim();
-    if (newSubjectName) {
-      const parsedTeacherSubs = newSubjectName.split(/[,,\n፤]/).map(s => s.trim()).filter(Boolean);
-      if (parsedTeacherSubs.length > 0) {
-        setSubjects(prevSubjects => {
-          let updatedSubs = [...(prevSubjects || [])];
-
-          parsedTeacherSubs.forEach((tName, idx) => {
-            const exists = updatedSubs.some(s => s.name.trim().toLowerCase() === tName.toLowerCase());
-            if (!exists) {
-              if (updatedSubs.length === 1 && idx === 0) {
-                updatedSubs[0].name = tName;
-              } else {
-                updatedSubs.push({
-                  id: `subj-${Date.now()}-${idx}`,
-                  name: tName,
-                  chapters: [
-                    {
-                      id: `chapter-${Date.now()}-${idx}`,
-                      name: 'ជំពូកទី១',
-                      rooms: [
-                        {
-                          id: `room-${Date.now()}-${idx}`,
-                          name: 'មេរៀនទី១',
-                          cards: [],
-                          pickedIds: [],
-                          createdAt: Date.now()
-                        }
-                      ],
-                      createdAt: Date.now()
-                    }
-                  ],
-                  createdAt: Date.now()
-                });
-              }
-            }
-          });
-
-          if (activeClassId) {
-            safeSetJSON(`subjects_class_${activeClassId}`, updatedSubs);
-            safeSetDoc(doc(db, 'teachers', updatedTeacher.id, 'classes', activeClassId), {
-              subjects: updatedSubs
-            }, { merge: true }).catch(err => console.warn('Failed syncing profile subject to class:', err));
-          }
-          return updatedSubs;
-        });
-      }
-    }
-  }, [activeClassId, classes]);
+  }, [subjects, teacher, activeClassId]);
 
   const handleDeleteSubject = useCallback((subjectId: string) => {
     const targetSub = subjects.find(s => s.id === subjectId);
@@ -2146,8 +1947,8 @@ export default function App() {
         // If all subjects deleted, reset with a fresh default subject
         if (updatedSubjects.length === 0) {
           const freshSubject: QuizSubject = {
-            id: `subj-default-${Date.now()}`,
-            name: (effectiveTeacher?.subjects && effectiveTeacher.subjects.trim()) || 'ភាសាខ្មែរ',
+            id: `subj-physics-${Date.now()}`,
+            name: 'រូបវិទ្យា',
             chapters: [
               {
                 id: `chapter-${Date.now()}`,
@@ -2191,17 +1992,17 @@ export default function App() {
         setActiveSubjectId(nextSubjectId);
 
         if (activeClassId) {
-          safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
+          localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
           if (nextSubjectId) {
-            safeSetItem(`active_subject_id_${activeClassId}`, nextSubjectId);
+            localStorage.setItem(`active_subject_id_${activeClassId}`, nextSubjectId);
           }
           if (nextActiveRoomId) {
-            safeSetItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
+            localStorage.setItem(`active_room_id_${activeClassId}`, nextActiveRoomId);
           }
-          safeSetJSON(`chapters_class_${activeClassId}`, nextChapters);
+          localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(nextChapters));
         }
 
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher?.id || 'local';
         if (activeClassId) {
           safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId), {
             subjects: updatedSubjects,
@@ -2222,10 +2023,10 @@ export default function App() {
     if (activeClassId) {
       const currentCls = classes.find(c => c.id === activeClassId);
       const validCurrentStudents = students.filter(s => isStudentInClass(s, activeClassId, currentCls?.name));
-      safeSetJSON(`students_class_${activeClassId}`, validCurrentStudents);
-      safeSetJSON(`picked_students_class_${activeClassId}`, pickedIds);
-      safeSetJSON(`manual_called_students_class_${activeClassId}`, manualCalledIds);
-      safeSetJSON(`quiz_cards_class_${activeClassId}`, cards);
+      localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(validCurrentStudents));
+      localStorage.setItem(`picked_students_class_${activeClassId}`, JSON.stringify(pickedIds));
+      localStorage.setItem(`manual_called_students_class_${activeClassId}`, JSON.stringify(manualCalledIds));
+      localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(cards));
 
       let updatedChapters = chapters;
       if (activeRoomId && chapters.length > 0) {
@@ -2240,24 +2041,19 @@ export default function App() {
       }
 
       if (updatedSubjects.length > 0) {
-        safeSetJSON(`subjects_class_${activeClassId}`, updatedSubjects);
+        localStorage.setItem(`subjects_class_${activeClassId}`, JSON.stringify(updatedSubjects));
       }
       if (updatedChapters.length > 0) {
-        safeSetJSON(`chapters_class_${activeClassId}`, updatedChapters);
+        localStorage.setItem(`chapters_class_${activeClassId}`, JSON.stringify(updatedChapters));
       }
       if (activeSubjectId) {
-        safeSetItem(`active_subject_id_${activeClassId}`, activeSubjectId);
+        localStorage.setItem(`active_subject_id_${activeClassId}`, activeSubjectId);
       }
       if (activeRoomId) {
-        safeSetItem(`active_room_id_${activeClassId}`, activeRoomId);
+        localStorage.setItem(`active_room_id_${activeClassId}`, activeRoomId);
       }
     }
 
-    lastSubjectsStrRef.current = '';
-    lastPickedStrRef.current = '';
-    lastCardsStrRef.current = '';
-    activeRoomIdRef.current = null;
-    activeSubjectIdRef.current = null;
     lastLoadedClassId.current = classId;
     setActiveClassId(classId);
     setSelectedStudentId(null);
@@ -2325,7 +2121,7 @@ export default function App() {
     }
 
     if (targetSubjects.length === 0) {
-      const migration = getMigratedSubjects([], effectiveTeacher);
+      const migration = getMigratedSubjects([]);
       targetSubjects = migration.subjects;
       targetActiveSubjectId = migration.activeSubjectId;
       targetActiveRoomId = targetSubjects[0]?.chapters[0]?.rooms[0]?.id || null;
@@ -2346,25 +2142,15 @@ export default function App() {
       targetActiveRoomId = targetRoom.id;
     }
 
-    // Strictly isolate cards: prioritize target room's cards, or target class's own cached cards
-    if (targetRoom && Array.isArray(targetRoom.cards) && targetRoom.cards.length > 0) {
-      targetCards = targetRoom.cards;
-    } else {
-      const cachedCardsStr = localStorage.getItem(`quiz_cards_class_${classId}`);
-      if (cachedCardsStr) {
-        try {
-          const parsed = JSON.parse(cachedCardsStr);
-          if (Array.isArray(parsed)) {
-            targetCards = parsed;
-          } else {
-            targetCards = [];
-          }
-        } catch {
-          targetCards = [];
-        }
-      } else {
-        targetCards = [];
+    const cachedCardsStr = localStorage.getItem(`quiz_cards_class_${classId}`);
+    if (cachedCardsStr) {
+      try {
+        targetCards = JSON.parse(cachedCardsStr);
+      } catch {
+        targetCards = targetRoom?.cards || [];
       }
+    } else {
+      targetCards = targetRoom?.cards || [];
     }
 
     setSubjects(targetSubjects);
@@ -2411,34 +2197,34 @@ export default function App() {
       const newOrder = classes.length;
       const newClass: ClassInfo = { id: newClassId, name: trimmed, order: newOrder };
       
-      const { subjects: defaultSubjects, activeSubjectId: defaultActiveSubjectId } = getMigratedSubjects([], effectiveTeacher);
+      const { subjects: defaultSubjects, activeSubjectId: defaultActiveSubjectId } = getMigratedSubjects([]);
       const defaultActiveRoomId = defaultSubjects[0]?.chapters[0]?.rooms[0]?.id || null;
 
-      safeSetJSON(`subjects_class_${newClassId}`, defaultSubjects);
+      localStorage.setItem(`subjects_class_${newClassId}`, JSON.stringify(defaultSubjects));
       if (defaultActiveSubjectId) {
-        safeSetItem(`active_subject_id_${newClassId}`, defaultActiveSubjectId);
+        localStorage.setItem(`active_subject_id_${newClassId}`, defaultActiveSubjectId);
       }
       if (defaultActiveRoomId) {
-        safeSetItem(`active_room_id_${newClassId}`, defaultActiveRoomId);
+        localStorage.setItem(`active_room_id_${newClassId}`, defaultActiveRoomId);
       }
 
-      const currentTeacherId = effectiveTeacherId;
+      const currentTeacherId = teacher?.id || 'local';
       const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
       const deletedClassesStr = localStorage.getItem(deletedKey);
       if (deletedClassesStr) {
         try {
           const set = new Set<string>(JSON.parse(deletedClassesStr));
           set.delete(newClassId);
-          safeSetJSON(deletedKey, Array.from(set));
+          localStorage.setItem(deletedKey, JSON.stringify(Array.from(set)));
         } catch {}
       }
 
       const sortedClasses = sortClasses([...classes, newClass]);
       setClasses(sortedClasses);
       if (teacher) {
-        safeSetJSON(`khmer_teacher_classes_${teacher.id}`, sortedClasses);
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
       }
-      safeSetJSON('khmer_teacher_classes', sortedClasses);
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       
       handleSwitchClass(newClassId);
 
@@ -2464,11 +2250,11 @@ export default function App() {
       setClasses(sortedClasses);
       
       if (teacher) {
-        safeSetJSON(`khmer_teacher_classes_${teacher.id}`, sortedClasses);
+        localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
       }
-      safeSetJSON('khmer_teacher_classes', sortedClasses);
+      localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
       
-      const currentTeacherId = effectiveTeacherId;
+      const currentTeacherId = teacher?.id || 'local';
       try {
         await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', targetId), {
           id: targetId,
@@ -2501,7 +2287,7 @@ export default function App() {
       onConfirm: async () => {
         const updatedClasses = classes.filter(c => c.id !== classId);
         
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher?.id || 'local';
         const deletedKey = `khmer_teacher_deleted_classes_${currentTeacherId}`;
         const deletedClassesStr = localStorage.getItem(deletedKey);
         let deletedSet = new Set<string>();
@@ -2511,7 +2297,7 @@ export default function App() {
           } catch {}
         }
         deletedSet.add(classId);
-        safeSetJSON(deletedKey, Array.from(deletedSet));
+        localStorage.setItem(deletedKey, JSON.stringify(Array.from(deletedSet)));
 
         try {
           await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', classId));
@@ -2522,17 +2308,17 @@ export default function App() {
         const sortedClasses = sortClasses(updatedClasses);
         setClasses(sortedClasses);
         if (teacher) {
-          safeSetJSON(`khmer_teacher_classes_${teacher.id}`, sortedClasses);
+          localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedClasses));
         }
-        safeSetJSON('khmer_teacher_classes', sortedClasses);
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedClasses));
 
-        safeRemoveItem(`students_class_${classId}`);
-        safeRemoveItem(`quiz_cards_class_${classId}`);
-        safeRemoveItem(`picked_students_class_${classId}`);
-        safeRemoveItem(`subjects_class_${classId}`);
-        safeRemoveItem(`chapters_class_${classId}`);
-        safeRemoveItem(`active_subject_id_${classId}`);
-        safeRemoveItem(`active_room_id_${classId}`);
+        localStorage.removeItem(`students_class_${classId}`);
+        localStorage.removeItem(`quiz_cards_class_${classId}`);
+        localStorage.removeItem(`picked_students_class_${classId}`);
+        localStorage.removeItem(`subjects_class_${classId}`);
+        localStorage.removeItem(`chapters_class_${classId}`);
+        localStorage.removeItem(`active_subject_id_${classId}`);
+        localStorage.removeItem(`active_room_id_${classId}`);
         
         if (activeClassId === classId) {
           handleSwitchClass(sortedClasses[0].id);
@@ -2553,7 +2339,7 @@ export default function App() {
       classId: activeClassId
     };
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     try {
       await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
     } catch (err) {
@@ -2579,7 +2365,7 @@ export default function App() {
       classId: fields.classId
     };
     
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     if (fields.classId === activeClassId) {
       try {
         await safeSetDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', newStudent.id), newStudent);
@@ -2600,7 +2386,7 @@ export default function App() {
       const savedRaw = localStorage.getItem(savedKey);
       const savedList = savedRaw ? JSON.parse(savedRaw) : [];
       savedList.push(newStudent);
-      safeSetJSON(savedKey, savedList);
+      localStorage.setItem(savedKey, JSON.stringify(savedList));
       alert(`បានរក្សាទុកសិស្ស «${fields.name}» ទៅកាន់ថ្នាក់ផ្សេងជោគជ័យ!`);
     }
   }, [activeClassId, teacher]);
@@ -2621,7 +2407,7 @@ export default function App() {
       classId: targetClassId
     }));
 
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     try {
       await Promise.all(
         newStudents.map(student => 
@@ -2644,7 +2430,7 @@ export default function App() {
       const savedRaw = localStorage.getItem(savedKey);
       const savedList = savedRaw ? JSON.parse(savedRaw) : [];
       savedList.push(...newStudents);
-      safeSetJSON(savedKey, savedList);
+      localStorage.setItem(savedKey, JSON.stringify(savedList));
     }
   }, [activeClassId, teacher]);
 
@@ -2654,7 +2440,7 @@ export default function App() {
     targetClassIdParam?: string
   ) => {
     const targetClassId = targetClassIdParam || activeClassId;
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     const cleanNames = names.map(n => n.trim()).filter(Boolean);
     const randomEmoji = () => EMOJIS[Math.floor(Math.random() * EMOJIS.length)];
 
@@ -2684,7 +2470,7 @@ export default function App() {
 
       setStudents(prev => [...prev, ...newStudents]);
       const updatedList = [...existingCurrent, ...newStudents];
-      safeSetJSON(`students_class_${targetClassId}`, updatedList);
+      localStorage.setItem(`students_class_${targetClassId}`, JSON.stringify(updatedList));
       return;
     }
 
@@ -2732,7 +2518,7 @@ export default function App() {
       return [...otherClasses, ...finalStudents];
     });
 
-    safeSetJSON(`students_class_${targetClassId}`, finalStudents);
+    localStorage.setItem(`students_class_${targetClassId}`, JSON.stringify(finalStudents));
 
     const finalIds = new Set(finalStudents.map(s => s.id));
     setPickedIds(prev => prev.filter(id => finalIds.has(id)));
@@ -2743,7 +2529,7 @@ export default function App() {
 
   const updateStudentDetail = useCallback(async (id: string, fields: Partial<Student>) => {
     let updatedStudent: Student | null = null;
-    const currentTeacherId = effectiveTeacherId;
+    const currentTeacherId = teacher?.id || 'local';
     
     setStudents(prev => {
       const studentToUpdate = prev.find(s => s.id === id);
@@ -2773,7 +2559,7 @@ export default function App() {
         
         const cleanedList = targetList.filter((s: any) => s.id !== id);
         cleanedList.push(updatedStudent);
-        safeSetJSON(targetKey, cleanedList);
+        localStorage.setItem(targetKey, JSON.stringify(cleanedList));
         
         alert(`បានផ្លាស់ប្ដូរថ្នាក់សិស្ស «${fields.name || studentToUpdate.name}» ទៅកាន់ថ្នាក់ផ្សេងជោគជ័យ!`);
         return filtered;
@@ -2787,7 +2573,7 @@ export default function App() {
         })();
         const updatedList = prev.map(s => s.id === id ? { ...s, ...fields } : s);
         if (activeClassId) {
-          safeSetJSON(`students_class_${activeClassId}`, updatedList);
+          localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(updatedList));
         }
         return updatedList;
       }
@@ -2804,7 +2590,7 @@ export default function App() {
       confirmText: 'បាទ/ចាស លុប',
       variant: 'danger',
       onConfirm: async () => {
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher?.id || 'local';
         try {
           await safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', id));
         } catch (err) {
@@ -2813,7 +2599,7 @@ export default function App() {
         setStudents(prev => {
           const filtered = prev.filter(s => s.id !== id);
           if (activeClassId) {
-            safeSetJSON(`students_class_${activeClassId}`, filtered);
+            localStorage.setItem(`students_class_${activeClassId}`, JSON.stringify(filtered));
           }
           return filtered;
         });
@@ -2831,7 +2617,7 @@ export default function App() {
       confirmText: 'បាទ/ចាស លុបទាំងអស់',
       variant: 'danger',
       onConfirm: async () => {
-        const currentTeacherId = effectiveTeacherId;
+        const currentTeacherId = teacher?.id || 'local';
         try {
           for (const s of students) {
             safeDeleteDoc(doc(db, 'teachers', currentTeacherId, 'classes', activeClassId, 'students', s.id)).catch(() => {});
@@ -2861,7 +2647,7 @@ export default function App() {
     }));
     setCards(newCards);
     if (activeClassId) {
-      safeSetJSON(`quiz_cards_class_${activeClassId}`, newCards);
+      localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(newCards));
     }
     saveClassMetadata(newCards, pickedIds);
   }, [activeClassId, pickedIds, saveClassMetadata]);
@@ -2869,7 +2655,7 @@ export default function App() {
   const handleUpdateCards = useCallback((updatedCards: QuizCard[]) => {
     setCards(updatedCards);
     if (activeClassId) {
-      safeSetJSON(`quiz_cards_class_${activeClassId}`, updatedCards);
+      localStorage.setItem(`quiz_cards_class_${activeClassId}`, JSON.stringify(updatedCards));
     }
     saveClassMetadata(updatedCards, pickedIds);
   }, [activeClassId, pickedIds, saveClassMetadata]);
@@ -2947,15 +2733,12 @@ export default function App() {
         localStorage.clear();
         setStudents([]);
         setCards([]);
-        setSubjects([]);
-        setChapters([]);
         setSelectedStudentId(null);
         setPickedIds([]);
-        setManualCalledIds([]);
         setActiveCardId(null);
         setTeacher(null);
-        setClasses([]);
-        setActiveClassId('');
+        setClasses(DEFAULT_CLASSES);
+        setActiveClassId('class-7a');
       }
     });
   }, [confirmAction]);
@@ -2974,7 +2757,6 @@ export default function App() {
     // Also clear active teacher's selected class ID in memory & offline caches
     if (teacher) {
       localStorage.removeItem(`khmer_teacher_active_class_id_${teacher.id}`);
-      localStorage.removeItem(`khmer_teacher_classes_${teacher.id}`);
     }
     localStorage.removeItem('khmer_teacher_active_class_id');
     localStorage.removeItem('khmer_teacher_classes');
@@ -2983,20 +2765,18 @@ export default function App() {
     const keysToClear = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
-      if (key && (key.startsWith('students_class_') || key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_') || key.startsWith('manual_called_students_class_') || key.startsWith('subjects_class_') || key.startsWith('chapters_class_'))) {
+      if (key && (key.startsWith('students_class_') || key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_') || key.startsWith('manual_called_students_class_'))) {
         keysToClear.push(key);
       }
     }
     keysToClear.forEach(k => localStorage.removeItem(k));
 
-    // Reset application states back to clean unauthenticated state
+    // Reset application states back to fresh template
     setTeacher(null);
-    setClasses([]);
-    setActiveClassId('');
+    setClasses(DEFAULT_CLASSES);
+    setActiveClassId('class-7a');
     setStudents([]);
     setCards([]);
-    setSubjects([]);
-    setChapters([]);
     setPickedIds([]);
     setManualCalledIds([]);
     setSelectedStudentId(null);
@@ -3024,10 +2804,10 @@ export default function App() {
   const activeCard = cards.find(c => c.id === activeCardId) || null;
 
   return (
-    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#222222] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
+    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#0f172a] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
       {/* Header */}
       <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
-        isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-white border-slate-200 shadow-xs'
+        isDarkMode ? 'bg-[#1e293b] border-slate-800' : 'bg-white border-slate-200 shadow-xs'
       }`}>
         <div 
           onClick={() => setActiveTab('wheel')}
@@ -3052,11 +2832,11 @@ export default function App() {
           </div>
         </div>
 
-        {/* 3D Glass Liquid Capsule Navigation Tabs */}
-        <nav className={`flex items-center gap-1.5 p-1.5 rounded-full border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
+        {/* Dynamic Telegram iOS Liquid Glass Water Droplet Navigation Tabs */}
+        <nav className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
           isDarkMode 
-            ? 'bg-[#151518]/95 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.06),0_8px_30px_rgba(0,0,0,0.7)]' 
-            : 'bg-slate-200/70 border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(0,0,0,0.04)]'
+            ? 'bg-slate-900/80 border-slate-800 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4),0_8px_30px_rgba(0,0,0,0.4)]' 
+            : 'bg-slate-200/60 border-white/80 shadow-[0_8px_30px_rgba(0,0,0,0.06),inset_0_1px_2px_rgba(0,0,0,0.04)]'
         }`}>
           {[
             { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass },
@@ -3073,45 +2853,68 @@ export default function App() {
               <motion.button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
-                whileHover={{ scale: 1.04 }}
+                whileHover={{ scale: 1.03 }}
                 whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
                 transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                className={`relative px-4 py-2 rounded-full text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none isolate ${
+                className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
                   isActive
                     ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-extrabold'
                     : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
                 }`}
               >
                 {isActive && (
-                  <GlassLiquidOverlay
-                    layoutId="mainNavGlassDroplet"
-                    isDarkMode={isDarkMode}
-                    variant="dark-glass"
-                  />
+                  <motion.div
+                    layoutId="telegramWaterDroplet"
+                    transition={{
+                      type: "spring",
+                      stiffness: 350,
+                      damping: 22,
+                      mass: 0.65
+                    }}
+                    className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                      isDarkMode
+                        ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                        : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                    }`}
+                  >
+                    {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                    <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                      isDarkMode 
+                        ? 'from-white/50 via-white/12 to-transparent' 
+                        : 'from-white/95 via-white/40 to-transparent'
+                    }`} />
+
+                    {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                    <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
+                      isDarkMode
+                        ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                        : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                    }`} />
+
+                    {/* Bottom Droplet Meniscus Light Rim (គែមពន្លឺបាតតំណក់ទឹកថ្លា) */}
+                    <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                      isDarkMode ? 'via-white/50' : 'via-white/90'
+                    }`} />
+                  </motion.div>
                 )}
 
                 <motion.span
                   animate={{ 
-                    scale: isActive ? 1.04 : 1,
+                    scale: isActive ? 1.05 : 1,
                     y: isActive ? -0.5 : 0
                   }}
                   transition={{ type: "spring", stiffness: 450, damping: 22 }}
                   className="relative z-10 flex items-center gap-2"
                 >
-                  <span className={`w-6 h-6 rounded-full flex items-center justify-center shrink-0 transition-all duration-200 ${
+                  <Icon className={`w-4 h-4 transition-all duration-300 ${
                     isActive
-                      ? isDarkMode 
-                        ? 'bg-blue-500/25 text-blue-400 border border-blue-400/50 shadow-[0_0_10px_rgba(59,130,246,0.4)]' 
-                        : 'bg-blue-500/15 text-blue-600 border border-blue-400/60 shadow-[0_0_8px_rgba(59,130,246,0.25)]'
+                      ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : 'text-blue-600 scale-110 drop-shadow-xs'
                       : isDarkMode ? 'text-slate-400' : 'text-slate-500'
-                  }`}>
-                    <Icon className={`w-3.5 h-3.5 ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
-                  </span>
-
+                  } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
                   <span className={
                     isActive 
                       ? isDarkMode 
-                        ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_4px_rgba(59,130,246,0.6)]' 
+                        ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
                         : 'text-blue-600 font-extrabold tracking-wide' 
                       : 'font-bold'
                   }>{tab.label}</span>
@@ -3131,118 +2934,86 @@ export default function App() {
         <div className="flex items-center gap-2">
           {/* Active Teacher Profile Area */}
           {teacher ? (
-            (() => {
-              const isDefaultTeacher = teacher.name === 'លោកគ្រូ/អ្នកគ្រូ សុវណ្ណភូមិ' || teacher.name === 'បង្កើតគណនីគ្រូ' || teacher.id === DEFAULT_CLOUD_TEACHER.id;
-              const displayName = isDefaultTeacher ? 'បង្កើតគណនីគ្រូ' : teacher.name;
-
-              return (
-                <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
-                  isDarkMode ? 'bg-slate-800/90 border-slate-700 hover:border-slate-600 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
-                }`}>
-                  {/* Avatar with Camera/Plus badge */}
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (isDefaultTeacher) {
-                        setAuthModalMode('register');
-                        setIsAuthModalOpen(true);
-                      } else {
-                        setIsProfileModalOpen(true);
-                      }
-                    }}
-                    className="relative cursor-pointer select-none rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
-                    title={isDefaultTeacher ? "ចុចដើម្បីបង្កើតគណនីគ្រូ" : "ចុចដើម្បីប្ដូររូបភាព Profile ពីទូរស័ព្ទ ឬកុំព្យូទ័រ"}
-                  >
-                    <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-500/40 bg-emerald-500 flex items-center justify-center text-white text-xs font-black shadow-xs group-hover/prof:border-emerald-500 transition-all">
-                      {teacher.avatarUrl && !isDefaultTeacher ? (
-                        <img 
-                          src={teacher.avatarUrl} 
-                          alt={displayName} 
-                          className="w-full h-full object-cover select-none" 
-                        />
-                      ) : (
-                        <User className="w-4.5 h-4.5" />
-                      )}
-                    </div>
-                    {/* Badge Icon */}
-                    <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-600 group-hover/prof:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-xs border border-white dark:border-slate-800 transition-transform group-hover/prof:scale-110">
-                      {isDefaultTeacher ? <UserPlus className="w-2.5 h-2.5" /> : <Camera className="w-2.5 h-2.5" />}
-                    </span>
-                  </button>
-
-                  <div 
-                    onClick={() => {
-                      if (isDefaultTeacher) {
-                        setAuthModalMode('register');
-                        setIsAuthModalOpen(true);
-                      } else {
-                        setIsProfileModalOpen(true);
-                      }
-                    }}
-                    className="text-left pr-1 cursor-pointer select-none hover:opacity-85 transition-opacity"
-                    title={isDefaultTeacher ? "ចុចដើម្បីបង្កើតគណនីគ្រូ" : "ចុចដើម្បីមើល ឬកែប្រែព័ត៌មាន Profile"}
-                  >
-                    <p className={`text-xs font-black whitespace-nowrap ${
-                      isDarkMode ? 'text-white drop-shadow-xs' : 'text-slate-900'
-                    }`}>
-                      {displayName}
-                    </p>
-                    {teacher.subjects && !isDefaultTeacher && (
-                      <p className={`text-[10px] font-bold leading-none truncate max-w-[130px] mt-0.5 ${
-                        isDarkMode ? 'text-slate-300' : 'text-slate-500'
-                      }`}>
-                        {teacher.subjects}
-                      </p>
-                    )}
-                  </div>
-
-                  {isDefaultTeacher ? (
-                    <button
-                      onClick={() => {
-                        setAuthModalMode('register');
-                        setIsAuthModalOpen(true);
-                      }}
-                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                        isDarkMode 
-                          ? 'text-indigo-300 hover:text-white hover:bg-indigo-600/30' 
-                          : 'text-indigo-600 hover:text-indigo-800 hover:bg-indigo-50'
-                      }`}
-                      title="បង្កើតគណនីគ្រូ"
-                    >
-                      <UserPlus className="w-3.5 h-3.5" />
-                    </button>
+            <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
+              isDarkMode ? 'bg-slate-800/90 border-slate-700 hover:border-slate-600 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
+            }`}>
+              {/* Avatar with Camera badge for instant change from phone/PC */}
+              <button
+                type="button"
+                onClick={() => setIsProfileModalOpen(true)}
+                className="relative cursor-pointer select-none rounded-full focus:outline-none focus:ring-2 focus:ring-indigo-500/50"
+                title="ចុចដើម្បីប្ដូររូបភាព Profile ពីទូរស័ព្ទ ឬកុំព្យូទ័រ"
+              >
+                <div className="w-8 h-8 rounded-full overflow-hidden border-2 border-emerald-500/40 bg-emerald-500 flex items-center justify-center text-white text-xs font-black shadow-xs group-hover/prof:border-emerald-500 transition-all">
+                  {teacher.avatarUrl ? (
+                    <img 
+                      src={teacher.avatarUrl} 
+                      alt={teacher.name} 
+                      className="w-full h-full object-cover select-none" 
+                    />
                   ) : (
-                    <button
-                      onClick={handleLogout}
-                      className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
-                        isDarkMode 
-                          ? 'text-slate-300 hover:text-red-400 hover:bg-red-500/20' 
-                          : 'text-slate-400 hover:text-red-500 hover:bg-red-500/10'
-                      }`}
-                      title="ចាកចេញពីគណនី"
-                    >
-                      <LogOut className="w-3.5 h-3.5" />
-                    </button>
+                    <User className="w-4.5 h-4.5" />
                   )}
                 </div>
-              );
-            })()
+                {/* Camera Badge Icon */}
+                <span className="absolute -bottom-1 -right-1 w-4 h-4 bg-indigo-600 group-hover/prof:bg-indigo-500 text-white rounded-full flex items-center justify-center shadow-xs border border-white dark:border-slate-800 transition-transform group-hover/prof:scale-110">
+                  <Camera className="w-2.5 h-2.5" />
+                </span>
+              </button>
+
+              <div 
+                onClick={() => setIsProfileModalOpen(true)}
+                className="text-left pr-1 hidden sm:block cursor-pointer select-none hover:opacity-85 transition-opacity"
+                title="ចុចដើម្បីមើល ឬកែប្រែព័ត៌មាន Profile"
+              >
+                <p className={`text-xs font-black truncate max-w-[110px] ${
+                  isDarkMode ? 'text-white drop-shadow-xs' : 'text-slate-900'
+                }`}>
+                  {teacher.name}
+                </p>
+                {teacher.subjects && (
+                  <p className={`text-[10px] font-bold leading-none truncate max-w-[110px] mt-0.5 ${
+                    isDarkMode ? 'text-slate-300' : 'text-slate-500'
+                  }`}>
+                    {teacher.subjects}
+                  </p>
+                )}
+              </div>
+
+              <button
+                onClick={handleLogout}
+                className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
+                  isDarkMode 
+                    ? 'text-slate-300 hover:text-red-400 hover:bg-red-500/20' 
+                    : 'text-slate-400 hover:text-red-500 hover:bg-red-500/10'
+                }`}
+                title="ចាកចេញពីគណនី"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+              </button>
+            </div>
           ) : (
-            <div className="flex items-center gap-1.5 sm:gap-2">
-              <GlassLiquidButton
-                isDarkMode={isDarkMode}
-                variant="indigo-glass"
+            <div className="flex items-center gap-1.5">
+              <button
+                onClick={() => {
+                  setAuthModalMode('login');
+                  setIsAuthModalOpen(true);
+                }}
+                className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
+              >
+                <LogIn className="w-3.5 h-3.5" />
+                <span className="hidden sm:inline">ចូលគណនី</span>
+              </button>
+              <button
                 onClick={() => {
                   setAuthModalMode('register');
                   setIsAuthModalOpen(true);
                 }}
-                className="h-10 px-4 py-2 text-xs font-extrabold shadow-[0_4px_18px_rgba(99,102,241,0.5)] shrink-0 gap-2"
+                className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
               >
-                <span className="w-6 h-6 rounded-full bg-white/25 border border-white/40 shadow-[0_0_8px_rgba(255,255,255,0.3)] flex items-center justify-center shrink-0 text-white">
-                  <UserPlus className="w-3.5 h-3.5" />
-                </span>
-                <span className="font-extrabold tracking-wide">បង្កើតគណនីគ្រូ</span>
-              </GlassLiquidButton>
+                <User className="w-3.5 h-3.5" />
+                <span>ចុះឈ្មោះគ្រូ</span>
+              </button>
             </div>
           )}
 
@@ -3270,17 +3041,15 @@ export default function App() {
             <RotateCcw className="w-4.5 h-4.5" />
           </button>
 
-          {/* 💧 3D Glass Liquid Capsule "បង្កើតសំណួរ AI" Button */}
+          {/* Create Questions Button with Cloud Status at bottom right */}
           <div className="flex flex-col items-end gap-0.5 shrink-0">
-            <GlassLiquidButton
-              isDarkMode={isDarkMode}
-              variant="orange-glass"
+            <button
               onClick={() => setIsLessonModalOpen(true)}
-              className="px-4 py-2 text-xs font-black shadow-[0_8px_25px_rgba(249,115,22,0.45)] cursor-pointer select-none group gap-1.5"
+              className="px-4 py-2 btn-orange-gemini text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-sm hover:shadow-md shadow-orange-500/20 group cursor-pointer select-none"
             >
-              <Sparkles className="w-4 h-4 text-amber-100 group-hover:rotate-12 transition-transform drop-shadow" />
-              <span className="hidden sm:inline font-extrabold tracking-wide drop-shadow-sm">បង្កើតសំណួរ AI</span>
-            </GlassLiquidButton>
+              <Sparkles className="w-4 h-4 text-orange-100 group-hover:rotate-12 transition-transform" />
+              <span className="hidden sm:inline">បង្កើតសំណួរ AI</span>
+            </button>
 
             {/* Cloud Sync Status - very small at bottom right */}
             <div 
@@ -3295,444 +3064,286 @@ export default function App() {
       </header>
 
       {/* Class Switcher & Workspace Sub-Bar */}
-      <div className={`py-2 px-4 sm:px-6 lg:px-8 flex flex-col gap-2 shrink-0 border-b transition-colors ${
-        isDarkMode ? 'bg-[#222222]/95 border-[#333333]' : 'bg-slate-50/90 border-slate-200'
+      <div className={`py-2.5 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b transition-colors gap-4 overflow-x-auto ${
+        isDarkMode ? 'bg-slate-900/90 border-slate-800' : 'bg-slate-50/90 border-slate-200'
       }`}>
-        {/* Top Row: Class Selector + Right workspace quick metrics */}
-        <div className="flex items-center justify-between gap-4 overflow-x-auto no-scrollbar">
-          <div className="flex items-center gap-2 shrink-0">
-            <div className="flex items-center gap-1.5 mr-1 text-slate-500 dark:text-slate-400 font-bold text-xs shrink-0">
-              <GraduationCap className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span>ថ្នាក់រៀន៖</span>
-            </div>
+        <div className="flex items-center gap-2 shrink-0">
+          <div className="flex items-center gap-1.5 mr-1 text-slate-500 dark:text-slate-400 font-bold text-xs">
+            <GraduationCap className="w-4 h-4 text-indigo-500 shrink-0" />
+            <span>ថ្នាក់រៀន៖</span>
+          </div>
 
-            {/* Class Pills Track */}
-            <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-200/50 dark:bg-slate-900/60 border border-white/80 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
-              {!teacher ? (
-                <div className="flex items-center gap-2 sm:gap-2.5 px-2 sm:px-3 py-0.5 max-w-full">
-                  <span className="text-[11px] sm:text-xs text-slate-500 dark:text-slate-400 italic hidden lg:inline truncate max-w-[200px] lg:max-w-none">
-                    សូមចូលប្រើប្រាស់ ឬបង្កើតគណនី ដើម្បីចាប់ផ្ដើមបង្កើតទិន្នន័យ
-                  </span>
-                  <GlassLiquidButton
-                    isDarkMode={isDarkMode}
-                    variant="indigo-glass"
-                    className="h-8 px-3 py-1 text-xs font-extrabold shrink-0 shadow-[0_4px_14px_rgba(99,102,241,0.4)] gap-1.5"
-                    onClick={() => {
-                      setAuthModalMode('login');
-                      setIsAuthModalOpen(true);
-                    }}
-                  >
-                    <LogIn className="w-3.5 h-3.5" />
-                    <span className="font-extrabold tracking-wide">ចូលគណនី</span>
-                  </GlassLiquidButton>
-                  <GlassLiquidButton
-                    isDarkMode={isDarkMode}
-                    variant="emerald-glass"
-                    className="h-8 px-3 py-1 text-xs font-extrabold shrink-0 shadow-[0_4px_14px_rgba(16,185,129,0.4)] gap-1.5"
-                    onClick={() => {
-                      setAuthModalMode('register');
-                      setIsAuthModalOpen(true);
-                    }}
-                  >
-                    <UserPlus className="w-3.5 h-3.5" />
-                    <span className="font-extrabold tracking-wide">បង្កើតគណនីគ្រូ</span>
-                  </GlassLiquidButton>
-                </div>
-              ) : classes.length === 0 ? (
-                <span className="text-xs text-slate-400 dark:text-slate-500 italic px-3 py-1">
-                  មិនទាន់មានថ្នាក់នៅឡើយទេ ចុច «បន្ថែមថ្នាក់» ដើម្បីបង្កើត
+          {/* Class Pills Track */}
+          <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/50 dark:bg-slate-900/60 border border-white/80 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
+            {!teacher ? (
+              <div className="flex items-center gap-2 px-2 py-1">
+                <span className="text-xs text-slate-500 dark:text-slate-400 italic">
+                  មិនទាន់មានគណនីចូលប្រើ — ទិន្នន័យទទេរ
                 </span>
-              ) : (
-                classes.map((cls, idx) => {
-                const isActive = activeClassId === cls.id;
-                return (
-                  <motion.div 
-                    key={cls.id ? `class-${cls.id}` : `class-idx-${idx}`}
-                    onClick={() => handleSwitchClass(cls.id)}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
-                    transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                    draggable={canDrag && !cls.isPinned}
-                    onDragStart={(e) => handleClassDragStart(e as any, idx)}
-                    onDragOver={(e) => handleClassDragOver(e as any, idx)}
-                    onDragEnd={handleClassDragEnd}
-                    onMouseLeave={() => setCanDrag(false)}
-                    className={`group/item relative px-4 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none isolate ${
-                      draggedClassIndex === idx
-                        ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50 dark:bg-slate-800 scale-95'
-                        : isActive 
-                          ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-extrabold' 
-                          : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
-                    }`}
-                  >
-                    {/* 3D Glass Liquid Droplet Pill */}
-                    {isActive && (
-                      <GlassLiquidOverlay
-                        layoutId="classWaterDroplet"
-                        isDarkMode={isDarkMode}
-                        variant="dark-glass"
-                      />
-                    )}
-
-                    <motion.span
-                      animate={{ 
-                        scale: isActive ? 1.04 : 1,
-                        y: isActive ? -0.5 : 0
+                <button
+                  onClick={() => {
+                    setAuthModalMode('login');
+                    setIsAuthModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
+                >
+                  ចូលគណនី
+                </button>
+                <button
+                  onClick={() => {
+                    setAuthModalMode('register');
+                    setIsAuthModalOpen(true);
+                  }}
+                  className="px-2.5 py-1 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 cursor-pointer"
+                >
+                  ចុះឈ្មោះគ្រូ
+                </button>
+              </div>
+            ) : classes.length === 0 ? (
+              <span className="text-xs text-slate-400 dark:text-slate-500 italic px-3 py-1">
+                មិនទាន់មានថ្នាក់នៅឡើយទេ ចុច «បន្ថែមថ្នាក់» ដើម្បីបង្កើត
+              </span>
+            ) : (
+              classes.map((cls, idx) => {
+              const isActive = activeClassId === cls.id;
+              return (
+                <motion.div 
+                  key={cls.id ? `class-${cls.id}` : `class-idx-${idx}`}
+                  onClick={() => handleSwitchClass(cls.id)}
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                  draggable={canDrag && !cls.isPinned}
+                  onDragStart={(e) => handleClassDragStart(e as any, idx)}
+                  onDragOver={(e) => handleClassDragOver(e as any, idx)}
+                  onDragEnd={handleClassDragEnd}
+                  onMouseLeave={() => setCanDrag(false)}
+                  className={`group/item relative px-3.5 py-1.5 rounded-xl text-xs font-bold flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
+                    draggedClassIndex === idx
+                      ? 'opacity-40 border-dashed border-indigo-400 bg-indigo-50 dark:bg-slate-800 scale-95'
+                      : isActive 
+                        ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-extrabold' 
+                        : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-600 hover:text-slate-900 hover:bg-white/40'
+                  }`}
+                >
+                  {/* Water Droplet Liquid Glass Pill */}
+                  {isActive && (
+                    <motion.div
+                      layoutId="classWaterDroplet"
+                      transition={{
+                        type: "spring",
+                        stiffness: 350,
+                        damping: 22,
+                        mass: 0.65
                       }}
-                      transition={{ type: "spring", stiffness: 450, damping: 22 }}
-                      className="relative z-10 flex items-center gap-1.5"
+                      className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                        isDarkMode
+                          ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                          : 'bg-white/80 border-white/95 shadow-[0_8px_24px_rgba(0,0,0,0.08),0_2px_6px_rgba(0,0,0,0.03),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]'
+                      }`}
                     >
-                      {!cls.isPinned ? (
-                        <div
-                          onMouseDown={() => setCanDrag(true)}
-                          onTouchStart={() => setCanDrag(true)}
-                          onMouseUp={() => setCanDrag(false)}
-                          onTouchEnd={() => setCanDrag(false)}
-                          className={`cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90 ${
-                            isActive 
-                              ? isDarkMode ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-500/10 text-blue-600' 
-                              : isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/10 text-slate-500'
-                          }`}
-                          title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
-                        >
-                          <GripVertical className="w-3 h-3" />
-                        </div>
-                      ) : (
-                        /* Visual Pin (ម្ជុល) if pinned */
-                        <button
-                          type="button"
-                          onClick={(e) => handleTogglePinClass(e, cls.id)}
-                          className="p-0.5 -ml-0.5 rounded-full hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
-                          title="បានខ្ទាស់ម្ជុលជាប់ (ចុចដោះម្ជុលចេញវិញដើម្បីអាចប្ដូរទីតាំងបាន)"
-                        >
-                          <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500 -rotate-45 drop-shadow-xs" />
-                        </button>
-                      )}
+                      {/* Top Specular Glare Dome Reflection (ចំណាំងពន្លឺកោងមូលតំណក់ទឹកថ្លា) */}
+                      <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                        isDarkMode 
+                          ? 'from-white/50 via-white/12 to-transparent' 
+                          : 'from-white/95 via-white/40 to-transparent'
+                      }`} />
                       
-                      <span className={
-                        isActive 
-                          ? isDarkMode 
-                            ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
-                            : 'text-blue-600 font-extrabold tracking-wide' 
-                          : 'font-bold'
-                      }>
-                        {cls.name}
-                      </span>
+                      {/* Central Radial Light Core (ស្នូលពន្លឺរលោងខាងក្នុង) */}
+                      <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2 pointer-events-none ${
+                        isDarkMode
+                          ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                          : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                      }`} />
 
-                      {/* Discrete action buttons (reveal on hover) */}
-                      <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity ml-0.5">
-                        {/* Pin / Unpin Button (ម្ជុល) */}
-                        <button
-                          type="button"
-                          onClick={(e) => handleTogglePinClass(e, cls.id)}
-                          className={`p-0.5 rounded transition-colors cursor-pointer ${
-                            cls.isPinned
-                              ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/20'
-                              : isActive 
-                                ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:text-amber-500' 
-                                : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-500'
-                          }`}
-                          title={cls.isPinned ? "ដោះម្ជុលចេញវិញ (Unpin ដើម្បីប្ដូរទីតាំងបាន)" : "ខ្ទាស់ម្ជុល (Pin)"}
-                        >
-                          {cls.isPinned ? (
-                            <PinOff className="w-2.5 h-2.5 text-amber-500" />
-                          ) : (
-                            <Pin className="w-2.5 h-2.5" />
-                          )}
-                        </button>
+                      {/* Bottom Droplet Meniscus Light Rim */}
+                      <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                        isDarkMode ? 'via-white/50' : 'via-white/90'
+                      }`} />
+                    </motion.div>
+                  )}
 
-                        {/* Moving left/right is only allowed for unpinned classes among other unpinned classes */}
-                        {!cls.isPinned && idx > 0 && !classes[idx - 1]?.isPinned && (
-                          <button
-                            onClick={(e) => handleMoveClass(e, idx, 'left')}
-                            className={`p-0.5 rounded transition-colors ${
-                              isActive 
-                                ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
-                                : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
-                            }`}
-                            title="រំកិលទៅឆ្វេង"
-                          >
-                            <ChevronLeft className="w-3 h-3" />
-                          </button>
+                  <motion.span
+                    animate={{ 
+                      scale: isActive ? 1.04 : 1,
+                      y: isActive ? -0.5 : 0
+                    }}
+                    transition={{ type: "spring", stiffness: 450, damping: 22 }}
+                    className="relative z-10 flex items-center gap-1.5"
+                  >
+                    {!cls.isPinned ? (
+                      <div
+                        onMouseDown={() => setCanDrag(true)}
+                        onTouchStart={() => setCanDrag(true)}
+                        onMouseUp={() => setCanDrag(false)}
+                        onTouchEnd={() => setCanDrag(false)}
+                        className={`cursor-grab active:cursor-grabbing p-0.5 -m-0.5 rounded transition-colors shrink-0 flex items-center justify-center opacity-40 group-hover/item:opacity-90 ${
+                          isActive 
+                            ? isDarkMode ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-500/10 text-blue-600' 
+                            : isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/10 text-slate-500'
+                        }`}
+                        title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
+                      >
+                        <GripVertical className="w-3 h-3" />
+                      </div>
+                    ) : (
+                      /* Visual Pin (ម្ជុល) if pinned */
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePinClass(e, cls.id)}
+                        className="p-0.5 -ml-0.5 rounded-full hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
+                        title="បានខ្ទាស់ម្ជុលជាប់ (ចុចដោះម្ជុលចេញវិញដើម្បីអាចប្ដូរទីតាំងបាន)"
+                      >
+                        <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500 -rotate-45 drop-shadow-xs" />
+                      </button>
+                    )}
+                    
+                    <span className={
+                      isActive 
+                        ? isDarkMode 
+                          ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                          : 'text-blue-600 font-extrabold tracking-wide' 
+                        : 'font-bold'
+                    }>
+                      {cls.name}
+                    </span>
+
+                    {/* Discrete action buttons (reveal on hover) */}
+                    <div className="opacity-0 group-hover/item:opacity-100 flex items-center gap-0.5 shrink-0 transition-opacity ml-0.5">
+                      {/* Pin / Unpin Button (ម្ជុល) */}
+                      <button
+                        type="button"
+                        onClick={(e) => handleTogglePinClass(e, cls.id)}
+                        className={`p-0.5 rounded transition-colors cursor-pointer ${
+                          cls.isPinned
+                            ? 'text-amber-500 hover:text-amber-600 hover:bg-amber-500/20'
+                            : isActive 
+                              ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:text-amber-500' 
+                              : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-500'
+                        }`}
+                        title={cls.isPinned ? "ដោះម្ជុលចេញវិញ (Unpin ដើម្បីប្ដូរទីតាំងបាន)" : "ខ្ទាស់ម្ជុល (Pin)"}
+                      >
+                        {cls.isPinned ? (
+                          <PinOff className="w-2.5 h-2.5 text-amber-500" />
+                        ) : (
+                          <Pin className="w-2.5 h-2.5" />
                         )}
-                        {!cls.isPinned && idx < classes.length - 1 && !classes[idx + 1]?.isPinned && (
-                          <button
-                            onClick={(e) => handleMoveClass(e, idx, 'right')}
-                            className={`p-0.5 rounded transition-colors ${
-                              isActive 
-                                ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
-                                : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
-                            }`}
-                            title="រំកិលទៅស្ដាំ"
-                          >
-                            <ChevronRight className="w-3 h-3" />
-                          </button>
-                        )}
+                      </button>
+
+                      {/* Moving left/right is only allowed for unpinned classes among other unpinned classes */}
+                      {!cls.isPinned && idx > 0 && !classes[idx - 1]?.isPinned && (
                         <button
-                          onClick={(e) => handleOpenRenameClass(e, cls.id, cls.name)}
+                          onClick={(e) => handleMoveClass(e, idx, 'left')}
                           className={`p-0.5 rounded transition-colors ${
                             isActive 
                               ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
                               : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
                           }`}
-                          title="កែឈ្មោះថ្នាក់"
+                          title="រំកិលទៅឆ្វេង"
                         >
-                          <Pencil className="w-2.5 h-2.5" />
+                          <ChevronLeft className="w-3 h-3" />
                         </button>
-                        {classes.length > 1 && (
-                          <button
-                            onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
-                            className={`p-0.5 rounded transition-colors ${
-                              isActive
-                                ? 'hover:bg-red-500 text-red-500 hover:text-white'
-                                : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
-                            }`}
-                            title="លុបថ្នាក់"
-                          >
-                            <Trash2 className="w-2.5 h-2.5" />
-                          </button>
-                        )}
-                      </div>
-                    </motion.span>
-                  </motion.div>
-                );
-              }))}
+                      )}
+                      {!cls.isPinned && idx < classes.length - 1 && !classes[idx + 1]?.isPinned && (
+                        <button
+                          onClick={(e) => handleMoveClass(e, idx, 'right')}
+                          className={`p-0.5 rounded transition-colors ${
+                            isActive 
+                              ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
+                              : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                          }`}
+                          title="រំកិលទៅស្ដាំ"
+                        >
+                          <ChevronRight className="w-3 h-3" />
+                        </button>
+                      )}
+                      <button
+                        onClick={(e) => handleOpenRenameClass(e, cls.id, cls.name)}
+                        className={`p-0.5 rounded transition-colors ${
+                          isActive 
+                            ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
+                            : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
+                        }`}
+                        title="កែឈ្មោះថ្នាក់"
+                      >
+                        <Pencil className="w-2.5 h-2.5" />
+                      </button>
+                      {classes.length > 1 && (
+                        <button
+                          onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                          className={`p-0.5 rounded transition-colors ${
+                            isActive
+                              ? 'hover:bg-red-500 text-red-500 hover:text-white'
+                              : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
+                          }`}
+                          title="លុបថ្នាក់"
+                        >
+                          <Trash2 className="w-2.5 h-2.5" />
+                        </button>
+                      )}
+                    </div>
+                  </motion.span>
+                </motion.div>
+              );
+            }))}
 
-              {teacher && (
-                <button
-                  onClick={handleOpenAddClass}
-                  className="px-3.5 py-1.5 bg-transparent border border-dashed rounded-full text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
-                  title="បន្ថែមថ្នាក់ថ្មី"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>បន្ថែមថ្នាក់</span>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Right workspace quick metrics */}
-          <div className="hidden lg:flex items-center gap-3 shrink-0 text-xs font-bold">
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
-              isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
-            }`}>
-              <UsersIcon className="w-3.5 h-3.5 text-indigo-500" />
-              <span>សិស្សសរុប៖ <strong className="text-indigo-600 dark:text-indigo-400">{currentClassStudents.length}</strong> នាក់</span>
-            </div>
-
-            <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
-              isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
-            }`}>
-              <Compass className="w-3.5 h-3.5 text-amber-500" />
-              <span>បានហៅ៖ <strong className="text-amber-600 dark:text-amber-400">{currentClassPickedIds.length + currentClassManualCalledIds.filter(id => !currentClassPickedIds.includes(id)).length}</strong>/{currentClassStudents.length}</span>
-              {currentClassManualCalledIds.length > 0 && (
-                <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded font-black">
-                  គ្រូហៅ {currentClassManualCalledIds.length}
-                </span>
-              )}
-            </div>
-
-            {(currentClassPickedIds.length > 0 || currentClassManualCalledIds.length > 0) && (
+            {teacher && (
               <button
-                onClick={() => {
-                  handleSetPickedIds([]);
-                  setManualCalledIds([]);
-                  if (activeClassId) {
-                    localStorage.removeItem(`manual_called_students_class_${activeClassId}`);
-                  }
-                }}
-                className="px-2.5 py-1 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-                title="លាងសម្អាតការហៅឈ្មោះឡើងវិញ"
+                onClick={handleOpenAddClass}
+                className="px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
+                title="បន្ថែមថ្នាក់ថ្មី"
               >
-                សម្អាតការហៅ
+                <Plus className="w-3.5 h-3.5" />
+                <span>បន្ថែមថ្នាក់</span>
               </button>
             )}
           </div>
         </div>
 
-        {/* Second Row: Subject Selector & Add Subject Tab (shown after class is selected) */}
-        {teacher && activeClassId && (
-          <div className="flex items-center gap-2 overflow-x-auto no-scrollbar pt-1 border-t border-slate-200/60 dark:border-slate-800/60 animate-in fade-in duration-200">
-            <div className="flex items-center gap-1.5 mr-1 text-slate-700 dark:text-slate-200 font-black text-xs shrink-0">
-              <BookOpen className="w-4 h-4 text-emerald-500 dark:text-emerald-400 shrink-0" />
-              <span>មុខវិជ្ជា៖</span>
-            </div>
-
-            {/* Subject Pills Track */}
-            <div className="flex items-center gap-1.5 p-1 rounded-full bg-slate-200/50 dark:bg-slate-900/60 border border-white/80 dark:border-white/10 shadow-[0_2px_8px_rgba(0,0,0,0.03)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
-              {subjects.map((sub) => {
-                const isSubActive = activeSubjectId === sub.id;
-                const subEmoji = sub.name === 'រូបវិទ្យា' ? '🧬' : sub.name === 'គីមីវិទ្យា' ? '🧪' : sub.name === 'ជីវវិទ្យា' ? '🌱' : sub.name === 'គណិតវិទ្យា' ? '📐' : sub.name === 'ភាសាខ្មែរ' ? '🇰🇭' : '📚';
-
-                if (editingSubjectIdTop === sub.id) {
-                  return (
-                    <div 
-                      key={sub.id} 
-                      className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 border border-emerald-500 rounded-full animate-in zoom-in-95 duration-100"
-                    >
-                      <input
-                        type="text"
-                        value={tempSubjectNameTop}
-                        onChange={(e) => setTempSubjectNameTop(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            if (tempSubjectNameTop.trim()) {
-                              handleRenameSubject(sub.id, tempSubjectNameTop.trim());
-                            }
-                            setEditingSubjectIdTop(null);
-                          }
-                          if (e.key === 'Escape') setEditingSubjectIdTop(null);
-                        }}
-                        autoFocus
-                        className="px-2 py-0.5 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-full focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-900 dark:text-white font-bold w-28"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          if (tempSubjectNameTop.trim()) {
-                            handleRenameSubject(sub.id, tempSubjectNameTop.trim());
-                          }
-                          setEditingSubjectIdTop(null);
-                        }}
-                        className="p-1 text-green-600 hover:bg-green-100 dark:hover:bg-green-900 rounded-full cursor-pointer transition-all active:scale-90"
-                      >
-                        <Check className="w-3 h-3" />
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setEditingSubjectIdTop(null)}
-                        className="p-1 text-slate-400 hover:bg-slate-200 dark:hover:bg-slate-800 rounded-full cursor-pointer transition-all active:scale-90"
-                      >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </div>
-                  );
-                }
-
-                return (
-                  <motion.div
-                    key={sub.id}
-                    onClick={() => handleSelectSubject(sub.id)}
-                    whileHover={{ scale: 1.04 }}
-                    whileTap={{ scale: 0.94 }}
-                    className={`group/subj relative px-3.5 py-1.5 rounded-full text-xs font-bold flex items-center gap-1.5 cursor-pointer select-none whitespace-nowrap transition-all duration-200 isolate ${
-                      isSubActive
-                        ? isDarkMode ? 'text-emerald-400 font-black' : 'text-emerald-700 font-black'
-                        : isDarkMode ? 'text-slate-200 hover:text-white hover:bg-white/10' : 'text-slate-700 hover:text-slate-950 hover:bg-white/50'
-                    }`}
-                  >
-                    {isSubActive && (
-                      <GlassLiquidOverlay
-                        layoutId="subjectWaterDroplet"
-                        isDarkMode={isDarkMode}
-                        variant="dark-glass"
-                      />
-                    )}
-
-                    <span className="relative z-10 flex items-center gap-1.5">
-                      <span>{subEmoji}</span>
-                      <span className={isSubActive ? (isDarkMode ? 'text-emerald-300 font-black drop-shadow-sm' : 'text-emerald-800 font-black') : 'font-extrabold'}>
-                        {sub.name}
-                      </span>
-
-                      {/* Hover actions */}
-                      <span className="opacity-0 group-hover/subj:opacity-100 flex items-center gap-0.5 ml-0.5 transition-opacity">
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            setEditingSubjectIdTop(sub.id);
-                            setTempSubjectNameTop(sub.name);
-                          }}
-                          className="p-0.5 text-slate-400 hover:text-emerald-500 rounded cursor-pointer"
-                          title="កែឈ្មោះមុខវិជ្ជា"
-                        >
-                          <Pencil className="w-2.5 h-2.5" />
-                        </button>
-                        {subjects.length > 1 && (
-                          <button
-                            type="button"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              handleDeleteSubject(sub.id);
-                            }}
-                            className="p-0.5 text-slate-400 hover:text-rose-500 rounded cursor-pointer"
-                            title="លុបមុខវិជ្ជា"
-                          >
-                            <Trash2 className="w-2.5 h-2.5" />
-                          </button>
-                        )}
-                      </span>
-                    </span>
-                  </motion.div>
-                );
-              })}
-
-              {/* Add Subject Inline Form / Button */}
-              {isAddingSubjectTop ? (
-                <div className="flex items-center gap-1 px-2 py-0.5 bg-emerald-500/15 border border-emerald-500 rounded-full animate-in zoom-in-95 duration-100">
-                  <input
-                    type="text"
-                    value={newSubjectNameTop}
-                    onChange={(e) => setNewSubjectNameTop(e.target.value)}
-                    placeholder="ឈ្មោះមុខវិជ្ជា..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        if (newSubjectNameTop.trim()) {
-                          handleCreateSubject(newSubjectNameTop.trim());
-                          setNewSubjectNameTop('');
-                        }
-                        setIsAddingSubjectTop(false);
-                      }
-                      if (e.key === 'Escape') setIsAddingSubjectTop(false);
-                    }}
-                    autoFocus
-                    className="px-2.5 py-0.5 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-full focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-900 dark:text-white font-bold w-32"
-                  />
-                  <button
-                    type="button"
-                    onClick={() => {
-                      if (newSubjectNameTop.trim()) {
-                        handleCreateSubject(newSubjectNameTop.trim());
-                        setNewSubjectNameTop('');
-                      }
-                      setIsAddingSubjectTop(false);
-                    }}
-                    className="px-2.5 py-0.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-full text-xs font-extrabold cursor-pointer transition-all active:scale-95"
-                  >
-                    បន្ថែម
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setIsAddingSubjectTop(false)}
-                    className="px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:text-slate-300 rounded-full text-xs font-bold cursor-pointer transition-all active:scale-95"
-                  >
-                    បោះបង់
-                  </button>
-                </div>
-              ) : (
-                <button
-                  onClick={() => {
-                    setIsAddingSubjectTop(true);
-                    setNewSubjectNameTop('');
-                  }}
-                  className="px-3.5 py-1 bg-transparent border border-dashed rounded-full text-xs font-extrabold flex items-center gap-1.5 transition-all cursor-pointer text-emerald-600 dark:text-emerald-400 hover:text-emerald-700 dark:hover:text-emerald-300 hover:bg-emerald-500/10 border-emerald-400/60 dark:border-emerald-500/40 active:scale-95 shrink-0"
-                  title="បន្ថែមមុខវិជ្ជាថ្មី"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>+ បន្ថែមមុខវិជ្ជា</span>
-                </button>
-              )}
-            </div>
+        {/* Right workspace quick metrics */}
+        <div className="hidden lg:flex items-center gap-3 shrink-0 text-xs font-bold">
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
+            isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
+          }`}>
+            <UsersIcon className="w-3.5 h-3.5 text-indigo-500" />
+            <span>សិស្សសរុប៖ <strong className="text-indigo-600 dark:text-indigo-400">{currentClassStudents.length}</strong> នាក់</span>
           </div>
-        )}
+
+          <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
+            isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
+          }`}>
+            <Compass className="w-3.5 h-3.5 text-amber-500" />
+            <span>បានហៅ៖ <strong className="text-amber-600 dark:text-amber-400">{currentClassPickedIds.length + currentClassManualCalledIds.filter(id => !currentClassPickedIds.includes(id)).length}</strong>/{currentClassStudents.length}</span>
+            {currentClassManualCalledIds.length > 0 && (
+              <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded font-black">
+                គ្រូហៅ {currentClassManualCalledIds.length}
+              </span>
+            )}
+          </div>
+
+          {(currentClassPickedIds.length > 0 || currentClassManualCalledIds.length > 0) && (
+            <button
+              onClick={() => {
+                handleSetPickedIds([]);
+                setManualCalledIds([]);
+                if (activeClassId) {
+                  localStorage.removeItem(`manual_called_students_class_${activeClassId}`);
+                }
+              }}
+              className="px-2.5 py-1 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
+              title="លាងសម្អាតការហៅឈ្មោះឡើងវិញ"
+            >
+              សម្អាតការហៅ
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Main Layout */}
       <main className="flex-1 flex overflow-hidden">
         {activeTab === 'wheel' && (
           <>
-            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#222222]">
+            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
               <SpinningWheel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
@@ -3753,7 +3364,7 @@ export default function App() {
               />
             </section>
             
-            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-[#333333]">
+            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-slate-800">
               <StudentPanel
                 students={currentClassStudents}
                 pickedIds={currentClassPickedIds}
@@ -3777,9 +3388,9 @@ export default function App() {
 
         {activeTab === 'quiz' && (
           <>
-            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#222222]">
+            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#0b0f19]">
               {/* Quick Switcher between Spinning Wheel (Image 1 - Default) and Student List (Image 3) */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] shrink-0">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-700 dark:text-slate-200">
                     {quizLeftView === 'wheel' ? 'កងបង្វិលសិស្ស' : 'បញ្ជីឈ្មោះសិស្ស'}
@@ -3866,7 +3477,7 @@ export default function App() {
             {/* Bright Orange line separator between student list and question board */}
             <div className="w-[3px] bg-[#f97316] h-full hidden md:block shrink-0" />
 
-            <section key={`quiz-section-${activeClassId}`} className={`flex-1 md:basis-3/5 h-full overflow-hidden flex flex-col ${
+            <section className={`flex-1 md:basis-3/5 h-full overflow-hidden flex flex-col ${
               isDarkMode ? 'bg-[#0f172a]' : 'bg-slate-50'
             }`}>
               <QuizPanel
@@ -3894,8 +3505,6 @@ export default function App() {
                 onCreateSubject={handleCreateSubject}
                 onRenameSubject={handleRenameSubject}
                 onDeleteSubject={handleDeleteSubject}
-                teacher={teacher}
-                onOpenAuthModal={() => setIsAuthModalOpen(true)}
               />
             </section>
           </>
@@ -3937,10 +3546,6 @@ export default function App() {
               activeClassId={activeClassId}
               isDarkMode={isDarkMode}
               teacher={teacher}
-              activeSubjectId={activeSubjectId}
-              activeSubjectName={subjects.find(s => s.id === activeSubjectId)?.name}
-              subjects={subjects}
-              onSelectSubject={handleSelectSubject}
               onAddStudentDetail={addStudentDetail}
               onRemoveStudent={removeStudent}
               onClearStudents={clearStudents}
@@ -3971,7 +3576,7 @@ export default function App() {
         )}
 
         {activeTab === 'exams-room' && (
-          <div key={`exams-section-${activeClassId}-${activeSubjectId}`} className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
             <ExamsPanel
               activeClassId={activeClassId || ''}
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
@@ -3979,10 +3584,6 @@ export default function App() {
               teacher={teacher}
               classes={classes}
               onSwitchClass={handleSwitchClass}
-              activeSubjectId={activeSubjectId}
-              activeSubjectName={subjects.find(s => s.id === activeSubjectId)?.name}
-              subjects={subjects}
-              onSelectSubject={handleSelectSubject}
             />
           </div>
         )}
@@ -3998,15 +3599,13 @@ export default function App() {
         isOpen={isLessonModalOpen}
         onClose={() => setIsLessonModalOpen(false)}
         onQuestionsGenerated={handleQuestionsGenerated}
-        isDarkMode={isDarkMode}
       />
 
       <TeacherAuthModal
         isOpen={isAuthModalOpen}
         onClose={() => setIsAuthModalOpen(false)}
-        onLoginSuccess={(acc) => handleUpdateTeacherProfile(acc)}
+        onLoginSuccess={(acc) => setTeacher(acc)}
         initialMode={authModalMode}
-        isDarkMode={isDarkMode}
       />
 
       {teacher && (
@@ -4014,7 +3613,7 @@ export default function App() {
           isOpen={isProfileModalOpen}
           onClose={() => setIsProfileModalOpen(false)}
           teacher={teacher}
-          onUpdateTeacher={handleUpdateTeacherProfile}
+          onUpdateTeacher={(updated) => setTeacher(updated)}
           onLogout={() => {
             setIsProfileModalOpen(false);
             setIsLogoutModalOpen(true);

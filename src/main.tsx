@@ -1,5 +1,3 @@
-import './lib/safeStorage.ts';
-import 'firebase/auth';
 import {StrictMode} from 'react';
 import {createRoot} from 'react-dom/client';
 import App from './App.tsx';

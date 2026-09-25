@@ -5,11 +5,9 @@ import { HelpCircle, Timer, CheckCircle, XCircle, Info, Trophy, AlertCircle, Rot
 import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
 import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
 import confetti from 'canvas-confetti';
-import { Question, QuizCard, Student, QuizRoom, QuizChapter, QuizSubject, TeacherAccount } from '../types';
+import { Question, QuizCard, Student, QuizRoom, QuizChapter, QuizSubject } from '../types';
 import { useConfirm } from '../context/ConfirmContext.tsx';
-import { safeSetItem } from '../lib/storageUtils';
 import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaRenderer';
-import { GlassLiquidButton } from './GlassLiquidCapsule';
 import { 
   Document, 
   Packer, 
@@ -53,8 +51,6 @@ interface QuizPanelProps {
   onCreateSubject?: (name: string) => void;
   onRenameSubject?: (subjectId: string, name: string) => void;
   onDeleteSubject?: (subjectId: string) => void;
-  teacher?: TeacherAccount | null;
-  onOpenAuthModal?: () => void;
 }
 
 export const AVAILABLE_FONTS = [
@@ -111,9 +107,7 @@ export default function QuizPanel({
   onSelectSubject,
   onCreateSubject,
   onRenameSubject,
-  onDeleteSubject,
-  teacher,
-  onOpenAuthModal
+  onDeleteSubject
 }: QuizPanelProps) {
   const { confirmAction } = useConfirm();
 
@@ -2229,45 +2223,6 @@ export default function QuizPanel({
   const remainingCount = cards.filter(c => !c.isRevealed).length;
   const layoutWidths = getLayoutClasses(headerLayout);
 
-  if (!teacher) {
-    return (
-      <div 
-        ref={containerRef}
-        className="flex-1 flex flex-col items-center justify-center p-8 text-center bg-transparent overflow-y-auto custom-scrollbar"
-      >
-        <div className={`p-8 sm:p-10 rounded-3xl border max-w-md w-full flex flex-col items-center backdrop-blur-2xl shadow-2xl relative overflow-hidden ${
-          isDarkMode 
-            ? 'bg-slate-900/80 border-slate-700/60 shadow-[0_12px_40px_rgba(0,0,0,0.6)]' 
-            : 'bg-white/90 border-slate-200/80 shadow-[0_12px_40px_rgba(0,0,0,0.08)]'
-        }`}>
-          {/* 3D Glass Droplet Icon */}
-          <div className="w-16 h-16 rounded-full bg-gradient-to-b from-indigo-500/20 to-purple-500/10 border border-indigo-400/30 flex items-center justify-center mb-5 shadow-[0_0_25px_rgba(99,102,241,0.25)]">
-            <BookOpen className="w-8 h-8 text-indigo-500 dark:text-indigo-400" />
-          </div>
-
-          <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-white mb-2 tracking-wide">
-            មិនទាន់មានគណនីគ្រូចូលប្រើ — ទិន្នន័យទទេរ
-          </h3>
-          <p className="text-slate-500 dark:text-slate-400 text-xs mb-6 leading-relaxed max-w-xs font-medium">
-            សូមបង្កើតគណនីគ្រូ ឬចូលប្រើប្រាស់ ដើម្បីបង្កើតថ្នាក់រៀន រៀបចំសំណួរវិញ្ញាសា និងផ្ទុកទិន្នន័យសិស្ស។
-          </p>
-
-          <GlassLiquidButton
-            isDarkMode={isDarkMode}
-            variant="indigo-glass"
-            onClick={onOpenAuthModal}
-            className="h-10 px-5 text-xs font-extrabold shadow-[0_6px_25px_rgba(99,102,241,0.5)] gap-2"
-          >
-            <span className="w-6 h-6 rounded-full bg-white/25 border border-white/40 shadow-[0_0_8px_rgba(255,255,255,0.3)] flex items-center justify-center shrink-0 text-white">
-              <Plus className="w-3.5 h-3.5" />
-            </span>
-            <span className="font-extrabold tracking-wide">បង្កើតគណនីគ្រូ</span>
-          </GlassLiquidButton>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <>
     <div 
@@ -2412,19 +2367,19 @@ export default function QuizPanel({
       ) : (
         <div className="animate-in fade-in slide-in-from-bottom-3 duration-250">
           {/* Header of Manage Page */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-200 dark:border-slate-800 pb-4 mb-8 gap-4">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-205 dark:border-slate-800 pb-4 mb-8 gap-4">
             <div className="flex items-center gap-3">
               <button
                 type="button"
                 onClick={exitManageMode}
-                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-800 dark:text-white rounded-xl font-bold text-xs cursor-pointer transition-all active:scale-95 border border-slate-200 dark:border-slate-700"
+                className="flex items-center gap-1.5 px-3.5 py-2 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-bold text-xs cursor-pointer transition-all active:scale-95 border border-slate-200 dark:border-slate-700"
               >
                 ← ត្រឡប់ទៅក្ដារសំណួរ
               </button>
               <div className="h-5 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:block" />
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-500 dark:text-indigo-400" />
-                <h3 className="text-lg font-black tracking-wide text-slate-900 dark:text-white">
+                <Layers className="w-5 h-5 text-indigo-505" />
+                <h3 className="text-lg font-black tracking-wide text-slate-800 dark:text-slate-205">
                   ការរៀបចំជំពូក និងមេរៀន
                 </h3>
               </div>
@@ -2436,7 +2391,7 @@ export default function QuizPanel({
                 <button
                   type="button"
                   onClick={() => setIsCreatingChapter(true)}
-                  className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-700 transition-all cursor-pointer shadow-md shadow-indigo-600/20 active:scale-95"
+                  className="flex items-center gap-1.5 px-3.5 py-2.5 bg-indigo-600 text-white font-bold rounded-xl text-xs hover:bg-indigo-700 transition-all cursor-pointer shadow-md shadow-indigo-600/10 active:scale-95"
                 >
                   <Plus className="w-3.5 h-3.5" />
                   <span>បង្កើតជំពូកថ្មី</span>
@@ -2453,7 +2408,7 @@ export default function QuizPanel({
                       if (e.key === 'Escape') setIsCreatingChapter(false);
                     }}
                     autoFocus
-                    className="px-2 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-white w-36 sm:w-44 font-bold"
+                    className="px-2 py-1 text-xs bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-800 dark:text-slate-100 w-36 sm:w-44"
                   />
                   <button
                     type="button"
@@ -2465,7 +2420,7 @@ export default function QuizPanel({
                   <button
                     type="button"
                     onClick={() => setIsCreatingChapter(false)}
-                    className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                    className="px-2.5 py-1 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all active:scale-95"
                   >
                     បោះបង់
                   </button>
@@ -2478,10 +2433,10 @@ export default function QuizPanel({
           <div className="mb-6 p-5 rounded-2xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm relative overflow-visible">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="space-y-1">
-                <h4 className="text-xs font-black text-slate-900 dark:text-white uppercase tracking-widest flex items-center gap-1.5">
-                  📚 មុខវិជ្ជាសកម្ម (ACTIVE SUBJECT) ៖
+                <h4 className="text-xs font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest flex items-center gap-1.5">
+                  📚 មុខវិជ្ជាសកម្ម (Active Subject) ៖
                 </h4>
-                <p className="text-[10.5px] text-slate-600 dark:text-slate-200 font-semibold leading-relaxed">
+                <p className="text-[10px] text-slate-500 dark:text-slate-400 font-semibold leading-relaxed">
                   សូមជ្រើសរើស មុខវិជ្ជាសកម្ម ដើម្បីមើលជំពូក និងមេរៀនរបស់មុខវិជ្ជានោះ។
                 </p>
               </div>
@@ -2493,10 +2448,10 @@ export default function QuizPanel({
                     setIsCreatingSubject(true);
                     setNewSubjectName('');
                   }}
-                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/20 active:scale-95 flex items-center gap-1.5 shrink-0 self-start md:self-auto"
+                  className="px-3.5 py-2 bg-emerald-600 hover:bg-emerald-700 text-white font-bold rounded-xl text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/10 active:scale-95 flex items-center gap-1.5 shrink-0 self-start md:self-auto"
                 >
                   <Plus className="w-3.5 h-3.5" />
-                  <span>+ បន្ថែមមុខវិជ្ជា</span>
+                  <span>បន្ថែមមុខវិជ្ជា</span>
                 </button>
               ) : (
                 <div className="flex items-center gap-1.5 p-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl shadow-xs animate-in fade-in-25 duration-100 shrink-0">
@@ -2515,7 +2470,7 @@ export default function QuizPanel({
                       if (e.key === 'Escape') setIsCreatingSubject(false);
                     }}
                     autoFocus
-                    className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800 dark:text-white w-36 sm:w-44 font-black"
+                    className="px-2.5 py-1.5 text-xs bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-lg focus:outline-none focus:ring-1 focus:ring-emerald-500 text-slate-800 dark:text-slate-100 w-36 sm:w-44 font-black"
                   />
                   <button
                     type="button"
@@ -2525,14 +2480,14 @@ export default function QuizPanel({
                       }
                       setIsCreatingSubject(false);
                     }}
-                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-lg text-xs font-bold cursor-pointer transition-all active:scale-95"
+                    className="px-2.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-bold cursor-pointer transition-all active:scale-95"
                   >
                     បន្ថែម
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsCreatingSubject(false)}
-                    className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:text-slate-300 dark:hover:bg-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all active:scale-95"
+                    className="px-2.5 py-1.5 bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 hover:text-slate-700 text-xs font-bold rounded-lg cursor-pointer transition-all active:scale-95"
                   >
                     បោះបង់
                   </button>
@@ -2550,7 +2505,7 @@ export default function QuizPanel({
                   return (
                     <div 
                       key={sub.id} 
-                      className="flex items-center gap-1.5 p-1 bg-indigo-500/10 border border-indigo-500 rounded-xl animate-in zoom-in-95 duration-100"
+                      className="flex items-center gap-1.5 p-1 bg-indigo-500/5 border border-indigo-500 rounded-xl animate-in zoom-in-95 duration-100"
                     >
                       <input
                         type="text"
@@ -2566,7 +2521,7 @@ export default function QuizPanel({
                           if (e.key === 'Escape') setEditingSubjectId(null);
                         }}
                         autoFocus
-                        className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-white font-bold w-32"
+                        className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-105 font-bold w-32"
                       />
                       <button
                         type="button"
@@ -2576,7 +2531,7 @@ export default function QuizPanel({
                           }
                           setEditingSubjectId(null);
                         }}
-                        className="p-1 text-green-600 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-900 rounded-md cursor-pointer shrink-0 transition-all active:scale-90"
+                        className="p-1 text-green-600 bg-green-50 dark:bg-green-950/30 hover:bg-green-100 rounded-md cursor-pointer shrink-0 transition-all active:scale-90"
                       >
                         <Check className="w-3.5 h-3.5" />
                       </button>
@@ -2602,30 +2557,23 @@ export default function QuizPanel({
                         onSelectSubject(sub.id);
                       }
                     }}
-                    className={`group px-4 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border flex items-center gap-2.5 relative select-none ${
+                    className={`group px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border flex items-center gap-2.5 hover:shadow-xs relative select-none ${
                       isActive
-                        ? 'bg-indigo-600 dark:bg-indigo-600 border-indigo-500 dark:border-indigo-400 text-white dark:text-white font-black shadow-[0_0_15px_rgba(99,102,241,0.5)] ring-2 ring-indigo-400/40'
-                        : 'bg-white hover:bg-slate-100/80 dark:bg-slate-800 dark:hover:bg-slate-700/80 border-slate-300 dark:border-slate-700 text-slate-800 dark:text-white hover:text-indigo-600 dark:hover:text-white shadow-xs'
+                        ? 'bg-indigo-500/10 border-indigo-505 text-indigo-900 dark:text-indigo-305 font-extrabold ring-1 ring-indigo-500/20 shadow-sm'
+                        : 'bg-slate-50 hover:bg-slate-100/80 dark:bg-slate-850 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    <span className="drop-shadow-sm">{subEmoji}</span>
-                    <span className={isActive ? "text-white font-black tracking-wide drop-shadow-sm" : "text-slate-800 dark:text-white font-black tracking-wide"}>
-                      {sub.name}
-                    </span>
+                    <span>{subEmoji} {sub.name}</span>
                     
                     {/* Tiny action block inside pills */}
-                    <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1 pl-1 border-l border-slate-300 dark:border-slate-600">
+                    <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1 pl-1 border-l border-slate-300 dark:border-slate-700">
                       <span
                         onClick={(e) => {
                           e.stopPropagation();
                           setEditingSubjectId(sub.id);
                           setTempSubjectName(sub.name);
                         }}
-                        className={`p-0.5 rounded cursor-pointer transition-transform active:scale-90 ${
-                          isActive 
-                            ? 'text-indigo-100 hover:text-white hover:bg-indigo-700' 
-                            : 'text-indigo-600 dark:text-indigo-300 hover:bg-indigo-100 dark:hover:bg-indigo-900/60'
-                        }`}
+                        className="p-0.5 text-indigo-600 dark:text-indigo-400 hover:bg-indigo-100 dark:hover:bg-indigo-950 rounded cursor-pointer transition-transform active:scale-90"
                         title="កែឈ្មោះមុខវិជ្ជា"
                       >
                         <Pencil className="w-3 h-3" />
@@ -2637,11 +2585,7 @@ export default function QuizPanel({
                             onDeleteSubject(sub.id);
                           }
                         }}
-                        className={`p-0.5 rounded cursor-pointer transition-transform active:scale-90 ${
-                          isActive 
-                            ? 'text-rose-100 hover:text-white hover:bg-rose-700' 
-                            : 'text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-900/60'
-                        }`}
+                        className="p-0.5 text-rose-600 dark:text-rose-400 hover:bg-rose-100 dark:hover:bg-rose-950 rounded cursor-pointer transition-transform active:scale-90"
                         title="លុបមុខវិជ្ជា"
                       >
                         <Trash2 className="w-3 h-3" />
@@ -2654,25 +2598,25 @@ export default function QuizPanel({
           </div>
 
           {/* Quick Info Box */}
-          <div className="mb-6 p-4 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800/60 text-indigo-900 dark:text-indigo-200 text-xs font-bold flex items-center gap-2">
+          <div className="mb-6 p-4 rounded-2xl bg-indigo-50 dark:bg-indigo-950/10 border border-indigo-200 dark:border-indigo-900/30 text-indigo-800 dark:text-indigo-400 text-xs font-bold flex items-center gap-2">
             <Info className="w-4.5 h-4.5 text-indigo-500 shrink-0" />
             <span>សូមជ្រើសរើសមេរៀនណាមួយខាងក្រោម រួចចុច "ត្រឡប់ទៅក្ដារសំណួរ" ដើម្បីសួរដេញដោលសិស្ស។</span>
           </div>
 
           {/* Active indicator */}
           {activeChapter && activeRoom && (
-            <div className="mb-6 px-4 py-3.5 bg-green-500/10 dark:bg-green-500/15 border border-green-300/40 dark:border-green-600/40 rounded-2xl flex items-center justify-between text-xs text-slate-800 dark:text-slate-100">
+            <div className="mb-6 px-4 py-3.5 bg-green-500/5 dark:bg-green-400/5 border border-green-200/30 dark:border-green-900/30 rounded-2xl flex items-center justify-between text-xs text-slate-600 dark:text-slate-300">
               <span className="font-bold flex items-center gap-2">
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-pulse shrink-0"></span>
-                <span className="text-slate-700 dark:text-slate-200">មេរៀនសកម្ម៖</span> 
-                <span className="text-indigo-700 dark:text-white font-black ml-1 bg-indigo-100/70 dark:bg-indigo-900/80 px-2.5 py-1 rounded-lg border border-indigo-200 dark:border-indigo-700">
+                <span>មេរៀនសកម្ម៖</span> 
+                <span className="text-indigo-600 dark:text-indigo-400 font-black ml-1 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1 rounded-lg">
                   [{activeChapter.name}] ➔ {activeRoom.name}
                 </span>
               </span>
               <button
                 type="button"
                 onClick={exitManageMode}
-                className="text-indigo-600 dark:text-indigo-300 hover:text-indigo-800 dark:hover:text-white underline font-black cursor-pointer bg-white dark:bg-slate-800 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-700 hover:shadow-xs"
+                className="text-indigo-600 dark:text-indigo-400 hover:underline font-black cursor-pointer bg-white dark:bg-slate-900 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 hover:shadow-xs"
               >
                 ទៅកាន់ក្ដារសំណួរឥឡូវនេះ ➔
               </button>
@@ -2726,16 +2670,16 @@ export default function QuizPanel({
                         </div>
                       ) : (
                         <div className="flex items-center gap-2 flex-1 min-w-0">
-                          <span className="text-xs font-black text-slate-900 dark:text-white tracking-wide truncate">
+                          <span className="text-xs font-black text-slate-800 dark:text-slate-200 tracking-wide truncate">
                             {chapter.name}
                           </span>
                           <button
                             type="button"
                             onClick={() => startRenameChapter(chapter)}
-                            className="p-1 px-2 flex items-center gap-1 text-indigo-600 dark:text-indigo-300 font-bold text-[10px] bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-900/40 dark:hover:bg-indigo-800/60 rounded-lg border border-indigo-200 dark:border-indigo-700/60 transition-all cursor-pointer shrink-0"
+                            className="p-1 px-2 flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold text-[10px] bg-indigo-50 hover:bg-indigo-100 dark:bg-indigo-950/45 dark:hover:bg-indigo-900/50 rounded-lg border border-indigo-100 dark:border-indigo-900/40 hover:border-indigo-200 transition-all cursor-pointer shrink-0"
                             title="ប្ដូរឈ្មោះជំពូក"
                           >
-                            <Edit3 className="w-3 h-3 text-indigo-600 dark:text-indigo-300" />
+                            <Edit3 className="w-3 h-3 text-indigo-600 dark:text-indigo-400" />
                             <span>ប្ដូរឈ្មោះ</span>
                           </button>
                         </div>
@@ -2748,7 +2692,7 @@ export default function QuizPanel({
                         <button
                           type="button"
                           onClick={() => onDeleteChapter(chapter.id)}
-                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/30 transition-all cursor-pointer"
+                          className="p-1.5 text-slate-400 hover:text-rose-500 rounded-md hover:bg-rose-50 dark:hover:bg-rose-950/20 transition-all cursor-pointer"
                           title="លុបជំពូកនេះចោល"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -2759,7 +2703,7 @@ export default function QuizPanel({
 
                   {/* Lessons list inside Chapter as a DROPDOWN */}
                   <div className="p-4 flex flex-col gap-3 relative overflow-visible">
-                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-500 dark:text-slate-300">
+                    <span className="text-[11px] font-black uppercase tracking-wider text-slate-400 dark:text-slate-500">
                       មេរៀន៖
                     </span>
 
@@ -2771,23 +2715,23 @@ export default function QuizPanel({
                           onClick={() => setOpenChapterDropdownId(openChapterDropdownId === chapter.id ? null : chapter.id)}
                           className={`w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl border transition-all text-xs font-bold select-none cursor-pointer ${
                             chapter.rooms.some(r => r.id === activeRoomId)
-                              ? 'bg-indigo-50 dark:bg-indigo-950/40 border-indigo-200 dark:border-indigo-700 text-indigo-700 dark:text-indigo-200 shadow-xs'
-                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-800 dark:text-white'
+                              ? 'bg-indigo-50 dark:bg-indigo-950/20 border-indigo-200 dark:border-indigo-900 text-indigo-600 dark:text-indigo-400'
+                              : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                           }`}
                         >
                           <div className="flex items-center gap-2 truncate pr-2">
-                            <BookOpen className="w-4 h-4 text-indigo-500 dark:text-indigo-400 shrink-0" />
-                            <span className="truncate font-bold">
+                            <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
+                            <span className="truncate">
                               {activeRoomInThisChapter 
                                 ? activeRoomInThisChapter.name 
                                 : `ជ្រើសរើសមេរៀនក្នុងជំពូកនេះ (${chapter.rooms.length})`}
                             </span>
                           </div>
                           <div className="flex items-center gap-1 shrink-0">
-                            <span className="text-[10px] font-semibold px-2 py-0.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-full">
+                            <span className="text-[10px] font-normal px-2 py-0.5 bg-slate-100 dark:bg-slate-800 rounded-full">
                               {chapter.rooms.some(r => r.id === activeRoomId) ? 'សកម្ម' : 'មិនទាន់រើស'}
                             </span>
-                            <ChevronDown className="w-3.5 h-3.5 text-slate-400 dark:text-slate-300" />
+                            <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                           </div>
                         </button>
 
@@ -2806,12 +2750,12 @@ export default function QuizPanel({
                                         setOpenChapterDropdownId(null);
                                       }
                                     }}
-                                    className={`group/room relative flex items-center justify-between px-2.5 py-2 rounded-lg transition-all text-xs font-bold select-none cursor-pointer ${
+                                    className={`group/room relative flex items-center justify-between px-2.5 py-1.5 rounded-lg transition-all text-xs font-bold select-none cursor-pointer ${
                                       editingRoomId === room.id
                                         ? 'bg-slate-50 dark:bg-slate-900 border border-indigo-400/80 shadow-inner'
                                         : isActive
-                                          ? 'bg-indigo-600 text-white shadow-sm font-black'
-                                          : 'bg-transparent text-slate-800 dark:text-white hover:bg-slate-100 dark:hover:bg-slate-850'
+                                          ? 'bg-indigo-600 text-white shadow-sm'
+                                          : 'bg-transparent text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-900'
                                     }`}
                                   >
                                     <div className="flex items-center gap-2 flex-grow pr-3 truncate" onClick={(e) => {
@@ -2819,7 +2763,7 @@ export default function QuizPanel({
                                         e.stopPropagation();
                                       }
                                     }}>
-                                      <BookOpen className={`w-3.5 h-3.5 shrink-0 ${isActive && editingRoomId !== room.id ? 'text-indigo-100' : 'text-slate-400 dark:text-slate-300'}`} />
+                                      <BookOpen className={`w-3.5 h-3.5 shrink-0 ${isActive && editingRoomId !== room.id ? 'text-indigo-200' : 'text-slate-400'}`} />
                                       
                                       {editingRoomId === room.id ? (
                                         <div className="flex items-center gap-1 w-full" onClick={(e) => e.stopPropagation()}>
@@ -2836,12 +2780,12 @@ export default function QuizPanel({
                                               }
                                             }}
                                             autoFocus
-                                            className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-950 dark:text-white font-bold w-full"
+                                            className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500 text-slate-950 dark:text-slate-50 font-bold w-full"
                                           />
                                           <button
                                             type="button"
                                             onClick={() => saveRoomRenameLocal(room.id)}
-                                            className="p-1 transform active:scale-95 text-green-600 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-900 rounded-md transition-all cursor-pointer shrink-0"
+                                            className="p-1 transform active:scale-95 text-green-600 bg-green-50 dark:bg-green-950/40 hover:bg-green-100 dark:hover:bg-green-905 rounded-md transition-all cursor-pointer shrink-0"
                                             title="រក្សាទុក"
                                           >
                                             <Check className="w-3.5 h-3.5" />
@@ -2858,7 +2802,7 @@ export default function QuizPanel({
                                       ) : (
                                         <div className="flex items-center gap-1.5 truncate">
                                           <span className="truncate">{room.name}</span>
-                                          <span className={`text-[10px] font-black shrink-0 ${isActive ? 'text-indigo-100 bg-indigo-700' : 'text-slate-600 dark:text-slate-300 bg-slate-100 dark:bg-slate-800'} px-1.5 py-0.5 rounded-md`}>
+                                          <span className={`text-[10px] font-black shrink-0 ${isActive ? 'text-indigo-100 bg-indigo-700' : 'text-slate-400 bg-slate-100 dark:bg-slate-800'} px-1.5 py-0.5 rounded-md`}>
                                             {room.cards ? room.cards.length : 0} សំណួរ
                                           </span>
                                         </div>
@@ -2876,8 +2820,8 @@ export default function QuizPanel({
                                           }}
                                           className={`p-1.5 px-2 flex items-center justify-center gap-1 rounded-lg transition-all cursor-pointer font-bold text-[10px] ${
                                             isActive
-                                              ? 'bg-indigo-700 text-white hover:bg-indigo-800 border border-indigo-500'
-                                              : 'bg-indigo-50 border border-indigo-100 text-indigo-700 hover:bg-indigo-100 dark:bg-indigo-900/50 dark:border-indigo-700/60 dark:text-indigo-200 dark:hover:bg-indigo-800/60'
+                                              ? 'bg-indigo-700 text-indigo-50 hover:bg-indigo-800 hover:text-white border border-indigo-500'
+                                              : 'bg-indigo-50/70 border border-indigo-100 text-indigo-600 hover:bg-indigo-100 hover:text-indigo-800 dark:bg-indigo-950/45 dark:border-indigo-900/40 dark:text-indigo-400 dark:hover:bg-indigo-900/50'
                                           }`}
                                           title="ប្ដូរឈ្មោះមេរៀន"
                                         >
@@ -2894,7 +2838,7 @@ export default function QuizPanel({
                                             }}
                                             className={`p-1.5 rounded-lg transition-colors cursor-pointer ${
                                               isActive
-                                                ? 'hover:bg-rose-700 text-rose-100 hover:text-white'
+                                                ? 'hover:bg-rose-700 text-indigo-300 hover:text-white'
                                                 : 'hover:bg-rose-100 dark:hover:bg-rose-950/40 text-slate-400 hover:text-rose-500'
                                             }`}
                                             title="លុបឈ្មោះមេរៀន"
@@ -3459,7 +3403,7 @@ export default function QuizPanel({
                                       const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
                                       const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
                                       setCustomLogo(transparentPng);
-                                      safeSetItem('teacher_custom_logo', transparentPng);
+                                      localStorage.setItem('teacher_custom_logo', transparentPng);
                                       setLogoUrlInput('');
                                     }
                                   }}
@@ -3473,7 +3417,7 @@ export default function QuizPanel({
                                     const formatted = formatGoogleDriveImageUrl(logoUrlInput.trim());
                                     const transparentPng = await removeWhiteBackgroundFromDataUrl(formatted);
                                     setCustomLogo(transparentPng);
-                                    safeSetItem('teacher_custom_logo', transparentPng);
+                                    localStorage.setItem('teacher_custom_logo', transparentPng);
                                     setLogoUrlInput('');
                                   }
                                 }}
@@ -3499,7 +3443,7 @@ export default function QuizPanel({
                                       const base64 = event.target?.result as string;
                                       const transparentPng = await removeWhiteBackgroundFromDataUrl(base64);
                                       setCustomLogo(transparentPng);
-                                      safeSetItem('teacher_custom_logo', transparentPng);
+                                      localStorage.setItem('teacher_custom_logo', transparentPng);
                                     };
                                     reader.readAsDataURL(file);
                                   }
