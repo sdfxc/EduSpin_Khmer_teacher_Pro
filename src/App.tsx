@@ -87,6 +87,32 @@ function getMigratedSubjects(
 
 const SAMPLE_STUDENTS: Record<string, Student[]> = {};
 
+const isSampleDemoClass = (clsId: string, clsName?: string): boolean => {
+  if (!clsId && !clsName) return false;
+
+  const sampleBaseIds = [
+    'class-7a', 'class-8a', 'class-9a', 
+    'class-7a1', 'class-8a1', 'class-9a1', 'class-10a1'
+  ];
+
+  const sampleNames = [
+    'ថ្នាក់ទី៧ក', 'ថ្នាក់ទី៨ក', 'ថ្នាក់ទី៩ក', 
+    'ថ្នាក់ទី៧ក១', 'ថ្នាក់ទី៨ក១', 'ថ្នាក់ទី៩ក១', 'ថ្នាក់ទី១០ក១'
+  ];
+
+  if (clsId) {
+    if (sampleBaseIds.includes(clsId)) return true;
+    if (sampleBaseIds.some(base => clsId.startsWith(`${base}-`))) return true;
+  }
+
+  if (clsName) {
+    const trimmed = clsName.trim();
+    if (sampleNames.includes(trimmed)) return true;
+  }
+
+  return false;
+};
+
 const DEFAULT_CLASSES: ClassInfo[] = [
   { id: 'class-7a', name: 'ថ្នាក់ទី៧ក', order: 0 },
   { id: 'class-8a', name: 'ថ្នាក់ទី៨ក', order: 1 },
@@ -148,7 +174,7 @@ function getInitialActiveTeacherAndClass() {
   if (savedClassesRaw) {
     try {
       const raw = JSON.parse(savedClassesRaw) as ClassInfo[];
-      parsedClasses = (raw || []).filter(c => c && c.name && c.name.trim() !== '');
+      parsedClasses = (raw || []).filter(c => c && c.name && c.name.trim() !== '' && !isSampleDemoClass(c.id, c.name));
     } catch {}
   }
 
@@ -617,6 +643,10 @@ export default function App() {
           const id = clsData.id || docSnap.id;
           clsData.id = id;
           if (deletedSet.has(id)) return;
+          if (isSampleDemoClass(id, clsData.name)) {
+            safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', id)).catch(() => {});
+            return;
+          }
           if (clsData && clsData.name && clsData.name.trim() !== '') {
             if (!seenIds.has(id)) {
               seenIds.add(id);
@@ -627,12 +657,12 @@ export default function App() {
 
         // Get locally saved classes fallback
         const isDefaultTeacherAccount = effectiveTeacherId === DEFAULT_CLOUD_TEACHER.id;
-        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${effectiveTeacherId}`) || localStorage.getItem('khmer_teacher_classes');
+        const localClassesStr = localStorage.getItem(`khmer_teacher_classes_${effectiveTeacherId}`);
         let parsedLocals: ClassInfo[] = [];
         let localClassesMap = new Map<string, number>();
         if (localClassesStr) {
           try {
-            parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '');
+            parsedLocals = (JSON.parse(localClassesStr) as ClassInfo[]).filter(c => c && c.name && c.name.trim() !== '' && !isSampleDemoClass(c.id, c.name));
             parsedLocals.forEach((lc, index) => {
               if (lc && lc.id) {
                 localClassesMap.set(lc.id, typeof lc.order === 'number' ? lc.order : index);
@@ -644,7 +674,7 @@ export default function App() {
         // Merge local classes with fetched cloud classes
         if (parsedLocals.length > 0) {
           for (const lc of parsedLocals) {
-            if (deletedSet.has(lc.id)) continue;
+            if (deletedSet.has(lc.id) || isSampleDemoClass(lc.id, lc.name)) continue;
             const existsInFetched = fetchedClasses.some(fc => fc.id === lc.id || fc.name.trim() === lc.name.trim());
             if (!existsInFetched) {
               fetchedClasses.push(lc);

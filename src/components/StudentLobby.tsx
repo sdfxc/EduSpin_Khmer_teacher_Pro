@@ -1208,18 +1208,19 @@ export default function StudentLobby({
                       <button
                         type="button"
                         onClick={() => handleApproveStudent(student.id)}
-                        className="w-7 h-7 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all border-none"
-                        title="អនុញ្ញាត (Approve)"
+                        className="px-2.5 py-1 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl flex items-center gap-1 cursor-pointer transition-all border-none font-black text-[11px] shadow-sm active:scale-95"
+                        title="ចុចទទួលសិស្ស (Approve Student)"
                       >
                         <Check className="w-3.5 h-3.5 text-white" />
+                        <span>ទទួល</span>
                       </button>
                       <button
                         type="button"
                         onClick={() => handleDeclineStudent(student.id)}
-                        className="w-7 h-7 bg-red-650 hover:bg-red-700 text-white rounded-lg flex items-center justify-center cursor-pointer transition-all border-none"
+                        className="p-1.5 bg-red-500/20 hover:bg-red-500/30 text-red-400 hover:text-red-300 rounded-xl flex items-center justify-center cursor-pointer transition-all border border-red-500/30"
                         title="បដិសេធ (Decline)"
                       >
-                        <XCircle className="w-3.5 h-3.5 text-white" />
+                        <XCircle className="w-3.5 h-3.5" />
                       </button>
                     </div>
                   </div>
