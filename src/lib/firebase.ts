@@ -97,6 +97,7 @@ export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRIT
 
 // Validate connection on boot as recommended in skill guidelines with non-blocking timeout
 export async function testConnection() {
+  if (isQuotaExceeded()) return;
   try {
     const testPromise = getDocFromServer(doc(db, 'test', 'connection'));
     const timeoutPromise = new Promise<never>((_, reject) =>
@@ -228,6 +229,37 @@ export const safeSetDoc = async (docRef: any, data: any, options?: any) => {
     return;
   }
 
+  // Prevent resurrecting deleted classes
+  if (data && !data.isDeleted && docRef?.path && typeof docRef.path === 'string') {
+    const pathParts = docRef.path.split('/');
+    const classIdx = pathParts.indexOf('classes');
+    if (classIdx >= 0 && pathParts.length > classIdx + 1) {
+      const classId = pathParts[classIdx + 1];
+      if (classId) {
+        try {
+          let isDeleted = false;
+          for (let i = 0; i < localStorage.length; i++) {
+            const key = localStorage.key(i);
+            if (key && key.startsWith('khmer_teacher_deleted_classes')) {
+              const raw = localStorage.getItem(key);
+              if (raw) {
+                const arr = JSON.parse(raw);
+                if (Array.isArray(arr) && arr.map(String).includes(String(classId))) {
+                  isDeleted = true;
+                  break;
+                }
+              }
+            }
+          }
+          if (isDeleted) {
+            console.warn(`[Firestore] Intercepted attempt to write to deleted class "${classId}". Operation cancelled.`);
+            return;
+          }
+        } catch {}
+      }
+    }
+  }
+
   try {
     const sanitized = cleanFirestoreData(data);
     await setDoc(docRef, sanitized, options);
@@ -263,6 +295,9 @@ export const safeDeleteDoc = async (docRef: any) => {
 };
 
 export const safeOnSnapshot = (docRef: any, callback: any, errorCallback?: any) => {
+  if (isQuotaExceeded()) {
+    return () => {};
+  }
   try {
     return onSnapshot(docRef, callback, (error: any) => {
       const errMsg = error instanceof Error ? error.message : String(error);

@@ -21,7 +21,7 @@ import GroupDivider from './components/GroupDivider';
 import StopwatchPanel from './components/StopwatchPanel';
 import StudentManager from './components/StudentManager';
 import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass, DEFAULT_CLOUD_TEACHER } from './types';
-import { collection, doc, getDoc, getDocs } from 'firebase/firestore';
+import { collection, doc, getDoc, getDocs, arrayUnion } from 'firebase/firestore';
 import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs, isQuotaExceeded } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
@@ -101,9 +101,46 @@ const SAMPLE_STUDENTS: Record<string, Student[]> = {};
 
 const DEFAULT_CLASSES: ClassInfo[] = [];
 
-const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
+function getDeletedClassIds(teacherId?: string): Set<string> {
+  const deletedSet = new Set<string>();
+  try {
+    for (let i = 0; i < localStorage.length; i++) {
+      const k = localStorage.key(i);
+      if (k && k.startsWith('khmer_teacher_deleted_classes')) {
+        const raw = localStorage.getItem(k);
+        if (raw) {
+          const arr = JSON.parse(raw);
+          if (Array.isArray(arr)) {
+            arr.forEach(id => {
+              if (id) deletedSet.add(String(id));
+            });
+          }
+        }
+      }
+    }
+  } catch {}
+  return deletedSet;
+}
+
+function markClassAsDeleted(classId: string, teacherId?: string) {
+  if (!classId) return;
+  const strId = String(classId);
+  const deletedSet = getDeletedClassIds(teacherId);
+  deletedSet.add(strId);
+  const arr = Array.from(deletedSet);
+  const json = JSON.stringify(arr);
+  try {
+    localStorage.setItem('khmer_teacher_deleted_classes_local', json);
+    if (teacherId && teacherId !== 'local') {
+      localStorage.setItem(`khmer_teacher_deleted_classes_${teacherId}`, json);
+    }
+  } catch {}
+}
+
+const sortClasses = (classList: ClassInfo[], teacherId?: string): ClassInfo[] => {
+  const deletedSet = getDeletedClassIds(teacherId);
   const clean = (classList || [])
-    .filter(c => c && c.name && c.name.trim() !== '')
+    .filter(c => c && c.id && c.name && c.name.trim() !== '' && !(c as any).isDeleted && !deletedSet.has(String(c.id)))
     .map(c => ({
       id: String(c.id),
       name: String(c.name).trim(),
@@ -148,6 +185,7 @@ function getInitialActiveTeacherAndClass() {
       teacherId = teacherObj?.id || '';
     } catch {}
   }
+  const deletedSet = getDeletedClassIds(teacherId);
   const savedActiveId = (teacherId ? localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) : null)
     || localStorage.getItem('khmer_teacher_active_class_id')
     || '';
@@ -159,17 +197,19 @@ function getInitialActiveTeacherAndClass() {
     try {
       const raw = JSON.parse(savedClassesRaw) as ClassInfo[];
       parsedClasses = (raw || [])
-        .filter(c => c && c.name && c.name.trim() !== '')
+        .filter(c => c && c.id && c.name && c.name.trim() !== '' && !deletedSet.has(String(c.id)))
         .map(c => ({
           id: String(c.id),
           name: String(c.name).trim(),
           order: typeof c.order === 'number' ? c.order : 0,
           isPinned: !!c.isPinned
         }));
-      if (savedActiveId && parsedClasses.some(c => c.id === savedActiveId)) {
+      if (savedActiveId && !deletedSet.has(savedActiveId) && parsedClasses.some(c => c.id === savedActiveId)) {
         effectiveClassId = savedActiveId;
       } else if (parsedClasses.length > 0) {
         effectiveClassId = parsedClasses[0].id;
+      } else {
+        effectiveClassId = '';
       }
     } catch {}
   }
@@ -729,8 +769,13 @@ export default function App() {
       const teacherDocRef = doc(db, 'teachers', teacher.id);
       unsubTeacher = safeOnSnapshot(teacherDocRef, (teacherSnap: any) => {
         if (teacherSnap && teacherSnap.exists && teacherSnap.exists()) {
-          const cloudTeacher = teacherSnap.data() as TeacherAccount;
+          const cloudTeacher = teacherSnap.data() as TeacherAccount & { deletedClassIds?: string[] };
           if (cloudTeacher) {
+            if (Array.isArray(cloudTeacher.deletedClassIds)) {
+              cloudTeacher.deletedClassIds.forEach((dId: string) => {
+                if (dId) markClassAsDeleted(String(dId), teacher.id);
+              });
+            }
             setTeacher(prev => {
               if (!prev) return cloudTeacher;
               if (
@@ -758,11 +803,19 @@ export default function App() {
 
         let fetchedClasses: ClassInfo[] = [];
         const seenIds = new Set<string>();
+        const deletedSet = getDeletedClassIds(teacher.id);
 
         classesSnap.forEach((docSnap: any) => {
           const clsData = docSnap.data();
           if (!clsData) return;
           const id = clsData.id || docSnap.id;
+
+          if (clsData.isDeleted === true || deletedSet.has(id)) {
+            // Document was marked deleted or in local deleted set! Safely clean up in cloud
+            safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', id)).catch(() => {});
+            return;
+          }
+
           if (clsData.name && String(clsData.name).trim() !== '') {
             if (!seenIds.has(id)) {
               seenIds.add(id);
@@ -776,7 +829,7 @@ export default function App() {
           }
         });
 
-        const sortedCloudClasses = sortClasses(fetchedClasses);
+        const sortedCloudClasses = sortClasses(fetchedClasses, teacher.id);
         setClasses(prev => {
           const isSame = prev.length === sortedCloudClasses.length &&
             prev.every((c, i) => c.id === sortedCloudClasses[i].id && c.name === sortedCloudClasses[i].name && c.order === sortedCloudClasses[i].order && c.isPinned === sortedCloudClasses[i].isPinned);
@@ -882,11 +935,22 @@ export default function App() {
 
     const loadClassDetails = async () => {
       try {
+        const deletedSet = getDeletedClassIds(teacher.id);
+        if (deletedSet.has(activeClassId)) {
+          setLoadingCloudData(false);
+          return;
+        }
+
         setLoadingCloudData(true);
         
         // 1. Fetch class doc
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         const classSnap = await safeGetDoc(classDocRef);
+        
+        if (getDeletedClassIds(teacher.id).has(activeClassId)) {
+          setLoadingCloudData(false);
+          return;
+        }
         
         let loadedSubjects: QuizSubject[] = [];
         let loadedActiveSubjectId: string | null = null;
@@ -940,7 +1004,14 @@ export default function App() {
           }
           loadedActiveRoomId = classData.activeRoomId || null;
         } else {
-          // Empty or new class in cloud – check local storage fallback first to prevent overwriting local guest data
+          // Empty or new class in cloud – check if this activeClassId is actually a valid non-deleted class in state
+          const isClassInList = classes.some(c => c.id === activeClassId) && !getDeletedClassIds(teacher.id).has(activeClassId);
+          if (!isClassInList) {
+            setLoadingCloudData(false);
+            return;
+          }
+
+          // Check local storage fallback first to prevent overwriting local guest data
           const localSubjectsStr = localStorage.getItem(`subjects_class_${activeClassId}`);
           if (localSubjectsStr) {
             try {
@@ -2626,13 +2697,20 @@ export default function App() {
       confirmText: 'បាទ/ចាស លុបថ្នាក់',
       variant: 'danger',
       onConfirm: async () => {
+        const currentTeacherId = teacher?.id || 'local';
+        markClassAsDeleted(classId, currentTeacherId);
+
         const updatedClasses = classes.filter(c => c.id !== classId);
-        const sortedClasses = sortClasses(updatedClasses);
+        const sortedClasses = sortClasses(updatedClasses, currentTeacherId);
         setClasses(sortedClasses);
 
-        // 1. Delete from Firestore if teacher is logged in
+        // 1. Mark as deleted and delete from Firestore if teacher is logged in
         if (teacher?.id) {
           try {
+            await safeSetDoc(doc(db, 'teachers', teacher.id), {
+              deletedClassIds: arrayUnion(classId)
+            }, { merge: true });
+            await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', classId), { isDeleted: true }, { merge: true });
             await safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
           } catch (err) {
             console.error('Failed to delete class from Firestore:', err);

@@ -10,6 +10,7 @@ const PROTECTED_PREFIXES = [
   'khmer_teacher_dark_mode',
   'khmer_teacher_classes',
   'khmer_teacher_active_class_id',
+  'khmer_teacher_deleted_classes',
   'students_class_',
   'quiz_cards_class_',
   'subjects_class_',
