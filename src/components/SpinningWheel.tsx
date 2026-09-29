@@ -359,7 +359,7 @@ export default function SpinningWheel({
         <motion.div
           ref={wheelRef}
           animate={controls}
-          className="w-full h-full rounded-full shadow-2xl bg-white dark:bg-[#222222] border-8 border-white dark:border-[#333333] p-1 relative overflow-hidden"
+          className="w-full h-full rounded-full shadow-2xl bg-white dark:bg-[#0e1524] border-8 border-white dark:border-slate-800 p-1 relative overflow-hidden"
           style={{ originX: '50%', originY: '50%' }}
         >
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible">
@@ -371,40 +371,40 @@ export default function SpinningWheel({
         <button
           onClick={handleSpin}
           disabled={isSpinning || students.length === 0}
-          className="absolute w-16 h-16 bg-white dark:bg-[#2a2a2a] rounded-full border-4 border-indigo-600 dark:border-indigo-500 shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-40 transition-all z-10 cursor-pointer"
+          className="absolute w-16 h-16 bg-white dark:bg-slate-800 rounded-full border-4 border-indigo-600 dark:border-indigo-500 shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-40 transition-all z-10 cursor-pointer"
         >
-          <Play className="w-8 h-8 fill-indigo-600 text-indigo-600" />
+          <Play className="w-8 h-8 fill-indigo-600 text-indigo-600 dark:fill-indigo-400 dark:text-indigo-400" />
         </button>
       </div>
 
-      {/* របារបញ្ជា៖ Reset (ខាងឆ្វេង) | Re-pick (កណ្ដាល) | ហៅសិស្សបន្ត (ខាងស្ដាំ) */}
+      {/* របារបញ្ជា៖ Reset | Re-pick | ហៅសិស្សបន្ត */}
       <div className="flex items-center gap-2 sm:gap-3 w-full max-w-sm justify-center mb-3">
-        {/* Reset - Left (ខាងឆ្វេង) */}
+        {/* Reset */}
         <button
           onClick={handleResetPicked}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-[#2a2a2a] border border-slate-200 dark:border-[#383838] text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-[#333333] transition-all cursor-pointer shadow-2xs active:scale-95"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all cursor-pointer shadow-2xs active:scale-95"
           title="កំណត់ឡើងវិញ / Reset"
         >
           <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <span>Reset</span>
         </button>
 
-        {/* Re-pick - Center (កណ្ដាល) */}
+        {/* Re-pick */}
         <button
           onClick={handleRepick}
           disabled={isSpinning || students.length === 0}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-[#2a2a2a] border border-slate-200 dark:border-[#383838] text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-[#333333] transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
           title="រើសម្តងទៀត / Re-pick"
         >
           <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           <span>Re-pick</span>
         </button>
 
-        {/* ហៅសិស្សបន្ត - Right (ខាងស្ដាំ) */}
+        {/* ហៅសិស្សបន្ត */}
         <button
           onClick={handleCallNext}
           disabled={isSpinning || students.length === 0}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-md shadow-indigo-500/25 active:scale-95 disabled:opacity-50 whitespace-nowrap"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-semibold text-xs transition-all cursor-pointer shadow-sm shadow-indigo-500/20 disabled:opacity-50 whitespace-nowrap"
           title="ហៅសិស្សបន្ត"
         >
           <Play className="w-3.5 h-3.5 fill-white shrink-0" />

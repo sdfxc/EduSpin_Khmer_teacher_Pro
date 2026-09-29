@@ -4,13 +4,20 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
-  --font-sans: "Battambang", "Khmer OS Battambang", "Inter", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Battambang", "Khmer OS Battambang", "Khmer Battambang", "Kantumruy Pro", "Noto Sans Khmer", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  --font-battambang: "Battambang", "Khmer OS Battambang", "Khmer Battambang", sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
 }
 
 @layer base {
+  html, body, button, input, select, textarea {
+    font-family: 'Battambang', 'Khmer OS Battambang', 'Khmer Battambang', 'Kantumruy Pro', 'Siemreap', system-ui, sans-serif;
+  }
   body {
-    @apply font-sans text-slate-900 antialiased bg-white;
+    @apply font-sans text-slate-900 antialiased bg-white selection:bg-indigo-500/20 selection:text-indigo-900 dark:selection:bg-indigo-500/30 dark:selection:text-indigo-200;
+    text-rendering: optimizeLegibility;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 

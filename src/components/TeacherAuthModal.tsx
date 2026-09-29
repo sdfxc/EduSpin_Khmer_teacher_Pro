@@ -1,6 +1,24 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, User, Key, School, BookOpen, UserPlus, LogIn, CheckCircle, Loader2, Mail, ArrowLeft, Send } from 'lucide-react';
+import { 
+  X, 
+  User, 
+  Key, 
+  School, 
+  BookOpen, 
+  UserPlus, 
+  LogIn, 
+  CheckCircle, 
+  Loader2, 
+  Mail, 
+  ArrowLeft, 
+  Send,
+  HelpCircle,
+  KeyRound,
+  ShieldCheck,
+  RefreshCw,
+  Sparkles
+} from 'lucide-react';
 import { TeacherAccount } from '../types';
 import { doc } from 'firebase/firestore';
 import { 
@@ -11,6 +29,7 @@ import {
   FacebookAuthProvider, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   handleFirestoreError, 
   OperationType, 
   safeSetDoc, 
@@ -78,12 +97,28 @@ function saveLocalAccount(account: TeacherAccount) {
 export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, initialMode = 'login' }: TeacherAuthModalProps) {
   const [isLoginView, setIsLoginView] = useState(initialMode === 'login');
   const [isLoading, setIsLoading] = useState(false);
-  const [activeSubModal, setActiveSubModal] = useState<'none' | 'email' | 'google' | 'facebook' | 'telegram'>('none');
+  const [activeSubModal, setActiveSubModal] = useState<'none' | 'email' | 'google' | 'facebook' | 'telegram' | 'forgot_password'>('none');
+
+  // Forgot Password fields
+  const [forgotMethod, setForgotMethod] = useState<'username' | 'email'>('username');
+  const [forgotUsername, setForgotUsername] = useState('');
+  const [forgotEmail, setForgotEmail] = useState('');
+  const [forgotTeacherFound, setForgotTeacherFound] = useState<TeacherAccount | null>(null);
+  const [forgotNewPassword, setForgotNewPassword] = useState('');
+  const [forgotConfirmPassword, setForgotConfirmPassword] = useState('');
+  const [showForgotNewPassword, setShowForgotNewPassword] = useState(false);
+  const [forgotStep, setForgotStep] = useState<'search' | 'set_new_password'>('search');
 
   useEffect(() => {
     if (isOpen) {
       setIsLoginView(initialMode === 'login');
       setActiveSubModal('none');
+      setForgotStep('search');
+      setForgotTeacherFound(null);
+      setForgotNewPassword('');
+      setForgotConfirmPassword('');
+      setForgotUsername('');
+      setForgotEmail('');
     }
   }, [initialMode, isOpen]);
 
@@ -504,6 +539,176 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
     }
   };
 
+  // ----------------------- FORGOT PASSWORD HANDLERS -----------------------
+  const handleForgotSearch = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    if (!forgotUsername.trim()) {
+      setErrorMsg('សូមបំពេញឈ្មោះគណនី (Username) ដែលចង់សង្គ្រោះ!');
+      return;
+    }
+
+    setIsLoading(true);
+    const cleanUsername = forgotUsername.trim().toLowerCase();
+
+    try {
+      // 1. Check local accounts
+      const localAccounts = getLocalAccounts();
+      const localMatch = localAccounts.find(
+        a => (a.id && a.id.toLowerCase() === cleanUsername) || (a.username && a.username.toLowerCase() === cleanUsername)
+      );
+
+      if (localMatch) {
+        setForgotTeacherFound(localMatch);
+        setForgotStep('set_new_password');
+        setIsLoading(false);
+        return;
+      }
+
+      // 2. Check Cloud Firestore
+      const teacherDocRef = doc(db, 'teachers', cleanUsername);
+      const teacherSnap = await safeGetDoc(teacherDocRef);
+
+      if (teacherSnap.exists()) {
+        const found = teacherSnap.data() as TeacherAccount;
+        setForgotTeacherFound(found);
+        setForgotStep('set_new_password');
+        setIsLoading(false);
+        return;
+      }
+
+      setErrorMsg(`រកមិនឃើញគណនីគ្រូឈ្មោះ "${forgotUsername}" នេះក្នុងប្រព័ន្ធឡើយ។ សូមពិនិត្យឈ្មោះម្តងទៀត ឬសាកល្បងសង្គ្រោះតាម Email!`);
+      setIsLoading(false);
+    } catch (err) {
+      console.warn('Forgot search fallback error:', err);
+      // Fallback to local
+      const localAccounts = getLocalAccounts();
+      const localMatch = localAccounts.find(
+        a => (a.id && a.id.toLowerCase() === cleanUsername) || (a.username && a.username.toLowerCase() === cleanUsername)
+      );
+      if (localMatch) {
+        setForgotTeacherFound(localMatch);
+        setForgotStep('set_new_password');
+        setIsLoading(false);
+        return;
+      }
+      setErrorMsg(`រកមិនឃើញគណនីគ្រូឈ្មោះ "${forgotUsername}" នេះទេ។ សូមពិនិត្យឈ្មោះម្តងទៀត!`);
+      setIsLoading(false);
+    }
+  };
+
+  const handleSendEmailReset = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+    if (!forgotEmail.trim()) {
+      setErrorMsg('សូមបំពេញអាសយដ្ឋាន Email របស់អ្នក!');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      await sendPasswordResetEmail(auth, forgotEmail.trim());
+      setSuccessMsg(`បានផ្ញើតំណភ្ជាប់កំណត់លេខសម្ងាត់ឡើងវិញទៅកាន់ "${forgotEmail.trim()}" រួចរាល់ហើយ! សូមពិនិត្យមើលប្រអប់សំបុត្រ (Inbox) ឬ Spam Folder នៃ Email របស់អ្នកដើម្បីប្តូរលេខសម្ងាត់ថ្មី។`);
+      setIsLoading(false);
+    } catch (err: any) {
+      console.warn('Firebase reset password error:', err);
+      const code = err?.code || '';
+      if (code === 'auth/user-not-found') {
+        setErrorMsg('មិនមានគណនីដែលបានចុះឈ្មោះជាមួយ Email នេះក្នុងប្រព័ន្ធឡើយ។');
+      } else if (code === 'auth/invalid-email') {
+        setErrorMsg('ទម្រង់ Email មិនត្រឹមត្រូវឡើយ។ សូមពិនិត្យឡើងវិញ!');
+      } else {
+        // Even if Firebase auth was not configured for this specific email, show a helpful message and look up in Firestore
+        const cleanEmail = forgotEmail.trim().toLowerCase();
+        const cleanId = `email_${cleanEmail.replace(/[^a-z0-9]/g, '_')}`;
+        const teacherDocRef = doc(db, 'teachers', cleanId);
+        const teacherSnap = await safeGetDoc(teacherDocRef);
+        if (teacherSnap.exists()) {
+          const found = teacherSnap.data() as TeacherAccount;
+          setForgotTeacherFound(found);
+          setForgotStep('set_new_password');
+          setIsLoading(false);
+          return;
+        }
+        setSuccessMsg(`ប្រសិនបើ Email "${forgotEmail.trim()}" មានក្នុងប្រព័ន្ធ ប្រព័ន្ធបានផ្ញើតំណភ្ជាប់រួចរាល់ហើយ! សូមពិនិត្យ Inbox/Spam។`);
+      }
+      setIsLoading(false);
+    }
+  };
+
+  const handleForgotSaveNewPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setErrorMsg('');
+    setSuccessMsg('');
+
+    if (!forgotNewPassword.trim()) {
+      setErrorMsg('សូមបញ្ចូលលេខសម្ងាត់ថ្មី!');
+      return;
+    }
+
+    if (forgotNewPassword.length < 4) {
+      setErrorMsg('លេខសម្ងាត់ថ្មីត្រូវមានយ៉ាងតិច ៤ តួអក្សរ!');
+      return;
+    }
+
+    if (forgotNewPassword !== forgotConfirmPassword) {
+      setErrorMsg('ការបញ្ជាក់លេខសម្ងាត់មិនត្រូវគ្នាឡើយ!');
+      return;
+    }
+
+    if (!forgotTeacherFound) {
+      setErrorMsg('រកមិនឃើញគណនីដែលត្រូវផ្លាស់ប្តូរលេខសម្ងាត់ឡើយ!');
+      return;
+    }
+
+    setIsLoading(true);
+
+    try {
+      const updatedTeacher: TeacherAccount = {
+        ...forgotTeacherFound,
+        password: forgotNewPassword
+      };
+
+      // 1. Save to local storage
+      saveLocalAccount(updatedTeacher);
+      localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
+
+      // 2. Sync to Cloud Firestore
+      const targetDocId = updatedTeacher.id || updatedTeacher.username || 'default_teacher';
+      const teacherDocRef = doc(db, 'teachers', targetDocId.toLowerCase());
+      safeSetDoc(teacherDocRef, updatedTeacher).catch((err) => {
+        console.warn('Firestore update password sync warning:', err);
+      });
+
+      // 3. Login and notify
+      onLoginSuccess(updatedTeacher);
+      setSuccessMsg(`បានផ្លាស់ប្តូរលេខសម្ងាត់ថ្មីសម្រាប់ ${updatedTeacher.name} ជោគជ័យ!`);
+
+      setTimeout(() => {
+        onClose();
+        setIsLoading(false);
+        setActiveSubModal('none');
+      }, 700);
+    } catch (err) {
+      console.warn('Error updating password:', err);
+      const updatedTeacher: TeacherAccount = {
+        ...forgotTeacherFound,
+        password: forgotNewPassword
+      };
+      saveLocalAccount(updatedTeacher);
+      localStorage.setItem('logged_in_teacher', JSON.stringify(updatedTeacher));
+      onLoginSuccess(updatedTeacher);
+      setSuccessMsg(`បានផ្លាស់ប្តូរលេខសម្ងាត់ថ្មីសម្រាប់ ${updatedTeacher.name} ជោគជ័យ!`);
+      setTimeout(() => {
+        onClose();
+        setIsLoading(false);
+        setActiveSubModal('none');
+      }, 700);
+    }
+  };
+
   // ----------------------- USERNAME / PASSWORD STANDARD LOGIN -----------------------
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -728,6 +933,7 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
                     {activeSubModal === 'google' && 'ចូលប្រើប្រាស់ជាមួយ Google'}
                     {activeSubModal === 'facebook' && 'ចូលប្រើប្រាស់ជាមួយ Facebook'}
                     {activeSubModal === 'telegram' && 'ចូលប្រើប្រាស់ជាមួយ Telegram'}
+                    {activeSubModal === 'forgot_password' && 'សង្គ្រោះលេខសម្ងាត់គ្រូបង្រៀន'}
                     {activeSubModal === 'none' && (isLoginView ? 'ចូលប្រើប្រាស់គណនីគ្រូ' : 'បង្កើតគណនេយ្យគ្រូបង្រៀន')}
                   </h2>
                   <p className="text-[10px] text-indigo-100 uppercase tracking-widest font-bold">
@@ -832,6 +1038,21 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
                       </div>
                     </>
                   )}
+
+                  <div className="flex justify-end pt-0.5">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotMethod('email');
+                        if (emailAddress) setForgotEmail(emailAddress);
+                        setActiveSubModal('forgot_password');
+                      }}
+                      className="text-xs text-indigo-600 hover:text-indigo-800 font-bold hover:underline flex items-center gap-1"
+                    >
+                      <HelpCircle className="w-3.5 h-3.5" />
+                      <span>ភ្លេចលេខសម្ងាត់ Email?</span>
+                    </button>
+                  </div>
 
                   <button
                     type="submit"
@@ -1029,6 +1250,220 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
                 </form>
               )}
 
+              {/* ----------------------- SUB-MODAL 5: FORGOT PASSWORD RECOVERY ----------------------- */}
+              {activeSubModal === 'forgot_password' && (
+                <div className="space-y-4">
+                  {/* Recovery Method Switcher */}
+                  <div className="flex bg-slate-100 p-1 rounded-2xl border border-slate-200">
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotMethod('username');
+                        setErrorMsg('');
+                        setSuccessMsg('');
+                      }}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        forgotMethod === 'username'
+                          ? 'bg-white text-indigo-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <User className="w-3.5 h-3.5" />
+                      <span>តាមឈ្មោះគណនី (Username)</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setForgotMethod('email');
+                        setErrorMsg('');
+                        setSuccessMsg('');
+                      }}
+                      className={`flex-1 py-2 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-1.5 cursor-pointer ${
+                        forgotMethod === 'email'
+                          ? 'bg-white text-indigo-700 shadow-sm'
+                          : 'text-slate-600 hover:text-slate-900'
+                      }`}
+                    >
+                      <Mail className="w-3.5 h-3.5" />
+                      <span>តាម Email</span>
+                    </button>
+                  </div>
+
+                  {/* METHOD A: VIA USERNAME */}
+                  {forgotMethod === 'username' && (
+                    <div>
+                      {forgotStep === 'search' ? (
+                        <form onSubmit={handleForgotSearch} className="space-y-3.5">
+                          <div className="p-3 bg-indigo-50/80 border border-indigo-100 rounded-2xl text-xs text-indigo-900 font-medium">
+                            💡 <strong>សង្គ្រោះគណនីភ្លាមៗ៖</strong> បញ្ចូលឈ្មោះគណនី (Username) ដែលលោកគ្រូ/អ្នកគ្រូបានបង្កើត ដើម្បីស្វែងរក និងកំណត់លេខសម្ងាត់ថ្មី។
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                              ឈ្មោះគណនី (Username) *
+                            </label>
+                            <div className="relative">
+                              <User className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+                              <input
+                                type="text"
+                                value={forgotUsername}
+                                onChange={(e) => setForgotUsername(e.target.value)}
+                                placeholder="ឧ. steve_123"
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <ShieldCheck className="w-4 h-4" />}
+                            <span>{isLoading ? 'កំពុងស្វែងរកគណនី...' : 'ស្វែងរកគណនីដើម្បីប្តូរលេខសម្ងាត់'}</span>
+                          </button>
+                        </form>
+                      ) : (
+                        /* STEP 2: SET NEW PASSWORD */
+                        <form onSubmit={handleForgotSaveNewPassword} className="space-y-3.5">
+                          {forgotTeacherFound && (
+                            <div className="p-3.5 bg-emerald-50 border border-emerald-200 rounded-2xl flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-700 font-black flex items-center justify-center shrink-0">
+                                <ShieldCheck className="w-5 h-5" />
+                              </div>
+                              <div className="min-w-0">
+                                <p className="text-xs font-bold text-emerald-950 truncate">
+                                  គណនីត្រូវបានរកឃើញ៖ {forgotTeacherFound.name}
+                                </p>
+                                <p className="text-[11px] text-emerald-700 truncate">
+                                  សាលា៖ {forgotTeacherFound.schoolName || 'សាលារៀនសុវណ្ណភូមិ'} • (@{forgotTeacherFound.username || forgotTeacherFound.id})
+                                </p>
+                              </div>
+                            </div>
+                          )}
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                              លេខសម្ងាត់ថ្មី (New Password) *
+                            </label>
+                            <div className="relative">
+                              <Key className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+                              <input
+                                type={showForgotNewPassword ? 'text' : 'password'}
+                                value={forgotNewPassword}
+                                onChange={(e) => setForgotNewPassword(e.target.value)}
+                                placeholder="យ៉ាងតិច ៤ តួអក្សរ"
+                                minLength={4}
+                                className="w-full pl-10 pr-12 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                                required
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowForgotNewPassword(!showForgotNewPassword)}
+                                className="absolute right-3.5 top-1.5 hover:bg-slate-100 p-1 rounded-lg transition-transform text-xl select-none active:scale-90 cursor-pointer"
+                              >
+                                {showForgotNewPassword ? '🙈' : '🙉'}
+                              </button>
+                            </div>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                              បញ្ជាក់លេខសម្ងាត់ថ្មី (Confirm Password) *
+                            </label>
+                            <div className="relative">
+                              <Key className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+                              <input
+                                type={showForgotNewPassword ? 'text' : 'password'}
+                                value={forgotConfirmPassword}
+                                onChange={(e) => setForgotConfirmPassword(e.target.value)}
+                                placeholder="បញ្ចូលលេខសម្ងាត់ថ្មីម្តងទៀត"
+                                minLength={4}
+                                className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                                required
+                              />
+                            </div>
+                          </div>
+
+                          <button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-emerald-200 active:scale-95 disabled:opacity-50 cursor-pointer"
+                          >
+                            {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4" />}
+                            <span>{isLoading ? 'កំពុងរក្សាទុក...' : 'រក្សាទុកលេខសម្ងាត់ថ្មី & ចូលប្រើប្រាស់'}</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForgotStep('search');
+                              setErrorMsg('');
+                            }}
+                            className="w-full py-1.5 text-xs text-slate-500 hover:text-slate-800 font-semibold text-center cursor-pointer"
+                          >
+                            ← ស្វែងរកគណនីផ្សេង
+                          </button>
+                        </form>
+                      )}
+                    </div>
+                  )}
+
+                  {/* METHOD B: VIA EMAIL */}
+                  {forgotMethod === 'email' && (
+                    <form onSubmit={handleSendEmailReset} className="space-y-3.5">
+                      <div className="p-3 bg-blue-50 border border-blue-100 rounded-2xl text-xs text-blue-900 font-medium">
+                        📧 <strong>ផ្ញើតំណភ្ជាប់សង្គ្រោះ៖</strong> បញ្ចូលអាសយដ្ឋាន Email ដែលលោកគ្រូបានចុះឈ្មោះ ប្រព័ន្ធនឹងផ្ញើតំណភ្ជាប់ Reset Password ទៅកាន់ Inbox របស់អ្នក។
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-bold text-slate-700 uppercase mb-1">
+                          អាសយដ្ឋាន Email *
+                        </label>
+                        <div className="relative">
+                          <Mail className="absolute left-3.5 top-2.5 w-4 h-4 text-slate-400" />
+                          <input
+                            type="email"
+                            value={forgotEmail}
+                            onChange={(e) => setForgotEmail(e.target.value)}
+                            placeholder="ឧ. teacher@school.edu.kh"
+                            className="w-full pl-10 pr-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-semibold text-slate-900 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 shadow-sm"
+                            required
+                          />
+                        </div>
+                      </div>
+
+                      <button
+                        type="submit"
+                        disabled={isLoading}
+                        className="w-full py-3 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-sm transition-all flex items-center justify-center gap-2 shadow-lg shadow-indigo-200 active:scale-95 disabled:opacity-50 cursor-pointer"
+                      >
+                        {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                        <span>{isLoading ? 'កំពុងផ្ញើ...' : 'ផ្ញើតំណភ្ជាប់សង្គ្រោះលេខសម្ងាត់'}</span>
+                      </button>
+                    </form>
+                  )}
+
+                  {/* Quick tips about Google / Telegram */}
+                  <div className="p-3 bg-amber-50/70 border border-amber-200/60 rounded-2xl text-[11.5px] text-amber-900 flex items-start gap-2">
+                    <span className="shrink-0 text-base">💡</span>
+                    <p>
+                      <strong>ចំណាំ៖</strong> ប្រសិនបើលោកគ្រូធ្លាប់ភ្ជាប់ជាមួយ <strong>Google</strong> ឬ <strong>Telegram</strong> អាចចុចត្រឡប់ក្រោយ ហើយចូលប្រើតាមប៊ូតុងខាងលើដោយមិនចាំបាច់ប្រើលេខសម្ងាត់ឡើយ។
+                    </p>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={() => setActiveSubModal('none')}
+                    className="w-full py-2 text-xs text-slate-500 hover:text-slate-800 font-bold text-center cursor-pointer"
+                  >
+                    ← ត្រឡប់ទៅការចូលប្រើប្រាស់វិញ
+                  </button>
+                </div>
+              )}
+
               {/* ----------------------- DEFAULT MAIN SOCIAL & FORM VIEW ----------------------- */}
               {activeSubModal === 'none' && (
                 <>
@@ -1133,6 +1568,22 @@ export default function TeacherAuthModal({ isOpen, onClose, onLoginSuccess, init
                             title={showLoginPassword ? "លាក់លេខសម្ងាត់" : "បង្ហាញលេខសម្ងាត់"}
                           >
                             {showLoginPassword ? '🙈' : '🙉'}
+                          </button>
+                        </div>
+                        <div className="flex items-center justify-between pt-1.5">
+                          <span className="text-[10px] text-slate-400 font-medium">យ៉ាងតិច ៤ តួអក្សរ</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setForgotMethod('username');
+                              if (loginUsername) setForgotUsername(loginUsername);
+                              setForgotStep('search');
+                              setActiveSubModal('forgot_password');
+                            }}
+                            className="text-xs text-indigo-600 hover:text-indigo-800 font-bold hover:underline flex items-center gap-1 cursor-pointer transition-colors"
+                          >
+                            <KeyRound className="w-3.5 h-3.5" />
+                            <span>ភ្លេចលេខសម្ងាត់?</span>
                           </button>
                         </div>
                       </div>

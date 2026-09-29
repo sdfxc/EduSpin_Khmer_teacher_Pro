@@ -25,6 +25,7 @@ import {
 import { LessonPlanItem } from '../../types/lessonMaterials';
 import { exportLessonPlanToDocx } from '../../lib/lessonWordExporter';
 import { useConfirm } from '../../context/ConfirmContext';
+import { getSavedApiKey } from '../../lib/gemini';
 
 interface LessonPlansManagerProps {
   plans: LessonPlanItem[];
@@ -135,7 +136,7 @@ export default function LessonPlansManager({
     setAiError(null);
 
     try {
-      const apiKey = localStorage.getItem('khmer_ai_gemini_api_key') || '';
+      const apiKey = getSavedApiKey() || localStorage.getItem('khmer_ai_gemini_api_key') || '';
       const res = await fetch('/api/generate-lesson-plan', {
         method: 'POST',
         headers: {
@@ -154,12 +155,20 @@ export default function LessonPlansManager({
         })
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'បរាជ័យក្នុងការបង្កើតកិច្ចតែងការដោយ AI');
+      const responseText = await res.text();
+      let generatedPlan: any;
+      try {
+        generatedPlan = JSON.parse(responseText);
+      } catch (jsonErr) {
+        if (!res.ok) {
+          throw new Error(`កំហុសម៉ាស៊ីនបម្រើ (${res.status})៖ ${responseText.slice(0, 150)}`);
+        }
+        throw new Error('ការឆ្លើយតបពី Server មិនត្រឹមត្រូវជាទម្រង់ JSON ទេ។');
       }
 
-      const generatedPlan = await res.json();
+      if (!res.ok || generatedPlan.error) {
+        throw new Error(generatedPlan.error || 'បរាជ័យក្នុងការបង្កើតកិច្ចតែងការដោយ AI');
+      }
 
       const newPlan: LessonPlanItem = {
         id: `plan-${Date.now()}`,

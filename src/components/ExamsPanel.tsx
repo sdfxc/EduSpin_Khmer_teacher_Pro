@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   Printer, 
@@ -27,11 +27,24 @@ import {
   FolderDown,
   Copy,
   Pin,
-  HelpCircle
+  HelpCircle,
+  Sliders,
+  Upload,
+  Key,
+  Award,
+  Compass,
+  Cpu,
+  Calculator,
+  Loader2,
+  Paperclip,
+  Brain,
+  Flame,
+  Image as ImageIcon
 } from 'lucide-react';
 import { formatGoogleDriveImageUrl, DEFAULT_GOOGLE_DRIVE_LOGO_LINK } from '../lib/driveUtils';
 import { removeWhiteBackgroundFromDataUrl } from '../lib/imageUtils';
-import { generateQuestions, getSavedApiKey, saveApiKey } from '../lib/gemini';
+import { useLanguage } from '../context/LanguageContext';
+import { generateQuestions, getSavedApiKey, saveApiKey, FileData } from '../lib/gemini';
 import { useConfirm } from '../context/ConfirmContext.tsx';
 import { PREBUILT_LESSONS } from '../lib/templates';
 import { Question, ClassInfo, QuizSubject } from '../types';
@@ -39,9 +52,11 @@ import FormulaRenderer, { renderFormulaToHtml, preprocessText } from './FormulaR
 import ExamPaperView from './ExamPaperView';
 import LessonsPanel from './lessons/LessonsPanel';
 import ExternalDocumentsPanel from './external-docs/ExternalDocumentsPanel';
+import { GlassLiquidOverlay } from './GlassLiquidCapsule';
 import { db, safeSetDoc, safeGetDoc, safeOnSnapshot } from '../lib/firebase';
 import { doc } from 'firebase/firestore';
 import { safeSetItem, safeSetJSON } from '../lib/storageUtils';
+import { getDeletedExamIds, markExamAsDeleted, unmarkExamAsDeleted } from '../lib/deletionRegistry';
 import { 
   Document, 
   Packer, 
@@ -88,6 +103,82 @@ export function stripPrefix(text: string): string {
   return text.trim().replace(/^[កខគឃង១២៣៤៥6789051234a-zA-Z]\s*[.\-\)៖:]\s*/, '').trim();
 }
 
+export const MOEYS_SUBJECTS = [
+  { id: 'math', name: 'គណិតវិទ្យា', icon: '📐', group: 'stem' },
+  { id: 'physics', name: 'រូបវិទ្យា', icon: '⚡', group: 'stem' },
+  { id: 'chemistry', name: 'គីមីវិទ្យា', icon: '🧪', group: 'stem' },
+  { id: 'biology', name: 'ជីវវិទ្យា', icon: '🌿', group: 'stem' },
+  { id: 'earth_science', name: 'ផែនដីវិទ្យា', icon: '🌍', group: 'stem' },
+  { id: 'khmer', name: 'ភាសាខ្មែរ', icon: '🇰🇭', group: 'social' },
+  { id: 'essay', name: 'តែងសេចក្ដី', icon: '✍️', group: 'social' },
+  { id: 'dictation', name: 'សរសេរតាមអាន', icon: '📝', group: 'social' },
+  { id: 'english', name: 'ភាសាអង់គ្លេស', icon: '🇬🇧', group: 'social' },
+  { id: 'french', name: 'ភាសាបារាំង', icon: '🇫🇷', group: 'social' },
+  { id: 'history', name: 'ប្រវត្តិវិទ្យា', icon: '🏛️', group: 'social' },
+  { id: 'geography', name: 'ភូមិវិទ្យា', icon: '🗺️', group: 'social' },
+  { id: 'morality', name: 'សីលធម៌–ពលរដ្ឋវិជ្ជា', icon: '🤝', group: 'social' },
+  { id: 'stem', name: 'STEM', icon: '🔬', group: 'stem' },
+  { id: 'ict', name: 'កុំព្យូទ័រ / ICT', icon: '💻', group: 'stem' },
+  { id: 'technology', name: 'បច្ចេកវិទ្យា', icon: '⚙️', group: 'stem' },
+  { id: 'home_economics', name: 'គេហវិទ្យា', icon: '🏡', group: 'vocational' },
+  { id: 'sports', name: 'អប់រំកាយ និងកីឡា', icon: '⚽', group: 'vocational' },
+  { id: 'other', name: 'មុខវិជ្ជាផ្សេងៗ', icon: '📚', group: 'social' },
+];
+
+export const MOEYS_GRADES = [
+  'ថ្នាក់ទី ១', 'ថ្នាក់ទី ២', 'ថ្នាក់ទី ៣', 'ថ្នាក់ទី ៤', 'ថ្នាក់ទី ៥', 'ថ្នាក់ទី ៦',
+  'ថ្នាក់ទី ៧', 'ថ្នាក់ទី ៨', 'ថ្នាក់ទី ៩', 'ថ្នាក់ទី ១០', 'ថ្នាក់ទី ១១', 'ថ្នាក់ទី ១២'
+];
+
+export const QUESTION_TYPES = [
+  { id: 'all_mixed', name: 'ចម្រុះទាំងអស់', desc: 'បន្សំគ្រប់ប្រភេទសំណួរ (QCM, T/F, Short, Problem, HOTS, PISA, STEM...)', icon: '✨' },
+  { id: 'qcm', name: 'QCM / MCQ', desc: 'ជម្រើស 4 (A, B, C, D) ឆ្លាស់ចម្លើយត្រឹមត្រូវ', icon: '🔘' },
+  { id: 'true_false', name: 'True / False', desc: 'ត្រូវ ឬ ខុស រហ័ស', icon: '⚖️' },
+  { id: 'short_answer', name: 'Short Answer', desc: 'សំណួរចម្លើយខ្លីៗ ចំគោលដៅ', icon: '📝' },
+  { id: 'problem_solving', name: 'Problem Solving', desc: 'លំហាត់គណនា រូបមន្ត និងដំណោះស្រាយ', icon: '🧮' },
+  { id: 'application', name: 'Application & Scenario', desc: 'ការអនុវត្តជាក់ស្តែង & ជីវភាពរស់នៅ', icon: '🌱' },
+  { id: 'hots', name: 'HOTS', desc: 'ការគិតកម្រិតខ្ពស់ (Higher Order Thinking)', icon: '💡' },
+  { id: 'pisa', name: 'PISA-style', desc: 'ស្ដង់ដារតេស្ត PISA អន្តរជាតិ MoEYS', icon: '🎯' },
+  { id: 'stem', name: 'STEM Project', desc: 'គម្រោង STEM & សមត្ថភាពអនុវត្ត', icon: '🔬' },
+];
+
+export const BLOOM_LEVELS = [
+  { id: 'all', name: 'ចម្រុះ', desc: 'L1-L6', icon: '✨' },
+  { id: 'remember', name: 'ចងចាំ', desc: 'Level 1', icon: '🧠' },
+  { id: 'understand', name: 'យល់ដឹង', desc: 'Level 2', icon: '💡' },
+  { id: 'apply', name: 'អនុវត្ត', desc: 'Level 3', icon: '⚙️' },
+  { id: 'analyze', name: 'វិភាគ', desc: 'Level 4', icon: '🔍' },
+  { id: 'evaluate', name: 'វាយតម្លៃ', desc: 'Level 5', icon: '⚖️' },
+  { id: 'create', name: 'បង្កើតថ្មី', desc: 'Level 6', icon: '🚀' },
+];
+
+export const DIFFICULTY_LEVELS = [
+  { id: 'all', name: 'ចម្រុះ (Mixed)', color: 'bg-slate-600' },
+  { id: 'easy', name: 'ងាយស្រួល (Easy)', color: 'bg-emerald-600' },
+  { id: 'medium', name: 'មធ្យម (Medium)', color: 'bg-amber-600' },
+  { id: 'hard', name: 'ពិបាក (Hard)', color: 'bg-rose-600' },
+];
+
+export const getMimeTypeFromExtension = (filename: string): string => {
+  const ext = filename.toLowerCase().split('.').pop() || '';
+  switch (ext) {
+    case 'pdf': return 'application/pdf';
+    case 'docx': return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'doc': return 'application/msword';
+    case 'pptx': return 'application/vnd.openxmlformats-officedocument.presentationml.presentation';
+    case 'ppt': return 'application/vnd.ms-powerpoint';
+    case 'xlsx': return 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet';
+    case 'xls': return 'text/csv';
+    case 'csv': return 'text/csv';
+    case 'txt': return 'text/plain';
+    case 'png': return 'image/png';
+    case 'jpg':
+    case 'jpeg': return 'image/jpeg';
+    case 'webp': return 'image/webp';
+    default: return 'application/octet-stream';
+  }
+};
+
 export interface ExamQuestion {
   id: string;
   text: string;
@@ -133,6 +224,58 @@ const DEFAULT_PHYSICS_QUESTIONS: ExamQuestion[] = [];
 const DEFAULT_CHEMISTRY_QUESTIONS: ExamQuestion[] = [];
 const DEFAULT_EXAMS: ExamPaper[] = [];
 
+export interface ExamSectionPreset {
+  id: string;
+  name: string;
+  desc: string;
+  icon: string;
+  counts: { choice: number; matching: number; fill_blank: number; theory: number; exercise: number };
+  points?: { choice: number; matching: number; fill_blank: number; theory: number; exercise: number };
+}
+
+export const SECTION_PRESETS: ExamSectionPreset[] = [
+  {
+    id: 'moeys_standard',
+    name: 'ស្តង់ដារក្រសួង MoEYS',
+    desc: 'បន្សំគ្រប់ផ្នែក (QCM 5, ផ្គូផ្គង 4, បំពេញ 4, ទ្រឹស្ដី 2, លំហាត់ 2)',
+    icon: '🌟',
+    counts: { choice: 5, matching: 4, fill_blank: 4, theory: 2, exercise: 2 },
+    points: { choice: 2, matching: 2, fill_blank: 2, theory: 2, exercise: 3 }
+  },
+  {
+    id: 'monthly_exam',
+    name: 'វិញ្ញាសាប្រចាំខែ',
+    desc: 'QCM 5, ផ្គូផ្គង 2, បំពេញ 3, ទ្រឹស្ដី 2, លំហាត់ 2 (សរុប 14)',
+    icon: '📅',
+    counts: { choice: 5, matching: 2, fill_blank: 3, theory: 2, exercise: 2 },
+    points: { choice: 2, matching: 2, fill_blank: 2, theory: 2, exercise: 3 }
+  },
+  {
+    id: 'semester_exam',
+    name: 'វិញ្ញាសាឆមាស',
+    desc: 'QCM 8, ផ្គូផ្គង 4, បំពេញ 4, ទ្រឹស្ដី 4, លំហាត់ 4 (សរុប 24)',
+    icon: '🎓',
+    counts: { choice: 8, matching: 4, fill_blank: 4, theory: 4, exercise: 4 },
+    points: { choice: 2, matching: 2, fill_blank: 2, theory: 2, exercise: 3 }
+  },
+  {
+    id: 'pure_qcm',
+    name: 'ពហុជ្រើសរើសសុទ្ធ (QCM)',
+    desc: 'QCM 20 សំណួរសុទ្ធ មិនមានផ្នែកផ្សេង',
+    icon: '🔘',
+    counts: { choice: 20, matching: 0, fill_blank: 0, theory: 0, exercise: 0 },
+    points: { choice: 2, matching: 2, fill_blank: 2, theory: 2, exercise: 3 }
+  },
+  {
+    id: 'stem_exercise',
+    name: 'ផ្តោតលើលំហាត់ STEM',
+    desc: 'QCM 4, ផ្គូផ្គង 2, បំពេញ 2, ទ្រឹស្ដី 2, លំហាត់ 5 (សរុប 15)',
+    icon: '🧮',
+    counts: { choice: 4, matching: 2, fill_blank: 2, theory: 2, exercise: 4 },
+    points: { choice: 2, matching: 2, fill_blank: 2, theory: 2, exercise: 3 }
+  }
+];
+
 // Helper to detect demo questions so they are removed cleanly
 const isDemoQuestion = (q: ExamQuestion): boolean => {
   if (!q) return false;
@@ -145,14 +288,15 @@ const isDemoQuestion = (q: ExamQuestion): boolean => {
   return false;
 };
 
-// Purge any demo exams and demo questions from stored array
+// Purge any demo exams, demo questions, and deleted exams from stored array
 const sanitizeExams = (rawExams: ExamPaper[], fallbackSchool: string): ExamPaper[] => {
   if (!Array.isArray(rawExams)) return [];
   const demoExamIds = ['exam-oct', 'exam-nov', 'exam-sem1'];
+  const delExamSet = getDeletedExamIds();
   
   return rawExams
     .filter(e => {
-      if (!e) return false;
+      if (!e || !e.id || delExamSet.has(String(e.id))) return false;
       // If it is a default demo exam with only demo questions
       if (demoExamIds.includes(e.id)) {
         const hasCustom = e.subjects?.some(s => s.questions?.some(q => !isDemoQuestion(q)));
@@ -188,6 +332,7 @@ export default function ExamsPanel({
   subjects = [],
   onSelectSubject
 }: ExamsPanelProps) {
+  const { language, setLanguage, t } = useLanguage();
   const { confirmAction } = useConfirm();
   const defaultSchool = teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ';
 
@@ -272,6 +417,7 @@ export default function ExamsPanel({
     };
 
     const updated = [clonedExam, ...exams];
+    unmarkExamAsDeleted(clonedExam.id);
     saveState(updated);
     setSelectedExamId(clonedExam.id);
     setIsCopyModalOpen(false);
@@ -462,93 +608,263 @@ export default function ExamsPanel({
     }
   }, [activeClassId, propActiveSubjectId, teacher?.id]);
 
-  // expert AI states
+  // expert AI states (aligned with MoEYS Assessment Model)
   const [isExpertAiModalOpen, setIsExpertAiModalOpen] = useState(false);
+  const [expertAiTab, setExpertAiTab] = useState<'curriculum' | 'sections' | 'bloom' | 'files'>('curriculum');
+  const [expertAiGrade, setExpertAiGrade] = useState(() => {
+    return activeClassName?.includes('ថ្នាក់ទី') ? activeClassName : 'ថ្នាក់ទី ៨';
+  });
   const [expertAiSubject, setExpertAiSubject] = useState('គណិតវិទ្យា');
-  const [expertAiCountChoice, setExpertAiCountChoice] = useState(5);
-  const [expertAiCountMatching, setExpertAiCountMatching] = useState(2);
-  const [expertAiCountFillBlank, setExpertAiCountFillBlank] = useState(2);
-  const [expertAiCountTheory, setExpertAiCountTheory] = useState(2);
-  const [expertAiCountExercise, setExpertAiCountExercise] = useState(1);
-  const [expertAiExamType, setExpertAiExamType] = useState('monthly');
-  const [expertAiInstructions, setExpertAiInstructions] = useState('សូមបង្កើតប្រធានវិញ្ញាសាល្អៗទៅតាមការណែនាំរបស់អ្នកជំនាញ');
+  const [expertAiChapter, setExpertAiChapter] = useState('');
+  const [expertAiLesson, setExpertAiLesson] = useState('');
+  const [expertAiTopic, setExpertAiTopic] = useState('');
+  const [expertAiQuestionType, setExpertAiQuestionType] = useState('all_mixed');
+  const [expertAiBloomLevel, setExpertAiBloomLevel] = useState('all');
+  const [expertAiDifficulty, setExpertAiDifficulty] = useState<'easy' | 'medium' | 'hard'>('medium');
+  const [expertAiLanguage, setExpertAiLanguage] = useState<'khmer' | 'english' | 'bilingual'>('khmer');
+  const [expertAiPointsPerQuestion, setExpertAiPointsPerQuestion] = useState(2);
+  const [expertAiExamType, setExpertAiExamType] = useState<'monthly' | 'semester'>('monthly');
+  const [expertAiCount, setExpertAiCount] = useState(10);
+  const [expertAiSectionMode, setExpertAiSectionMode] = useState<'by_section' | 'total'>('by_section');
+  const [expertAiSectionCounts, setExpertAiSectionCounts] = useState({
+    choice: 5,     // ផ្នែកទី ១៖ សំណួរពហុជ្រើសរើស (QCM / Multiple Choice)
+    matching: 4,   // ផ្នែកទី ២៖ សំណួរផ្គូផ្គង (Matching)
+    fill_blank: 4, // ផ្នែកទី ៣៖ សំណួរបំពេញចន្លោះ (Fill in the blanks)
+    theory: 2,     // ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី & ការរស់នៅ (General Theory & Concepts)
+    exercise: 2    // ផ្នែកទី ៥៖ លំហាត់ & ដោះស្រាយបញ្ហា (Exercises & Problem Solving)
+  });
+  const [expertAiSectionPoints, setExpertAiSectionPoints] = useState({
+    choice: 2,
+    matching: 2,
+    fill_blank: 2,
+    theory: 2,
+    exercise: 3
+  });
+  const [expertAiIncludeExplanation, setExpertAiIncludeExplanation] = useState(true);
+  const [expertAiInstructions, setExpertAiInstructions] = useState('');
+  const [expertAiText, setExpertAiText] = useState('');
+  const [expertAiActiveConfigTab, setExpertAiActiveConfigTab] = useState<'prompt_builder' | 'attachments'>('prompt_builder');
+  const [expertAiUploadedImages, setExpertAiUploadedImages] = useState<FileData[]>([]);
+  const [expertAiUploadedPdfs, setExpertAiUploadedPdfs] = useState<FileData[]>([]);
+  const [expertAiUploadedOfficeFiles, setExpertAiUploadedOfficeFiles] = useState<FileData[]>([]);
+  const [isExpertDragging, setIsExpertDragging] = useState(false);
+  const expertFileInputRef = useRef<HTMLInputElement>(null);
+  const [expertAiApiKeyInput, setExpertAiApiKeyInput] = useState(() => getSavedApiKey() || '');
+  const [expertAiShowKeyInput, setExpertAiShowKeyInput] = useState(false);
   const [isExpertGenerating, setIsExpertGenerating] = useState(false);
+
+  // Sync default grade and subject when active exam/classroom shifts
+  useEffect(() => {
+    if (activeClassName && activeClassName.includes('ថ្នាក់ទី')) {
+      setExpertAiGrade(activeClassName);
+    }
+    if (activeSubject?.name) {
+      setExpertAiSubject(activeSubject.name);
+    } else if (propActiveSubjectName) {
+      setExpertAiSubject(propActiveSubjectName);
+    }
+  }, [activeClassName, activeSubject?.name, propActiveSubjectName]);
+
+  const handleExpertRemoveImage = (index: number) => {
+    const fileName = expertAiUploadedImages[index]?.name || `រូបភាព ${index + 1}`;
+    confirmAction({
+      title: 'លុបរូបភាព',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ដករូបភាព «${fileName}» នេះចេញមែនទេ?`,
+      confirmText: 'បាទ/ចាស ដកចេញ',
+      variant: 'danger',
+      onConfirm: () => {
+        setExpertAiUploadedImages(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+  };
+
+  const handleExpertRemovePdf = (index: number) => {
+    const fileName = expertAiUploadedPdfs[index]?.name || `ឯកសារ PDF ${index + 1}`;
+    confirmAction({
+      title: 'លុបឯកសារ PDF',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ដកឯកសារ «${fileName}» នេះចេញមែនទេ?`,
+      confirmText: 'បាទ/ចាស ដកចេញ',
+      variant: 'danger',
+      onConfirm: () => {
+        setExpertAiUploadedPdfs(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+  };
+
+  const handleExpertRemoveOfficeFile = (index: number) => {
+    const fileName = expertAiUploadedOfficeFiles[index]?.name || `ឯកសារ ${index + 1}`;
+    confirmAction({
+      title: 'លុបឯកសារ',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ដកឯកសារ «${fileName}» នេះចេញមែនទេ?`,
+      confirmText: 'បាទ/ចាស ដកចេញ',
+      variant: 'danger',
+      onConfirm: () => {
+        setExpertAiUploadedOfficeFiles(prev => prev.filter((_, i) => i !== index));
+      }
+    });
+  };
+
+  const removeExpertImage = (idx: number) => {
+    setExpertAiUploadedImages(prev => prev.filter((_, i) => i !== idx));
+  };
+  const removeExpertPdf = (idx: number) => {
+    setExpertAiUploadedPdfs(prev => prev.filter((_, i) => i !== idx));
+  };
+  const removeExpertOfficeFile = (idx: number) => {
+    setExpertAiUploadedOfficeFiles(prev => prev.filter((_, i) => i !== idx));
+  };
+
+  const processExpertFiles = (files: File[]) => {
+    files.forEach(file => {
+      const nameLower = file.name.toLowerCase();
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        const base64String = reader.result as string; 
+        const fileData: FileData = {
+          name: file.name,
+          mimeType: file.type || getMimeTypeFromExtension(nameLower),
+          data: base64String
+        };
+
+        if (nameLower.endsWith('.pdf')) {
+          setExpertAiUploadedPdfs(prev => {
+            if (prev.some(p => p.name === file.name)) return prev;
+            return [...prev, fileData];
+          });
+        } else if (
+          nameLower.endsWith('.docx') ||
+          nameLower.endsWith('.doc') ||
+          nameLower.endsWith('.pptx') ||
+          nameLower.endsWith('.ppt') ||
+          nameLower.endsWith('.xlsx') ||
+          nameLower.endsWith('.xls') ||
+          nameLower.endsWith('.csv') ||
+          nameLower.endsWith('.txt') ||
+          file.type.includes('word') ||
+          file.type.includes('presentation') ||
+          file.type.includes('spreadsheet') ||
+          file.type.includes('text')
+        ) {
+          setExpertAiUploadedOfficeFiles(prev => {
+            if (prev.some(of => of.name === file.name)) return prev;
+            return [...prev, fileData];
+          });
+        } else if (file.type.startsWith('image/')) {
+          setExpertAiUploadedImages(prev => {
+            if (prev.some(img => img.name === file.name)) return prev;
+            return [...prev, fileData];
+          });
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const handleExpertDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsExpertDragging(true);
+  };
+
+  const handleExpertDragLeave = () => {
+    setIsExpertDragging(false);
+  };
+
+  const handleExpertDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsExpertDragging(false);
+    if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+      processExpertFiles(Array.from(e.dataTransfer.files));
+    }
+  };
+
+  const handleExpertFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processExpertFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleExpertImageUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processExpertFiles(Array.from(e.target.files));
+    }
+  };
+
+  const handleExpertDocUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files && e.target.files.length > 0) {
+      processExpertFiles(Array.from(e.target.files));
+    }
+  };
 
   const handleExpertAiGenerate = async () => {
     if (!activeExam) {
       alert("សូមជ្រើសរើស ឬបង្កើតវិញ្ញាសារប្រឡងជាមុនសិន!");
       return;
     }
-    const totalCount = expertAiCountChoice + expertAiCountMatching + expertAiCountFillBlank + expertAiCountTheory + expertAiCountExercise;
-    if (totalCount === 0) {
-      alert("សូមជ្រើសរើសបរិមាណសំណួរយ៉ាងហោចណាស់មួយប្រភេទ!");
+
+    const totalCountToRequest = expertAiSectionMode === 'by_section'
+      ? (expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise)
+      : expertAiCount;
+
+    if (totalCountToRequest <= 0) {
+      alert("សូមកំណត់ចំនួនសំណួរយ៉ាងហោចណាស់ ១ សំណួរ ឬ ១ លំហាត់!");
       return;
     }
+
     setIsExpertGenerating(true);
     try {
-      const gPreset = `Act as an expert high school and Grade 9 diploma curriculum developer in Cambodia.
-Generate exactly ${totalCount} high-quality, professional, academic exam questions in Khmer language matching the Cambodian ministry curriculum.
-Make sure the questions follow standard educational guidelines for Cambodia, prioritizing rigorous logic, clear scenarios, and appropriate level of difficulty.
+      const categoryCountsParam = expertAiSectionMode === 'by_section' ? {
+        choice: expertAiSectionCounts.choice,
+        matching: expertAiSectionCounts.matching,
+        fill_blank: expertAiSectionCounts.fill_blank,
+        theory: expertAiSectionCounts.theory,
+        exercise: expertAiSectionCounts.exercise
+      } : undefined;
 
-Subject: ${expertAiSubject}
-Exam Type: ${expertAiExamType === 'monthly' ? 'វិញ្ញាសាប្រលងប្រចាំខែ (Monthly Exam)' : 'វិញ្ញាសាប្រឡងឆមាស (Semester Exam)'}
-Class Level: ${activeClassName}
-Custom user instructions: ${expertAiInstructions}
-
-CRITICAL FORMAT REQUIREMENT for formulas and notations (Mathematics, Physics, Chemistry):
-- Use standard HTML/CSS compatible math annotations so they can be processed and rendered beautifully on search/web/PDF previews:
-  - Exponents (powers): use "^" (e.g. "x^2", "10^{-5}", "y^{2x}").
-  - Subscripts (molecular indices): use "_" (e.g. "H_2O", "CO_2", "x_i", "C_nH_{2n+2}").
-  - Fractions: use LaTeX formatting style "\\frac{numerator}{denominator}" (e.g. "\\frac{d}{t}", "\\frac{1}{2}").
-  - Square roots: use "\\sqrt{expression}" (e.g. "\\sqrt{64}", "\\sqrt{x}").
-  - Reactant arrow: write using "->" or "-->" or "\\rightarrow" (e.g., "HCl + NaOH -> NaCl + H_2O").
-  - Symbols: use standard math equivalents: "\\pm" for ±, "\\times" for ×, "\\div" for ÷, "\\le" for ≤, "\\ge" for ≥, "\\pi" for π, "\\Delta" for Δ, "\\alpha" for α, "\\beta" for β, "\\theta" for θ.
-
-SUBJECT SPECIFIC DIRECTIVES:
-- If គណិតវិទ្យា (Mathematics): design equations, geometry, fractions, formulas, and logical reasoning exercises.
-- If រូបវិទ្យា (Physics): design problems evaluating laws of mechanics, Ohm's law, heat, force, electrical resistivity calculations.
-- If គីមីវិទ្យា (Chemistry): design chemical reactions, atoms structure, indicator solutions, valency, acid-base-salt chemical equations.
-- If ជីវវិទ្យា (Biology): design cell organelles, DNA/Mitosis concepts, plant reproduction, human respiration or blood systems, digestive organs.
-- If ផែនដីវិទ្យា (Earth Science): geological rock cycles, volcano styles, ocean floor features, atmosphere layers, climate zones, orbital dynamics.
-- If ភាសាខ្មែរ (Khmer): focus on grammatical particles, spellings, author analysis, comprehension, syntax, vocabulary.
-- If តែងសេចក្ដី (Essay Writing): create prompt scenarios about describing scenes, analyzing national achievements, morality values, explaining proverbs (e.g. ស្វ័យសិក្សា, សាមគ្គីភាព) with structured options determining correct composition parts or paragraph organization styles.
-- If សរសេរតាមអាន (Dictation): test homophones, silent letters, correct syllable spellings, vocabulary errors.
-- If ភូមិវិទ្យា (Geography): test borders of Cambodia, agricultural crops, weather patterns, regions, major rivers (Mekong, Tonle Sap), natural resources of Cambodia.
-- If ប្រវត្តិវិទ្យា (History): test prehistory of Cambodia, Funan, Chenla, Angkorian peak rulers (Suryavarman II, Jayavarman VII), post-Angkorian era treaties, independence movement.
-- If សីលធម៌-ពលរដ្ឋ (Moral-Civic): ethical behaviors, traffic laws, rights, duties, constitutional articles, traditional respect.
-- If គេហវិទ្យា (Home Economics): hygiene, culinary techniques, family budget allocation, clothing maintenance, domestic care.
-- If ភាសាអង់គ្លេស (English): test common prepositions, reading comprehension, grammar tenses (present perfect, simple past), spelling.
-- If ភាសាបារាំង (French): basic conjugations (être, avoir, premier groupe), singular/plural adjectives, common dialogues.
-
-Output the response in JSON format.`;
-
-      const generated = await generateQuestions(
-        gPreset, 
-        totalCount, 
-        [], 
-        [], 
-        [], 
-        'general', 
-        'khmer',
-        {
-          choice: expertAiCountChoice,
-          matching: expertAiCountMatching,
-          fill_blank: expertAiCountFillBlank,
-          theory: expertAiCountTheory,
-          exercise: expertAiCountExercise
-        }
-      );
+      const generated = await generateQuestions({
+        lessonText: expertAiText || '',
+        count: totalCountToRequest,
+        images: expertAiUploadedImages,
+        pdfs: expertAiUploadedPdfs,
+        officeFiles: expertAiUploadedOfficeFiles,
+        questionType: expertAiQuestionType,
+        pisaLanguage: expertAiLanguage,
+        categoryCounts: categoryCountsParam,
+        grade: expertAiGrade || activeClassName,
+        subject: expertAiSubject,
+        chapter: expertAiChapter,
+        lesson: expertAiLesson,
+        topic: expertAiTopic,
+        bloomLevel: expertAiBloomLevel,
+        difficulty: expertAiDifficulty,
+        points: expertAiPointsPerQuestion,
+        includeExplanation: expertAiIncludeExplanation,
+        customInstructions: `${expertAiExamType === 'monthly' ? 'វិញ្ញាសាប្រលងប្រចាំខែ (Monthly Exam)' : 'វិញ្ញាសាប្រឡងឆមាស (Semester Exam)'}។ ${expertAiInstructions}`,
+      });
       
       if (generated && generated.length > 0) {
-        const mappedQuestions: ExamQuestion[] = generated.map((g, idx) => ({
-          id: `eq-ai-expert-${Date.now()}-${idx}-${Math.random()}`,
-          text: g.text,
-          options: g.options,
-          correctIndex: g.correctIndex,
-          category: g.category || 'choice',
-          explanation: g.explanation || "",
-          points: g.category === 'exercise' ? 5 : g.category === 'theory' ? 3 : 2
-        }));
+        const mappedQuestions: ExamQuestion[] = generated.map((g, idx) => {
+          const cat = (g.category as any) || (
+            expertAiQuestionType === 'problem_solving' || expertAiQuestionType === 'stem' ? 'exercise' :
+            expertAiQuestionType === 'short_answer' || expertAiQuestionType === 'hots' ? 'theory' :
+            expertAiQuestionType === 'true_false' ? 'choice' :
+            'choice'
+          );
+
+          const allocatedPoints = expertAiSectionMode === 'by_section'
+            ? (expertAiSectionPoints[cat as keyof typeof expertAiSectionPoints] || expertAiPointsPerQuestion || 2)
+            : (g.points || expertAiPointsPerQuestion || 2);
+
+          return {
+            id: `eq-ai-expert-${Date.now()}-${idx}-${Math.random()}`,
+            text: g.text,
+            options: g.options || [],
+            correctIndex: typeof g.correctIndex === 'number' ? g.correctIndex : 0,
+            questionType: (g.questionType === 'pisa' || expertAiQuestionType === 'pisa') ? 'pisa' : 'general',
+            category: cat,
+            explanation: g.explanation || "",
+            points: allocatedPoints
+          };
+        });
 
         const updatedExams = exams.map(e => {
           if (e.id === activeExam.id) {
@@ -578,7 +894,7 @@ Output the response in JSON format.`;
         });
 
         saveState(updatedExams);
-        alert(`សំណួរជំនាញ AI ចំនួន ${mappedQuestions.length} ត្រូវ​បាន​បង្កើត និង​បញ្ចូល​ទៅ​ក្នុង​មុខ​វិជ្ជា ${expertAiSubject} នៃវិញ្ញាសាឡើយជោគជ័យ!`);
+        alert(`សំណួរ & លំហាត់ជំនាញ AI MoEYS ចំនួន ${mappedQuestions.length} ត្រូវ​បាន​បង្កើត និង​បញ្ចូល​ទៅ​ក្នុង​មុខ​វិជ្ជា «${expertAiSubject}» នៃវិញ្ញាសាដោយជោគជ័យ!`);
         setIsExpertAiModalOpen(false);
       } else {
         throw new Error("No questions returned");
@@ -640,6 +956,7 @@ Output the response in JSON format.`;
     };
 
     const updated = [newExam, ...exams];
+    unmarkExamAsDeleted(newExam.id);
     saveState(updated);
     setSelectedExamId(newExam.id);
     setIsCreateModalOpen(false);
@@ -691,6 +1008,7 @@ Output the response in JSON format.`;
       confirmText: 'បាទ/ចាស លុបវិញ្ញាសា',
       variant: 'danger',
       onConfirm: () => {
+        markExamAsDeleted(id, activeClassId);
         const remaining = exams.filter(e => e.id !== id);
         saveState(remaining);
         if (selectedExamId === id && remaining.length > 0) {
@@ -4608,246 +4926,1030 @@ Output the response in JSON format.`;
         )}
       </AnimatePresence>
 
-      {/* MODAL 3: Expert AI Questions Builder Modal */}
+      {/* MODAL 3: Expert AI Questions Builder Modal (MoEYS AI Curriculum Assessment Expert) */}
       <AnimatePresence>
         {isExpertAiModalOpen && (
-          <div className="fixed inset-0 bg-black/70 backdrop-blur-xs flex items-center justify-center p-4 z-55 overflow-y-auto">
+          <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-2 sm:p-4 z-55 overflow-y-auto">
             <motion.div
-              initial={{ scale: 0.95, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0.95, opacity: 0 }}
-              className={`w-full max-w-lg rounded-3xl shadow-2xl overflow-hidden text-left p-6 ${
-                isDarkMode ? 'bg-[#121829] border border-indigo-950/80 text-white' : 'bg-white border text-slate-850'
+              initial={{ scale: 0.93, opacity: 0, y: 15 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.93, opacity: 0, y: 15 }}
+              transition={{ type: "spring", stiffness: 350, damping: 30 }}
+              className={`w-full max-w-4xl rounded-3xl shadow-2xl overflow-hidden text-left flex flex-col max-h-[92vh] border ${
+                isDarkMode 
+                  ? 'bg-slate-900/95 border-indigo-500/30 text-white shadow-indigo-500/10' 
+                  : 'bg-white/95 border-indigo-100 text-slate-800 shadow-2xl'
               }`}
             >
-              <div className="flex items-center justify-between border-b pb-3 mb-4 dark:border-slate-800">
+              {/* Header with Sparkling 3D Glass Badge */}
+              <div className="px-5 py-4 border-b dark:border-slate-800/80 flex items-center justify-between shrink-0 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-pink-500/10 backdrop-blur-sm">
+                <div className="flex items-center gap-3">
+                  <div className="w-11 h-11 rounded-2xl bg-gradient-to-tr from-indigo-600 via-purple-600 to-pink-500 text-white flex items-center justify-center shadow-lg shadow-indigo-500/30 ring-4 ring-indigo-500/10">
+                    <Sparkles className="w-6 h-6 animate-pulse" />
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <h3 className="font-black font-sans text-sm sm:text-base bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 dark:from-indigo-400 dark:via-purple-300 dark:to-pink-400 bg-clip-text text-transparent">
+                        {t('expert_ai_title')}
+                      </h3>
+                      <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase tracking-wider bg-amber-500/15 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                        Smart Model V3
+                      </span>
+                    </div>
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 font-medium">
+                      {t('expert_ai_subtitle')}
+                    </p>
+                  </div>
+                </div>
+                
                 <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 rounded-lg bg-amber-500/10 text-amber-500 flex items-center justify-center">
-                    <Sparkles className="w-4 h-4 text-amber-500 animate-pulse" />
-                  </div>
-                  <div>
-                    <h3 className="font-black font-sans text-xs sm:text-sm">រៀបចំវិញ្ញាសារដោយ AI Expert</h3>
-                    <p className="text-[10px] text-slate-400">បង្កើតប្រធានវិញ្ញាសាតាមស្តង់ដារក្រសួងអប់រំ និងកម្មវិធីសិក្សាជាតិ</p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsExpertAiModalOpen(false)}
-                  className="p-1 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-lg text-slate-400 border-none cursor-pointer"
-                >
-                  <X className="w-4 h-4" />
-                </button>
-              </div>
+                  <button
+                    type="button"
+                    onClick={() => setExpertAiShowKeyInput(!expertAiShowKeyInput)}
+                    className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-indigo-200 dark:border-slate-800 text-[11px] font-bold text-indigo-600 dark:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-slate-800/60 transition-all cursor-pointer bg-white dark:bg-slate-900"
+                    title="កំណត់សោរ Gemini API Key"
+                  >
+                    <Key className="w-3.5 h-3.5" />
+                    <span className="hidden sm:inline">API Key</span>
+                  </button>
 
-              <div className="space-y-4">
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">មុខវិជ្ជាប្រឡង (Subject)</label>
-                    <select
-                      value={expertAiSubject}
-                      onChange={(e) => setExpertAiSubject(e.target.value)}
-                      className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                    >
-                      <optgroup label="វិទ្យាសាស្ត្រពិត (Science)">
-                        <option value="គណិតវិទ្យា">គណិតវិទ្យា (Mathematics)</option>
-                        <option value="រូបវិទ្យា">រូបវិទ្យា (Physics)</option>
-                        <option value="គីមីវិទ្យា">គីមីវិទ្យា (Chemistry)</option>
-                        <option value="ជីវវិទ្យា">ជីវវិទ្យា (Biology)</option>
-                        <option value="ផែនដីវិទ្យា">ផែនដីវិទ្យា (Earth Science)</option>
-                      </optgroup>
-                      <optgroup label="វិទ្យាសាស្ត្រសង្គម (Social Science)">
-                        <option value="ភាសាខ្មែរ">ភាសាខ្មែរ (Khmer Language)</option>
-                        <option value="តែងសេចក្ដី">តែងសេចក្ដី (Essay Writing)</option>
-                        <option value="សរសេរតាមអាន">សរសេរតាមអាន (Dictation)</option>
-                        <option value="ភូមិវិទ្យា">ភូមិវិទ្យា (Geography)</option>
-                        <option value="ប្រវត្តិវិទ្យា">ប្រវត្តិវិទ្យា (History)</option>
-                        <option value="សីលធម៌-ពលរដ្ឋ">សីលធម៌-ពលរដ្ឋ (Moral-Civic)</option>
-                        <option value="គេហវិទ្យា">គេហវិទ្យា (Home Economics)</option>
-                      </optgroup>
-                      <optgroup label="ភាសាបរទេស (Foreign Language)">
-                        <option value="ភាសាអង់គ្លេស">ភាសាអង់គ្លេស (English)</option>
-                        <option value="ភាសាបារាំង">ភាសាបារាំង (French)</option>
-                      </optgroup>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">ប្រភេទវិញ្ញាសា (Exam Type)</label>
-                    <select
-                      value={expertAiExamType}
-                      onChange={(e) => setExpertAiExamType(e.target.value)}
-                      className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                    >
-                      <option value="monthly">វិញ្ញាសាប្រលងប្រចាំខែ (Monthly Exam)</option>
-                      <option value="semester">វិញ្ញាសាប្រឡងឆមាស (Semester Exam)</option>
-                    </select>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">កម្រិតសិក្សា (Class Level)</label>
-                    <div className="w-full mt-1.5 px-3 py-2 bg-slate-50 dark:bg-slate-900 border rounded-xl text-xs font-black border-slate-300 dark:border-slate-800 text-slate-600 dark:text-slate-300 truncate">
-                      {activeClassName || "ទូទៅ"}
-                    </div>
-                  </div>
-
-                  <div>
-                    <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">សរុបសំណួរដែលត្រូវបង្កើត</label>
-                    <div className="w-full mt-1.5 px-3 py-2 bg-amber-500/10 border border-amber-500/30 rounded-xl text-xs font-black text-amber-600 dark:text-amber-400">
-                      {expertAiCountChoice + expertAiCountMatching + expertAiCountFillBlank + expertAiCountTheory + expertAiCountExercise} សំណួរ (Questions)
-                    </div>
-                  </div>
-                </div>
-
-                <div className="p-3 bg-slate-50 dark:bg-slate-900 border dark:border-slate-800 rounded-2xl space-y-3">
-                  <h4 className="text-[11px] font-black text-slate-500 dark:text-slate-450 uppercase tracking-wider">ប្រភេទទម្រង់សំណួរដែលត្រូវការ</h4>
-                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-2.5">
-                    {/* Choice questions */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ គូសធីច</label>
-                      <select
-                        value={expertAiCountChoice}
-                        onChange={(e) => setExpertAiCountChoice(Number(e.target.value))}
-                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 20].map((num) => (
-                          <option key={num} value={num}>
-                            {num} សំណួរ
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Matching questions */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ ផ្គូផ្គង</label>
-                      <select
-                        value={expertAiCountMatching}
-                        onChange={(e) => setExpertAiCountMatching(Number(e.target.value))}
-                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                          <option key={num} value={num}>
-                            {num} សំណួរ
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Fill blank questions */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ បំពេញចន្លោះ</label>
-                      <select
-                        value={expertAiCountFillBlank}
-                        onChange={(e) => setExpertAiCountFillBlank(Number(e.target.value))}
-                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                          <option key={num} value={num}>
-                            {num} សំណួរ
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Theory questions */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">សំណួរ ទូទៅទ្រឹស្ដី & ការរស់នៅ</label>
-                      <select
-                        value={expertAiCountTheory}
-                        onChange={(e) => setExpertAiCountTheory(Number(e.target.value))}
-                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                          <option key={num} value={num}>
-                            {num} សំណួរ
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-
-                    {/* Exercises */}
-                    <div className="space-y-1">
-                      <label className="text-[10px] font-bold text-slate-500 dark:text-slate-400 block">លំហាត់</label>
-                      <select
-                        value={expertAiCountExercise}
-                        onChange={(e) => setExpertAiCountExercise(Number(e.target.value))}
-                        className="w-full px-2 py-1.5 border rounded-xl text-[11px] font-bold dark:bg-slate-950 border-slate-300 dark:border-slate-800 dark:text-white"
-                      >
-                        {[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map((num) => (
-                          <option key={num} value={num}>
-                            {num} លំហាត់
-                          </option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-indigo-500 dark:text-indigo-400 uppercase flex items-center gap-1.5">
-                    <Sparkles className="w-3 h-3" />
-                    សោរ Gemini API Key (ប្រើប្រាស់គណនីគន្លឹះតែមួយ)
-                  </label>
-                  <input
-                    type="password"
-                    placeholder="បញ្ចូលសោរ API Key របស់អ្នក..."
-                    value={aiApiKeyInput}
-                    onChange={(e) => {
-                      setAiApiKeyInput(e.target.value);
-                      saveApiKey(e.target.value);
-                    }}
-                    className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500"
-                  />
-                  <p className="text-[9px] text-slate-450 dark:text-slate-500 mt-1">
-                    * ប្រព័ន្ធទាញយក និងកំណត់សោរ API key តែមួយដូចគ្នាសម្រាប់គ្រប់ប៊ូតុងជំនួយ AI ទាំងអស់។
-                  </p>
-                </div>
-
-                <div>
-                  <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase">សេចក្ដីណែនាំគន្លឹះបន្ថែមរបស់លោកគ្រូ អ្នកគ្រូ</label>
-                  <textarea
-                    rows={2}
-                    placeholder="ឧ. សង្កត់ធ្ងន់មេរៀន សន្ទស្សន៍ចំណាំងពន្លឺ ឬ សមីការគីមី... ឬ ជម្រើសចម្លើយដែលមានភាពស៊ីជម្រៅ"
-                    value={expertAiInstructions}
-                    onChange={(e) => setExpertAiInstructions(e.target.value)}
-                    className="w-full mt-1.5 px-3 py-2 border rounded-xl text-xs font-semibold dark:bg-slate-900 border-slate-300 dark:border-slate-800 dark:text-white"
-                  />
-                </div>
-
-                <div className="p-3 bg-amber-500/5 rounded-2xl border border-dashed border-amber-500/20 text-[10px] text-amber-600 dark:text-amber-400 font-medium leading-relaxed">
-                  💡 <strong>បញ្ជាក់៖</strong> សំណួរដែលបង្កើតដោយ AI Expert នឹងត្រូវបញ្ចូលទៅក្នុងមុខវិជ្ជា និងវិញ្ញាសារសន្លឹកកិច្ចការដែលកំពុងបើកស្រាប់នេះភ្លាមៗ។ ប្រសិនបើពុំទាន់មានមុខវិជ្ជានោះនៅក្នុងសន្លឹកកិច្ចការទេ ប្រព័ន្ធនឹងស្វ័យប្រវត្តបង្កើតមុខវិជ្ជាថ្មីឱ្យតែម្ដង។
-                </div>
-
-                <div className="flex items-center justify-end gap-2 border-t pt-4 dark:border-slate-800">
                   <button
                     type="button"
                     onClick={() => setIsExpertAiModalOpen(false)}
-                    className="px-4 py-2 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white border-none cursor-pointer"
+                    className="p-2 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-white transition-all border-none cursor-pointer bg-transparent"
                   >
-                    បិទ
+                    <X className="w-5 h-5" />
                   </button>
+                </div>
+              </div>
+
+              {/* API Key Dropdown if toggled */}
+              {expertAiShowKeyInput && (
+                <div className="px-5 py-3 bg-amber-50 dark:bg-amber-950/30 border-b border-amber-200 dark:border-amber-900/50 flex flex-col sm:flex-row items-start sm:items-center gap-3">
+                  <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300 font-bold text-xs shrink-0">
+                    <Key className="w-4 h-4" />
+                    <span>Gemini API Key:</span>
+                  </div>
+                  <input
+                    type="password"
+                    placeholder="បញ្ចូល Google Gemini API Key (ឧ. AIzaSy...)"
+                    value={expertAiApiKeyInput}
+                    onChange={(e) => {
+                      setExpertAiApiKeyInput(e.target.value);
+                      saveApiKey(e.target.value);
+                    }}
+                    className="flex-1 w-full px-3 py-1.5 text-xs font-mono rounded-lg border border-amber-300 dark:border-amber-800 dark:bg-slate-950 dark:text-white"
+                  />
+                  <span className="text-[10px] text-slate-400">
+                    * ប្រព័ន្ធរក្សាទុកស្វ័យប្រវត្តិ
+                  </span>
+                </div>
+              )}
+
+              {/* Main Tab Navigation */}
+              <div className="px-5 pt-3 pb-2 border-b dark:border-slate-800/80 flex items-center gap-2 overflow-x-auto shrink-0 bg-slate-50/50 dark:bg-slate-900/50">
+                <button
+                  type="button"
+                  onClick={() => setExpertAiTab('curriculum')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                    expertAiTab === 'curriculum'
+                      ? 'bg-indigo-600 text-white border-indigo-600 shadow-md shadow-indigo-600/20'
+                      : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-750'
+                  }`}
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>១. កម្មវិធីសិក្សាជាតិ (MoEYS)</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExpertAiTab('sections')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                    expertAiTab === 'sections'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-md shadow-amber-600/20'
+                      : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-750'
+                  }`}
+                >
+                  <Layers className="w-4 h-4" />
+                  <span>២. ផ្នែកវិញ្ញាសា & ចំនួនសំណួរ</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExpertAiTab('bloom')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                    expertAiTab === 'bloom'
+                      ? 'bg-purple-600 text-white border-purple-600 shadow-md shadow-purple-600/20'
+                      : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-750'
+                  }`}
+                >
+                  <Sliders className="w-4 h-4" />
+                  <span>៣. កម្រិតវិភាគ & លក្ខខណ្ឌ</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setExpertAiTab('files')}
+                  className={`flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-black transition-all cursor-pointer border ${
+                    expertAiTab === 'files'
+                      ? 'bg-pink-600 text-white border-pink-600 shadow-md shadow-pink-600/20'
+                      : 'bg-white dark:bg-slate-800/80 text-slate-600 dark:text-slate-300 border-slate-200 dark:border-slate-750 hover:bg-slate-100 dark:hover:bg-slate-750'
+                  }`}
+                >
+                  <Paperclip className="w-4 h-4" />
+                  <span>៤. ឯកសារ & រូបភាពជំនួយ</span>
+                  {(expertAiUploadedImages.length > 0 || expertAiUploadedPdfs.length > 0 || expertAiUploadedOfficeFiles.length > 0) && (
+                    <span className="w-2 h-2 rounded-full bg-pink-400 animate-ping"></span>
+                  )}
+                </button>
+              </div>
+
+              {/* Scrollable Content Body */}
+              <div className="flex-1 overflow-y-auto p-5 space-y-5">
+
+                {/* TAB 1: CURRICULUM & QUESTION TYPES */}
+                {expertAiTab === 'curriculum' && (
+                  <div className="space-y-5">
+                    {/* Grade & Subject Grid */}
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
+                      
+                      {/* Grade Selector (3 cols) */}
+                      <div className="md:col-span-4 space-y-1.5">
+                        <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                          <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>កម្រិតថ្នាក់ (Grade Level)</span>
+                        </label>
+                        <select
+                          value={expertAiGrade}
+                          onChange={(e) => setExpertAiGrade(e.target.value)}
+                          className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-black dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-xs"
+                        >
+                          {MOEYS_GRADES.map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Subject Selector (8 cols) */}
+                      <div className="md:col-span-8 space-y-1.5">
+                        <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                          <BookOpen className="w-3.5 h-3.5 text-purple-500" />
+                          <span>មុខវិជ្ជាក្រសួងអប់រំ (MoEYS Subject)</span>
+                        </label>
+                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800">
+                          {MOEYS_SUBJECTS.map((sub) => {
+                            const isSelected = expertAiSubject === sub.name;
+                            return (
+                              <button
+                                key={sub.id}
+                                type="button"
+                                onClick={() => setExpertAiSubject(sub.name)}
+                                className={`px-2.5 py-2 rounded-xl text-left flex items-center gap-2 text-xs font-bold transition-all border cursor-pointer ${
+                                  isSelected
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs scale-[1.02]'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-indigo-300'
+                                }`}
+                              >
+                                <span className="text-sm">{sub.icon}</span>
+                                <span className="truncate">{sub.name}</span>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Chapter & Lesson Row */}
+                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-slate-50/80 dark:bg-slate-950/40 rounded-2xl border border-slate-200 dark:border-slate-800/80">
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+                          ជំពូក (Chapter / Unit)
+                        </label>
+                        <input
+                          type="text"
+                          value={expertAiChapter}
+                          onChange={(e) => setExpertAiChapter(e.target.value)}
+                          placeholder="ឧ. ជំពូកទី ១ ឬ ចលនាត្រង់"
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+                          មេរៀន (Lesson / Topic)
+                        </label>
+                        <input
+                          type="text"
+                          value={expertAiLesson}
+                          onChange={(e) => setExpertAiLesson(e.target.value)}
+                          placeholder="ឧ. មេរៀនទី ២ ឬ ច្បាប់ញូតុន"
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+                          ចំណងជើងរង ឬប្រធានបទគន្លឹះ (Specific Focus)
+                        </label>
+                        <input
+                          type="text"
+                          value={expertAiTopic}
+                          onChange={(e) => setExpertAiTopic(e.target.value)}
+                          placeholder="ឧ. កម្លាំងកកិត និងច្បាប់រក្សាថាមពល"
+                          className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Question Assessment Types (Image 1 Full Grid) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                          <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+                          <span>ប្រភេទសំណួរ (Question Assessment Types)</span>
+                        </label>
+                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                          {QUESTION_TYPES.find(t => t.id === expertAiQuestionType)?.name || 'សំណួរចម្រុះ'}
+                        </span>
+                      </div>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                        {QUESTION_TYPES.map((type) => {
+                          const isSelected = expertAiQuestionType === type.id;
+                          return (
+                            <button
+                              key={type.id}
+                              type="button"
+                              onClick={() => setExpertAiQuestionType(type.id)}
+                              className={`p-3 rounded-2xl text-left flex items-start gap-3 transition-all border cursor-pointer relative overflow-hidden ${
+                                isSelected
+                                  ? 'bg-gradient-to-br from-indigo-500/10 via-purple-500/10 to-pink-500/10 border-indigo-500 dark:border-indigo-400 shadow-sm ring-2 ring-indigo-500/20'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800/80 hover:border-slate-300 dark:hover:border-slate-700'
+                              }`}
+                            >
+                              <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 text-base ${
+                                isSelected 
+                                  ? 'bg-indigo-600 text-white shadow-xs' 
+                                  : 'bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300'
+                              }`}>
+                                {type.icon}
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <div className="text-xs font-black truncate text-slate-800 dark:text-slate-100 flex items-center justify-between">
+                                  <span>{type.name}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                                </div>
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-0.5 leading-relaxed font-medium">
+                                  {type.desc}
+                                </div>
+                              </div>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 1.5: SECTIONS & COUNTS */}
+                {expertAiTab === 'sections' && (
+                  <div className="space-y-5">
+                    {/* Section Mode Choice: Toggle between By Section and Total */}
+                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-4 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800 gap-3">
+                      <div>
+                        <h4 className="text-xs font-black text-slate-800 dark:text-white uppercase flex items-center gap-1.5">
+                          <Settings className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>{t('exam_config_mode')}</span>
+                        </h4>
+                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-medium">
+                          {language === 'kh' ? 'កំណត់រចនាសម្ព័ន្ធវិញ្ញាសាជាផ្នែកៗ ឬកំណត់ចំនួនសំណួរសរុបតែម្តង' : 'Configure exam by section or set total questions count at once'}
+                        </p>
+                      </div>
+                      
+                      <div className="flex items-center gap-1.5 bg-white dark:bg-slate-900 p-1 border border-slate-200 dark:border-slate-800 rounded-xl w-full sm:w-auto">
+                        <button
+                          type="button"
+                          onClick={() => setExpertAiSectionMode('by_section')}
+                          className={`flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                            expertAiSectionMode === 'by_section'
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {t('by_section')}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setExpertAiSectionMode('total')}
+                          className={`flex-1 sm:flex-none px-3.5 py-2 rounded-lg text-xs font-black transition-all cursor-pointer whitespace-nowrap ${
+                            expertAiSectionMode === 'total'
+                              ? 'bg-indigo-600 text-white shadow-xs'
+                              : 'text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          {t('total_count_only')}
+                        </button>
+                      </div>
+                    </div>
+
+                    {expertAiSectionMode === 'by_section' ? (
+                      <div className="space-y-5">
+                        {/* Section Presets Selection (Quick Click) */}
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                            <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                            <span>{t('quick_section_presets')}</span>
+                          </label>
+                          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
+                            {SECTION_PRESETS.map((preset) => {
+                              const isSelected = 
+                                expertAiSectionCounts.choice === preset.counts.choice &&
+                                expertAiSectionCounts.matching === preset.counts.matching &&
+                                expertAiSectionCounts.fill_blank === preset.counts.fill_blank &&
+                                expertAiSectionCounts.theory === preset.counts.theory &&
+                                expertAiSectionCounts.exercise === preset.counts.exercise;
+                                
+                              return (
+                                <button
+                                  key={preset.id}
+                                  type="button"
+                                  onClick={() => {
+                                    setExpertAiSectionCounts({ ...preset.counts });
+                                    if (preset.points) {
+                                      setExpertAiSectionPoints({ ...preset.points });
+                                    }
+                                  }}
+                                  className={`p-3 rounded-2xl text-left border transition-all cursor-pointer relative overflow-hidden flex flex-col justify-between h-full ${
+                                    isSelected
+                                      ? 'bg-amber-500/5 dark:bg-amber-500/10 border-amber-500 dark:border-amber-400 ring-2 ring-amber-500/20'
+                                      : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-750'
+                                  }`}
+                                >
+                                  <div className="flex items-start gap-2.5">
+                                    <span className="text-xl shrink-0">{preset.icon}</span>
+                                    <div>
+                                      <div className="text-xs font-black text-slate-800 dark:text-white flex items-center gap-1">
+                                        <span>{t(preset.id)}</span>
+                                        {isSelected && <Check className="w-3.5 h-3.5 text-amber-600 dark:text-amber-400 shrink-0" />}
+                                      </div>
+                                      <div className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-0.5 leading-relaxed font-medium">
+                                        {t(preset.id + '_desc')}
+                                      </div>
+                                    </div>
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+
+                        {/* Individual Section Config Cards */}
+                        <div className="space-y-3">
+                          <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                            <Layers className="w-3.5 h-3.5 text-indigo-500" />
+                            <span>{t('customize_sections')}</span>
+                          </label>
+
+                          <div className="space-y-3">
+                            {/* Card 1: Multiple Choice */}
+                            <div className="p-4 bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 flex items-center justify-center shrink-0 font-bold text-base">
+                                  🔘
+                                </div>
+                                <div>
+                                  <h5 className="text-xs font-black text-slate-800 dark:text-white">
+                                    {t('section_1_qcm')}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                    {t('section_1_desc')}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 self-end md:self-auto">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('questions_count')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      value={expertAiSectionCounts.choice}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setExpertAiSectionCounts(prev => ({ ...prev, choice: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('questions')}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('points_per_question')}</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={50}
+                                      value={expertAiSectionPoints.choice}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        setExpertAiSectionPoints(prev => ({ ...prev, choice: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('points')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card 2: Matching */}
+                            <div className="p-4 bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-purple-50 dark:bg-purple-950/40 text-purple-600 dark:text-purple-400 flex items-center justify-center shrink-0 font-bold text-base">
+                                  🔗
+                                </div>
+                                <div>
+                                  <h5 className="text-xs font-black text-slate-800 dark:text-white">
+                                    {t('section_2_matching')}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                    {t('section_2_desc')}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 self-end md:self-auto">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('questions_count')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      value={expertAiSectionCounts.matching}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setExpertAiSectionCounts(prev => ({ ...prev, matching: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('questions')}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('points_per_question')}</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={50}
+                                      value={expertAiSectionPoints.matching}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        setExpertAiSectionPoints(prev => ({ ...prev, matching: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('points')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card 3: Fill Blank */}
+                            <div className="p-4 bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-pink-50 dark:bg-pink-950/40 text-pink-600 dark:text-pink-400 flex items-center justify-center shrink-0 font-bold text-base">
+                                  📝
+                                </div>
+                                <div>
+                                  <h5 className="text-xs font-black text-slate-800 dark:text-white">
+                                    {language === 'kh' ? 'ផ្នែកទី ៣៖ សំណួរបំពេញចន្លោះ' : 'Section 3: Fill in the Blanks'}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                    {language === 'kh' ? 'បំពេញចន្លោះនូវពាក្យគន្លឹះ ច្បាប់ ឬទិន្នន័យជាក់លាក់' : 'Fill in the blanks with keywords, rules, or specific data'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 self-end md:self-auto">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('questions_count')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      value={expertAiSectionCounts.fill_blank}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setExpertAiSectionCounts(prev => ({ ...prev, fill_blank: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('questions')}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('points_per_question')}</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={50}
+                                      value={expertAiSectionPoints.fill_blank}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        setExpertAiSectionPoints(prev => ({ ...prev, fill_blank: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('points')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card 4: Theory */}
+                            <div className="p-4 bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 font-bold text-base">
+                                  💡
+                                </div>
+                                <div>
+                                  <h5 className="text-xs font-black text-slate-800 dark:text-white">
+                                    {language === 'kh' ? 'ផ្នែកទី ៤៖ សំណួរទ្រឹស្ដី & ការយល់ដឹង' : 'Section 4: Theory & Concepts'}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                    {language === 'kh' ? 'សំណួរយល់ដឹង ទ្រឹស្ដី អនុវត្តន៍ជាក់ស្ដែង និងអត្ថបទវិភាគ' : 'Concept understanding, theories, practical applications, and essays'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 self-end md:self-auto">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('questions_count')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      value={expertAiSectionCounts.theory}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setExpertAiSectionCounts(prev => ({ ...prev, theory: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('questions')}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('points_per_question')}</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={50}
+                                      value={expertAiSectionPoints.theory}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        setExpertAiSectionPoints(prev => ({ ...prev, theory: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('points')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Card 5: Exercise */}
+                            <div className="p-4 bg-white dark:bg-slate-900/60 rounded-2xl border border-slate-200 dark:border-slate-800/80 shadow-xs flex flex-col md:flex-row md:items-center justify-between gap-4">
+                              <div className="flex items-center gap-3">
+                                <div className="w-9 h-9 rounded-xl bg-emerald-50 dark:bg-emerald-950/40 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0 font-bold text-base">
+                                  🧮
+                                </div>
+                                <div>
+                                  <h5 className="text-xs font-black text-slate-800 dark:text-white">
+                                    {language === 'kh' ? 'ផ្នែកទី ៥៖ លំហាត់ & ដោះស្រាយបញ្ហា' : 'Section 5: Exercises & Problem Solving'}
+                                  </h5>
+                                  <p className="text-[10px] text-slate-400 dark:text-slate-500 font-medium">
+                                    {language === 'kh' ? 'លំហាត់គណនា ដោះស្រាយ រូបមន្ត គីមីវិទ្យា រូបវិទ្យា គណិតវិទ្យា...' : 'Calculation exercises, problem solving, physics, chemistry, math...'}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-4 self-end md:self-auto">
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('questions_count')}</span>
+                                  <div className="flex items-center gap-1.5">
+                                    <input
+                                      type="number"
+                                      min={0}
+                                      max={100}
+                                      value={expertAiSectionCounts.exercise}
+                                      onChange={(e) => {
+                                        const val = Math.max(0, parseInt(e.target.value) || 0);
+                                        setExpertAiSectionCounts(prev => ({ ...prev, exercise: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('questions')}</span>
+                                  </div>
+                                </div>
+
+                                <div className="space-y-1">
+                                  <span className="text-[9px] font-black text-slate-400 dark:text-slate-500 uppercase block">{t('points_per_question')}</span>
+                                  <div className="flex items-center gap-1">
+                                    <input
+                                      type="number"
+                                      min={1}
+                                      max={50}
+                                      value={expertAiSectionPoints.exercise}
+                                      onChange={(e) => {
+                                        const val = Math.max(1, parseInt(e.target.value) || 1);
+                                        setExpertAiSectionPoints(prev => ({ ...prev, exercise: val }));
+                                      }}
+                                      className="w-16 text-center text-xs font-black text-slate-800 dark:text-white font-mono bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-750 rounded-lg p-1.5 focus:ring-2 focus:ring-indigo-500 focus:outline-none [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none font-medium shadow-sm hover:border-slate-300 dark:hover:border-slate-600 transition-colors"
+                                    />
+                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 font-bold">{t('points')}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Breakdown Summary Section */}
+                        <div className="p-4 bg-emerald-500/5 dark:bg-emerald-500/10 rounded-2xl border border-emerald-500/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                          <div>
+                            <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
+                              <Award className="w-3.5 h-3.5 text-emerald-500 animate-bounce" />
+                              <span>សង្ខេបការកំណត់ផ្នែកវិញ្ញាសា (Sections Summary)</span>
+                            </h4>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-medium">
+                              ផ្នែកដែលបានកំណត់នឹងមានលក្ខណៈដូចខាងលើ ដោយគណនាពិន្ទុរួមស្វ័យប្រវត្តិ។
+                            </p>
+                          </div>
+
+                          <div className="flex items-center gap-4 text-xs font-black text-slate-800 dark:text-white">
+                            <div className="text-right">
+                              <span className="text-slate-400 font-bold block text-[9px] uppercase">សំណួរសរុប</span>
+                              <span className="font-mono text-base text-indigo-600 dark:text-indigo-400">
+                                {expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise} សំណួរ
+                              </span>
+                            </div>
+                            <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
+                            <div className="text-right">
+                              <span className="text-slate-400 font-bold block text-[9px] uppercase">ពិន្ទុសរុប</span>
+                              <span className="font-mono text-base text-emerald-600 dark:text-emerald-400">
+                                {expertAiSectionPoints.choice * expertAiSectionCounts.choice + expertAiSectionPoints.matching * expertAiSectionCounts.matching + expertAiSectionPoints.fill_blank * expertAiSectionCounts.fill_blank + expertAiSectionPoints.theory * expertAiSectionCounts.theory + expertAiSectionPoints.exercise * expertAiSectionCounts.exercise} ពិន្ទុ
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ) : (
+                      /* Mode: Total Questions Only */
+                      <div className="space-y-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
+                        <div className="space-y-1.5">
+                          <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase">
+                            ចំនួនសំណួរដែលត្រូវបង្កើត (Total Questions)
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            {[5, 10, 15, 20, 25, 30].map((count) => (
+                              <button
+                                key={count}
+                                type="button"
+                                onClick={() => setExpertAiCount(count)}
+                                className={`px-3 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                                  expertAiCount === count
+                                    ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                {count}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        <div className="space-y-1.5 pt-3 border-t dark:border-slate-800">
+                          <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase">
+                            ពិន្ទុក្នុង ១ សំណួរ (Points per Question)
+                          </label>
+                          <div className="flex items-center gap-1.5">
+                            {[1, 2, 3, 5, 10].map((pt) => (
+                              <button
+                                key={pt}
+                                type="button"
+                                onClick={() => setExpertAiPointsPerQuestion(pt)}
+                                className={`px-3.5 py-1.5 rounded-xl text-xs font-black border transition-all cursor-pointer ${
+                                  expertAiPointsPerQuestion === pt
+                                    ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                                }`}
+                              >
+                                {pt} ពិន្ទុ
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* TAB 2: BLOOM'S TAXONOMY & EXAM SPECIFICATIONS */}
+                {expertAiTab === 'bloom' && (
+                  <div className="space-y-5">
+                    
+                    {/* Bloom's Taxonomy Level */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                        <Brain className="w-3.5 h-3.5 text-purple-500" />
+                        <span>{t('bloom_taxonomy')}</span>
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
+                        {BLOOM_LEVELS.map((bloom) => {
+                          const isSelected = expertAiBloomLevel === bloom.id;
+                          return (
+                            <button
+                              key={bloom.id}
+                              type="button"
+                              onClick={() => setExpertAiBloomLevel(bloom.id)}
+                              className={`p-2.5 rounded-2xl text-center flex flex-col items-center gap-1 transition-all border cursor-pointer ${
+                                isSelected
+                                  ? 'bg-purple-600 text-white border-purple-600 shadow-sm ring-2 ring-purple-500/20'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300 hover:border-purple-300'
+                              }`}
+                            >
+                              <span className="text-base">{bloom.icon}</span>
+                              <span className="text-[11px] font-black">{t(bloom.id)}</span>
+                              <span className="text-[8px] opacity-75 font-mono">
+                                {bloom.id === 'all' ? 'L1-L6' : `${language === 'kh' ? 'កម្រិត ' : 'Level '}${bloom.id === 'remember' ? '1' : bloom.id === 'understand' ? '2' : bloom.id === 'apply' ? '3' : bloom.id === 'analyze' ? '4' : bloom.id === 'evaluate' ? '5' : '6'}`}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Difficulty & Exam Type */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Difficulty */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                          <Flame className="w-3.5 h-3.5 text-amber-500" />
+                          <span>{t('difficulty')}</span>
+                        </label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {DIFFICULTY_LEVELS.map((dif) => {
+                            const isSelected = expertAiDifficulty === dif.id;
+                            return (
+                              <button
+                                key={dif.id}
+                                type="button"
+                                onClick={() => setExpertAiDifficulty(dif.id)}
+                                className={`py-2 px-1.5 rounded-xl text-center text-xs font-bold transition-all border cursor-pointer ${
+                                  isSelected
+                                    ? `${dif.color} text-white border-transparent shadow-xs`
+                                    : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
+                                }`}
+                              >
+                                {t(dif.id)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+
+                      {/* Exam Type */}
+                      <div className="space-y-1.5">
+                        <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                          <FileText className="w-3.5 h-3.5 text-indigo-500" />
+                          <span>{t('exam_context')}</span>
+                        </label>
+                        <select
+                          value={expertAiExamType}
+                          onChange={(e) => setExpertAiExamType(e.target.value)}
+                          className="w-full px-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-black dark:text-white"
+                        >
+                          <option value="monthly">{t('exam_context_monthly')}</option>
+                          <option value="semester">{language === 'kh' ? 'វិញ្ញាសាប្រឡងឆមាស' : 'Semester Exam Assessment'}</option>
+                          <option value="national">{language === 'kh' ? 'វិញ្ញាសាសាកល្បងឌីប្លូម / បាក់ឌុប' : 'Mock National Exam Assessment'}</option>
+                          <option value="olympiad">{language === 'kh' ? 'វិញ្ញាសាសិស្សពូកែ' : 'Outstanding Student / Olympiad Assessment'}</option>
+                        </select>
+                      </div>
+                    </div>
+
+                    {/* Question Count & Points Per Question */}
+                    <div className="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <label className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase">
+                          ចំនួនសំណួរដែលត្រូវបង្កើត (Total Questions)
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          {[5, 10, 15, 20, 25, 30].map((count) => (
+                            <button
+                              key={count}
+                              type="button"
+                              onClick={() => setExpertAiCount(count)}
+                              className={`px-2.5 py-1 rounded-lg text-xs font-black border transition-all cursor-pointer ${
+                                expertAiCount === count
+                                  ? 'bg-indigo-600 text-white border-indigo-600 shadow-xs'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                              }`}
+                            >
+                              {count}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div className="flex items-center justify-between pt-2 border-t dark:border-slate-800">
+                        <label className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase">
+                          ពិន្ទុក្នុង ១ សំណួរ (Points per Question)
+                        </label>
+                        <div className="flex items-center gap-1.5">
+                          {[1, 2, 3, 5, 10].map((pt) => (
+                            <button
+                              key={pt}
+                              type="button"
+                              onClick={() => setExpertAiPointsPerQuestion(pt)}
+                              className={`px-3 py-1 rounded-lg text-xs font-black border transition-all cursor-pointer ${
+                                expertAiPointsPerQuestion === pt
+                                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-xs'
+                                  : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
+                              }`}
+                            >
+                              {pt} ពិន្ទុ
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* TAB 3: FILES, IMAGES & EXTRA NOTES */}
+                {expertAiTab === 'files' && (
+                  <div className="space-y-4">
+                    
+                    {/* File Upload Area */}
+                    <div className="space-y-2">
+                      <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                        <Upload className="w-3.5 h-3.5 text-pink-500" />
+                        <span>ឯកសារយោង និងរូបភាពសៀវភៅពុម្ព (Reference Files & Images)</span>
+                      </label>
+
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                        {/* Image Upload Box */}
+                        <div className="p-4 rounded-2xl border-2 border-dashed border-indigo-200 dark:border-slate-800 bg-indigo-50/20 dark:bg-slate-950/40 text-center flex flex-col items-center justify-center relative hover:border-indigo-400 transition-all cursor-pointer">
+                          <input
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            onChange={handleExpertImageUpload}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          <ImageIcon className="w-6 h-6 text-indigo-500 mb-1.5" />
+                          <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                            បញ្ចូលរូបភាព (Images / Photos)
+                          </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            រូបទំព័រសៀវភៅពុម្ព, លំហាត់ ឬក្រាហ្វិក
+                          </span>
+                        </div>
+
+                        {/* Document Upload Box */}
+                        <div className="p-4 rounded-2xl border-2 border-dashed border-purple-200 dark:border-slate-800 bg-purple-50/20 dark:bg-slate-950/40 text-center flex flex-col items-center justify-center relative hover:border-purple-400 transition-all cursor-pointer">
+                          <input
+                            type="file"
+                            accept=".pdf,.docx,.doc,.pptx,.txt"
+                            multiple
+                            onChange={handleExpertDocUpload}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                          />
+                          <FileText className="w-6 h-6 text-purple-500 mb-1.5" />
+                          <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+                            បញ្ចូលឯកសារ PDF / Word / PPTX
+                          </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            កម្រងវិញ្ញាសាចាស់ៗ, កិច្ចតែងការ, ឯកសារក្រសួង
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Display Uploaded Files */}
+                      {(expertAiUploadedImages.length > 0 || expertAiUploadedPdfs.length > 0 || expertAiUploadedOfficeFiles.length > 0) && (
+                        <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border dark:border-slate-800 space-y-2">
+                          <span className="text-[10px] font-black text-slate-400 uppercase">ឯកសារដែលបានបញ្ចូល៖</span>
+                          <div className="flex flex-wrap gap-1.5">
+                            {expertAiUploadedImages.map((img, i) => (
+                              <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold">
+                                <ImageIcon className="w-3 h-3" />
+                                <span className="max-w-[120px] truncate">{img.name || `រូបភាព ${i+1}`}</span>
+                                <button type="button" onClick={() => removeExpertImage(i)} className="text-slate-400 hover:text-red-500">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {expertAiUploadedPdfs.map((pdf, i) => (
+                              <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-purple-500/10 text-purple-600 dark:text-purple-400 border border-purple-500/20 rounded-xl text-xs font-bold">
+                                <FileText className="w-3 h-3" />
+                                <span className="max-w-[120px] truncate">{pdf.name || `PDF ${i+1}`}</span>
+                                <button type="button" onClick={() => removeExpertPdf(i)} className="text-slate-400 hover:text-red-500">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                            {expertAiUploadedOfficeFiles.map((doc, i) => (
+                              <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20 rounded-xl text-xs font-bold">
+                                <FileText className="w-3 h-3" />
+                                <span className="max-w-[120px] truncate">{doc.name || `ឯកសារ ${i+1}`}</span>
+                                <button type="button" onClick={() => removeExpertOfficeFile(i)} className="text-slate-400 hover:text-red-500">
+                                  <X className="w-3 h-3" />
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Teacher Extra Instructions */}
+                    <div className="space-y-1.5">
+                      <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
+                        <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                        <span>សេចក្ដីណែនាំគន្លឹះបន្ថែមរបស់លោកគ្រូ អ្នកគ្រូ (Custom Prompt)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="ឧ. សូមសង្កត់ធ្ងន់លើលំហាត់គណនាសមីការគីមី និងទ្រឹស្ដីដែលមានក្នុងសៀវភៅពុម្ពទំព័រ ២៥-៣០..."
+                        value={expertAiInstructions}
+                        onChange={(e) => setExpertAiInstructions(e.target.value)}
+                        className="w-full px-3.5 py-2.5 border rounded-2xl text-xs font-medium dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500"
+                      />
+                    </div>
+                  </div>
+                )}
+
+              </div>
+
+              {/* Bottom Summary Bar & Action Footer */}
+              <div className="p-4 border-t dark:border-slate-800/80 bg-slate-50/80 dark:bg-slate-900/80 flex flex-col sm:flex-row items-center justify-between gap-3 shrink-0">
+                <div className="flex items-center gap-2 text-xs font-bold text-slate-600 dark:text-slate-300">
+                  <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                  {expertAiSectionMode === 'by_section' ? (
+                    <span>
+                      {expertAiGrade} • {expertAiSubject} • សរុប {expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise} សំណួរ ({expertAiSectionPoints.choice * expertAiSectionCounts.choice + expertAiSectionPoints.matching * expertAiSectionCounts.matching + expertAiSectionPoints.fill_blank * expertAiSectionCounts.fill_blank + expertAiSectionPoints.theory * expertAiSectionCounts.theory + expertAiSectionPoints.exercise * expertAiSectionCounts.exercise} ពិន្ទុសរុប)
+                    </span>
+                  ) : (
+                    <span>{expertAiGrade} • {expertAiSubject} • {expertAiCount} សំណួរ ({expertAiPointsPerQuestion} ពិន្ទុ/សំណួរ)</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2 w-full sm:w-auto justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setIsExpertAiModalOpen(false)}
+                    className="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white border-none cursor-pointer bg-transparent"
+                  >
+                    បោះបង់
+                  </button>
+
                   <button
                     type="button"
                     disabled={isExpertGenerating}
                     onClick={handleExpertAiGenerate}
-                    className="px-5 py-2.5 bg-amber-600 hover:bg-amber-700 disabled:opacity-50 text-white rounded-2xl text-xs font-extrabold cursor-pointer active:scale-95 transition-all outline-none border-none flex items-center gap-1.5 shadow-md shadow-amber-500/10"
+                    className="flex-1 sm:flex-none px-6 py-2.5 bg-gradient-to-r from-indigo-600 via-purple-600 to-pink-600 hover:from-indigo-700 hover:via-purple-700 hover:to-pink-700 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-indigo-500/25 flex items-center justify-center gap-2 cursor-pointer active:scale-95 transition-all outline-none border-none disabled:opacity-50"
                   >
                     {isExpertGenerating ? (
                       <>
-                        <span className="w-3.5 h-3.5 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
-                        <span>កំពុងវិនិច្ឆ័យ & បង្កើត...</span>
+                        <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+                        <span>កំពុងវិភាគ & បង្កើតសំណួរវិញ្ញាសារ...</span>
                       </>
                     ) : (
                       <>
-                        <Sparkles className="w-3.5 h-3.5 text-white" />
-                        <span>✨ ចាប់ផ្ដើមបង្កើតសំណួរ</span>
+                        <Sparkles className="w-4 h-4 text-white animate-pulse" />
+                        <span>✨ ចាប់ផ្ដើមបង្កើតវិញ្ញាសារ (AI Expert)</span>
                       </>
                     )}
                   </button>
                 </div>
               </div>
+
             </motion.div>
           </div>
         )}
@@ -5215,7 +6317,7 @@ Output the response in JSON format.`;
                 {/* Right print preview sheet column */}
                 <div className="lg:col-span-7 flex flex-col gap-3 h-full">
                   <div className="flex-1 bg-slate-100 dark:bg-slate-900/60 border border-slate-200 dark:border-slate-800 rounded-2xl shadow-inner p-4 overflow-y-auto max-h-[60vh] lg:max-h-[70vh]">
-                    <div className="text-center font-bold text-xs text-slate-500 mb-3 font-mono uppercase tracking-wider">ផ្ទាំងឯកសារមើលជាមុន (Standard MOEYS Print Preview)</div>
+                    <div className="text-center font-bold text-xs text-slate-500 mb-3 font-mono uppercase tracking-wider">{t('exam_standard_preview')}</div>
                     <div 
                       style={{
                         paddingTop: `${marginTop}${marginUnit}`,

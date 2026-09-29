@@ -146,16 +146,71 @@ function extractClientExcel(base64Data: string): string {
   }
 }
 
+export interface GenerateQuestionsOptions {
+  lessonText?: string;
+  count?: number;
+  images?: FileData[];
+  pdfs?: FileData[];
+  officeFiles?: FileData[];
+  questionType?: string;
+  pisaLanguage?: 'khmer' | 'english' | 'bilingual';
+  categoryCounts?: { choice: number; matching: number; fill_blank: number; theory: number; exercise: number };
+  grade?: string;
+  subject?: string;
+  chapter?: string;
+  lesson?: string;
+  topic?: string;
+  bloomLevel?: string;
+  difficulty?: string;
+  points?: number;
+  includeExplanation?: boolean;
+  customInstructions?: string;
+}
+
 export async function generateQuestions(
-  lessonText: string, 
+  lessonTextOrOptions: string | GenerateQuestionsOptions, 
   count: number = 25,
   images: FileData[] = [],
   pdfs: FileData[] = [],
   officeFiles: FileData[] = [],
-  questionType: 'general' | 'pisa' = 'general',
+  questionType: string = 'general',
   pisaLanguage: 'khmer' | 'english' | 'bilingual' = 'khmer',
   categoryCounts?: { choice: number; matching: number; fill_blank: number; theory: number; exercise: number }
 ): Promise<Question[]> {
+  const options: GenerateQuestionsOptions = typeof lessonTextOrOptions === 'string' || !lessonTextOrOptions
+    ? {
+        lessonText: typeof lessonTextOrOptions === 'string' ? lessonTextOrOptions : '',
+        count,
+        images,
+        pdfs,
+        officeFiles,
+        questionType,
+        pisaLanguage,
+        categoryCounts
+      }
+    : lessonTextOrOptions;
+
+  const {
+    lessonText = '',
+    count: reqCount = 25,
+    images: reqImages = [],
+    pdfs: reqPdfs = [],
+    officeFiles: reqOfficeFiles = [],
+    questionType: reqQuestionType = 'general',
+    pisaLanguage: reqPisaLanguage = 'khmer',
+    categoryCounts: reqCategoryCounts,
+    grade = '',
+    subject = '',
+    chapter = '',
+    lesson = '',
+    topic = '',
+    bloomLevel = 'all',
+    difficulty = 'medium',
+    points = 2,
+    includeExplanation = true,
+    customInstructions = ''
+  } = options;
+
   try {
     // 1. First, try to request the custom backend server proxy
     try {
@@ -165,7 +220,26 @@ export async function generateQuestions(
           "Content-Type": "application/json",
           "x-api-key": getSavedApiKey()
         },
-        body: JSON.stringify({ lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage, categoryCounts })
+        body: JSON.stringify({ 
+          lessonText, 
+          count: reqCount, 
+          images: reqImages, 
+          pdfs: reqPdfs, 
+          officeFiles: reqOfficeFiles, 
+          questionType: reqQuestionType, 
+          pisaLanguage: reqPisaLanguage, 
+          categoryCounts: reqCategoryCounts,
+          grade,
+          subject,
+          chapter,
+          lesson,
+          topic,
+          bloomLevel,
+          difficulty,
+          points,
+          includeExplanation,
+          customInstructions
+        })
       });
 
       if (response.ok) {
@@ -181,9 +255,19 @@ export async function generateQuestions(
           options: q.options,
           correctIndex: q.correctIndex,
           id: `q-${i}-${Date.now()}`,
-          questionType: q.questionType || questionType,
+          questionType: q.questionType || reqQuestionType,
           category: q.category || 'choice',
-          explanation: q.explanation || ""
+          explanation: q.explanation || "",
+          grade: q.grade || grade,
+          subject: q.subject || subject,
+          chapter: q.chapter || chapter,
+          lesson: q.lesson || lesson,
+          topic: q.topic || topic,
+          bloomLevel: q.bloomLevel || bloomLevel,
+          difficulty: q.difficulty || difficulty,
+          learningObjective: q.learningObjective || '',
+          solutionStepByStep: q.solutionStepByStep || '',
+          points: q.points || points
         }));
       }
 
@@ -218,24 +302,24 @@ export async function generateQuestions(
 
       // 2. Direct Gemini API call from the client (Client-side Fallback helper)
       let extractedClientText = "";
-      for (const of of officeFiles) {
+      for (const of of reqOfficeFiles) {
         const name = of.name || "Doc";
         const rawType = of.mimeType || "";
         if (name.toLowerCase().endsWith(".docx") || rawType.includes("wordprocessingml")) {
           const txt = await extractClientDocx(of.data);
           extractedClientText += `\n[Word Document: ${name}]\n${txt}\n`;
         } else if (name.toLowerCase().endsWith(".pptx") || rawType.includes("presentationml")) {
-          const txt = await extractClientPptx(of.data);        } else if (name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".csv") || rawType.includes("spreadsheet") || rawType.includes("excel")) {
+          const txt = await extractClientPptx(of.data);
+        } else if (name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".csv") || rawType.includes("spreadsheet") || rawType.includes("excel")) {
           const txt = extractClientExcel(of.data);
           extractedClientText += `\n[Excel Sheet: ${name}]\n${txt}\n`;
         }
       }
 
-      const isPisa = questionType === 'pisa';
-      const isBilingual = pisaLanguage === 'bilingual';
-      const isEnglish = pisaLanguage === 'english';
+      const isBilingual = reqPisaLanguage === 'bilingual';
+      const isEnglish = reqPisaLanguage === 'english';
       
-      let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the theme.`;
+      let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the Cambodian curriculum context.`;
       if (isEnglish) {
         languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST be written entirely in English language because this is an international standard evaluation. Do not use Khmer. Everything must be high-quality, clear, correct academic English translation.`;
       } else if (isBilingual) {
@@ -251,10 +335,10 @@ Make sure everything including the options represents exact equivalent translati
       }
 
       let categoryRatiosPrompt = "";
-      let totalRequestedCount = count;
+      let totalRequestedCount = reqCount;
 
-      if (categoryCounts) {
-        const { choice = 0, matching = 0, fill_blank = 0, theory = 0, exercise = 0 } = categoryCounts;
+      if (reqCategoryCounts) {
+        const { choice = 0, matching = 0, fill_blank = 0, theory = 0, exercise = 0 } = reqCategoryCounts;
         totalRequestedCount = choice + matching + fill_blank + theory + exercise;
         categoryRatiosPrompt = `
 CRITICAL QUANTITY AND CATEGORY REQUIREMENTS:
@@ -268,56 +352,72 @@ You MUST generate exactly:
 For each question, "category" field MUST be "choice", "matching", "fill_blank", "theory", or "exercise".`;
       }
 
-      const prompt = `Based on the provided input materials (which may contain text notes, images, PDF documents, or Microsoft Office documents), generate ${totalRequestedCount} high-quality, concise multiple-choice questions for students. 
-Each question should be high-quality and have exactly 4 options.
+      const bloomPrompt = bloomLevel && bloomLevel !== 'all' 
+        ? `BLOOM'S TAXONOMY LEVEL: Strictly generate questions targeting Bloom's Level: ${bloomLevel.toUpperCase()} (Remember, Understand, Apply, Analyze, Evaluate, or Create).` 
+        : `BLOOM'S TAXONOMY LEVEL: Provide a balanced progression across Bloom's Taxonomy Levels (Remember, Understand, Apply, Analyze, Evaluate, Create).`;
+
+      const questionTypeDescription = (reqQuestionType === 'all_mixed' || reqQuestionType === 'mixed' || reqQuestionType === 'all')
+        ? 'ចម្រុះគ្រប់ប្រភេទទាំងអស់ (Mixed Assessment Types: Balanced combination of QCM/MCQ, True/False, Short Answer, Problem Solving, Application & Scenario, HOTS, PISA-style, and STEM projects)'
+        : reqQuestionType;
+
+      const prompt = `
+# SYSTEM IDENTITY & ROLE:
+អ្នកគឺជា "AI Educational Assessment Expert សម្រាប់កម្មវិធីសិក្សាកម្ពុជា" (Cambodian MoEYS Curriculum Assessment Expert).
+ភារកិច្ចរបស់អ្នកគឺបង្កើត សំណួរ ចម្លើយ លំហាត់ QCM/MCQ, True/False, Short Answer, Problem Solving, Application, HOTS, PISA-style និង STEM questions ស្របតាមកម្មវិធីសិក្សា និងឯកសារផ្លូវការរបស់ក្រសួងអប់រំ យុវជន និងកីឡា (MoEYS Cambodia: https://sala.moeys.gov.kh/).
+
+# 1. ព័ត៌មាននៃការបង្កើត (INPUT CONTEXT):
+- ថ្នាក់ទី (Grade): ${grade || 'គ្រប់កម្រិតថ្នាក់ MoEYS'}
+- មុខវិជ្ជា (Subject): ${subject || 'មុខវិជ្ជាទូទៅ'}
+- ជំពូក (Chapter): ${chapter || 'ជំពូកពាក់ព័ន្ធ'}
+- មេរៀន (Lesson): ${lesson || 'មេរៀនពាក់ព័ន្ធ'}
+- ប្រធានបទ (Topic): ${topic || 'ប្រធានបទគោល'}
+- ចំនួនសំណួរដែលត្រូវបង្កើត (Total Count): ${totalRequestedCount} សំណួរ
+- ប្រភេទសំណួរ (Question Type): ${questionTypeDescription}
+- កម្រិតលំបាក (Difficulty): ${difficulty}
+- ពិន្ទុក្នុងមួយសំណួរ (Points): ${points} ពិន្ទុ
+- បង្ហាញដំណោះស្រាយលម្អិត (Include Step-by-Step Solutions): ${includeExplanation ? 'Yes' : 'No'}
+${customInstructions ? `- ការណែនាំបន្ថែមពិសេសពីគ្រូ (Custom Teacher Directive): ${customInstructions}` : ''}
+
+# 2. ប្រភពចំណេះដឹងដែលត្រូវគោរពតាមលំដាប់អាទិភាព៖
+1. កម្មវិធីសិក្សាលម្អិតរបស់ក្រសួងអប់រំ យុវជន និងកីឡា (MoEYS Detailed Curriculum)
+2. សៀវភៅសិក្សាគោលរបស់ក្រសួង (Official MoEYS Textbooks)
+3. សៀវភៅគ្រូ / Teacher Guide
+4. ឯកសារពិសោធន៍ និងឯកសារ STEM របស់ MoEYS
+5. ឯកសារសំណួរ និងការវាយតម្លៃ PISA របស់ MoEYS (https://sala.moeys.gov.kh/)
+
+${bloomPrompt}
+
+# 3. គោលការណ៍តាមមុខវិជ្ជាជាក់លាក់ (SUBJECT-SPECIFIC RULES):
+- គណិតវិទ្យា (Math): បង្ហាញ Given (បម្រាប់), Formula (រូបមន្ត), Calculation (ការគណនា), Answer (ចម្លើយ) និងផ្ទៀងផ្ទាត់លេខនព្វន្តឱ្យបានត្រឹមត្រូវ ១០០%។
+- រូបវិទ្យា (Physics): បង្ហាញ Known (បម្រាប់), Find (ស្វែងរក), Formula (រូបមន្ត), Substitution (ជំនួសលេខ), Calculation, SI Unit (ឯកតា), Final Answer។ ពិនិត្យ dimensional consistency។
+- គីមីវិទ្យា (Chemistry): ពិនិត្យ Chemical formula, Chemical equation, Balance equation, Valency, Mole calculation, Concentration, pH, Reaction type។
+- ជីវវិទ្យា (Biology): ផ្តោតលើ Structure, Function, Biological Process, Human/Plant biology, Ecology, Genetics, Environment។
+- ផែនដីវិទ្យា (Earth Science): Earth structure, Rocks, Minerals, Plate tectonics, Weather, Climate, Natural resources of Cambodia។
+- ភូមិវិទ្យា (Geography): ផែនទីកម្ពុជា, ប្រព័ន្ធទន្លេមេគង្គ-បឹងទន្លេសាប, កសិកម្ម, អាកាសធាតុ, ធនធានធម្មជាតិ, ASEAN និងពិភពលោក។
+- ប្រវត្តិវិទ្យា (History): សម័យបុរេប្រវត្តិ, នគរភ្នំ (Funan), ចេនឡា (Chenla), មហានគរ (Angkor), ក្រោយអង្គរ, កាលបរិច្ឆេទ, តួអង្គប្រវត្តិសាស្ត្រ, សារៈសំខាន់ប្រវត្តិសាស្ត្រ។
+- សីលធម៌–ពលរដ្ឋវិជ្ជា (Moral-Civics): បង្កើតសំណួរ Scenario-based, ការទទួលខុសត្រូវ, វិន័យ, សីលធម៌រស់នៅ, ច្បាប់ចរាចរណ៍, សិទ្ធិ និងករណីយកិច្ច។
+- ភាសាខ្មែរ (Khmer): អក្ខរាវិរុទ្ធ, វេយ្យាករណ៍, អក្សរសិល្ប៍, ការអានស្វែងយល់, សិក្សាអត្ថបទ, តែងសេចក្ដី។
+- ភាសាអង់គ្លេស (English): Grammar tenses, prepositions, reading comprehension, vocabulary in context.
+- STEM & ICT & បច្ចេកវិទ្យា: Problem-solving scenarios, engineering design, coding logic, practical application.
+
+# 4. ច្បាប់សម្រាប់ជម្រើស A B C D (DISTRACTOR RULES):
+- មានចម្លើយត្រឹមត្រូវតែ 1 គត់។
+- Distractors (ជម្រើសខុស) ត្រូវមានភាពសមហេតុផល និងឆ្លុះបញ្ចាំងពីកំហុសដែលសិស្សងាយនឹងច្រឡំ (Misconceptions).
+- ហាមប្រើ "All of the above" ឬ "None of the above" ប្រសិនបើមិនចាំបាច់។
+- Randomize ទីតាំងចម្លើយត្រឹមត្រូវ (correctIndex ត្រូវផ្លាស់ប្តូរឆ្លាស់គ្នា 0, 1, 2, 3)។
+
+# 5. រចនាប័ទ្មសរសេររូបមន្ត (FORMULA NOTATION):
+- ស្វ័យគុណ (Exponents): សរសេរប្រើ "^" (ឧ. "x^2", "10^{-5}")។
+- សន្ទស្សន៍ (Subscripts): សរសេរប្រើ "_" (ឧ. "H_2O", "CO_2")។
+- ប្រភាគ (Fractions): សរសេរតាមរបៀប LaTeX "\\frac{a}{b}" (ឧ. "\\frac{s}{t}")។
+- ឫស (Square roots): សរសេរប្រើ "\\sqrt{x}"។
+- សញ្ញាព្រួញប្រតិកម្ម: សរសេរប្រើ "->" ឬ "\\rightarrow"។
+- និមិត្តសញ្ញា: "\\pm", "\\times", "\\div", "\\pi", "\\Delta", "\\alpha", "\\theta"។
 
 ${languagePrompt}
-
 ${categoryRatiosPrompt}
 
-========================================================================
-CRITICAL MANDATORY REQUIREMENT: SHORT, CONCISE, EASY TO UNDERSTAND & QUICK TO READ
-(លក្ខខណ្ឌដាច់ខាត៖ សំណួរខ្លី ច្បាស់ ងាយយល់ និងជម្រើសចម្លើយខ្លីៗ រហ័សសម្រាប់សិស្ស)
-========================================================================
-The questions will be displayed on a big classroom screen and spinning wheel with a 15-20 second countdown timer.
-Students must be able to read and understand the question and all 4 options IN SECONDS.
-DO NOT generate wordy, convoluted, or lengthy sentences! Keep everything clean, punchy, and accessible.
-
-1. QUESTION TEXT (សំណួរខ្លី ខ្លឹម ចំគោលដៅ ងាយយល់):
-   - MUST be short, direct, and concise: Strictly 1 to 2 lines (ideally 8 to 15 Khmer words, maximum 75-80 characters).
-   - Get straight to the key concept. DO NOT add unnecessary preambles, long winding descriptive clauses, or repetitive phrases.
-   - ❌ FORBIDDEN (Too long, slow to read): "តើមួយណាជាបរិមាណវ៉ិចទ័រដែលបង្ហាញពីការផ្លាស់ប្តូរទីតាំងរបស់វត្ថុពីចំណុចចាប់ផ្តើមទៅចំណុចបញ្ចប់?"
-   - ✅ REQUIRED (Short, crisp, instantly understood): "តើបម្លាស់ទីជាអ្វី?" ឬ "តើបរិមាណណាជាបម្លាស់ទី?" ឬ "តើឯកតា SI នៃកម្លាំងគឺអ្វី?" ឬ "តើរូបមន្តល្បឿនគឺអ្វី?"
-   - ❌ FORBIDDEN: "ប្រសិនបើសិស្សម្នាក់ធ្វើការសង្កេតលើចលនារបស់រថយន្តមួយដែលធ្វើដំណើរលើផ្លូវត្រង់ស្មើ... តើចម្ងាយចរគិតយ៉ាងដូចម្តេច?"
-   - ✅ REQUIRED: "តើចលនាត្រង់ស្មើមានរូបមន្តចម្ងាយអ្វី?" ឬ "តើ $v = \\frac{s}{t}$ ជារូបមន្តអ្វី?"
-
-2. OPTIONS / CHOICES (ចម្លើយ A, B, C, D ខ្លីៗ ច្បាស់ៗ):
-   - Each option MUST be very short and concise: Strictly 1 to 3 words, a single term, a number with unit, or a short formula.
-   - NEVER write full sentences or explanatory paragraphs inside options.
-   - ❌ FORBIDDEN: "ជាបម្លាស់ទីដែលកើតឡើងនៅពេលវត្ថុផ្លាស់ប្តូរទីតាំងពីចំណុចមួយទៅចំណុចមួយទៀត"
-   - ✅ REQUIRED: "បម្លាស់ទី", "ល្បឿន", "សំទុះ", "ចម្ងាយចរ"
-   - ✅ REQUIRED: "10 m/s", "5 N", "v = s/t", "H_2O", "100°C"
-
-3. EXPLANATION (ការពន្យល់):
-   - Keep the explanation also brief, concise, and clear (1 to 2 short sentences).
-
-${!isPisa && !categoryCounts ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in Lesson-based General Evaluation format. Focus on asking about definitions, formulas, theories, or key points mentioned directly in the lesson material. Keep questions and options crisp and short. Mix in real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) for approximately 20% of the total questions.` : ''}
-
-${isPisa ? `CRITICAL SPECIAL REQUIREMENT: All questions MUST be in PISA (Programme for International Student Assessment) format.
-Keep the question prompt scenario brief and concise so students can read and grasp the problem quickly without reading lengthy paragraphs.
-Options must be short, clear, and distinct.` : ''}
-
-CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
-If the questions involve math, physics, or chemistry:
-- Use standard notations for formulas so they can be processed and rendered beautifully:
-  - Exponents (powers): write using "^" (e.g., "x^2", "10^{-5}", "y^{2x}").
-  - Subscripts (indices or molecular numbers): write using "_" (e.g., "H_2O", "CO_2", "x_i", "C_nH_{2n+2}"). Note: common formulas like "H2O", "CO2", "H2SO4" can also just be written directly without underscores and will be auto-subscripted.
-  - Fractions: write using LaTeX style "\\frac{numerator}{denominator}" (e.g., "\\frac{s}{t}", "\\frac{1}{2}").
-  - Square roots: write using "\\sqrt{expression}" (e.g., "\\sqrt{16}", "\\sqrt{x}").
-  - Chemical reaction arrows: write using "->" or "-->" or "\\rightarrow" (e.g., "2H_2 + O_2 -> 2H_2O").
-  - Mathematics symbols: use LaTeX style formatting: "\\pm" for ±, "\\times" for ×, "\\div" for ÷, "\\le" for ≤, "\\ge" for ≥, "\\pi" for π, "\\Delta" for Δ, "\\alpha" for α, "\\beta" for β, "\\theta" for θ.
-
-Please thoroughly analyze all provided resource attachments (images, PDF documents, and extracted text from Word, PowerPoint, or Excel files) and text notes, then provide the response in JSON format.`;
+Generate exactly ${totalRequestedCount} structured questions in JSON format matching the schema.`;
 
       const parts: any[] = [{ text: prompt }];
 
@@ -328,7 +428,7 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
         parts.push({ text: combined });
       }
 
-      images.forEach((img) => {
+      reqImages.forEach((img) => {
         let base64Data = img.data;
         if (base64Data.includes(";base64,")) {
           base64Data = base64Data.split(";base64,").pop() || "";
@@ -341,7 +441,7 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
         });
       });
 
-      pdfs.forEach((pdf) => {
+      reqPdfs.forEach((pdf) => {
         let base64Data = pdf.data;
         if (base64Data.includes(";base64,")) {
           base64Data = base64Data.split(";base64,").pop() || "";
@@ -356,7 +456,7 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
 
       const fetchWithRetry = async (retriesLeft = 4, delayMs = 1500): Promise<Response> => {
         const res = await fetch(
-          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: {
@@ -377,16 +477,21 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
                     properties: {
                       text: { 
                         type: "STRING", 
-                        description: "Short, direct, concise question text (strictly under 15 words). Easy for students to read and understand at a glance in under 3-5 seconds. NEVER write long convoluted sentences or long paragraphs." 
+                        description: "Question text in accordance with MoEYS curriculum" 
                       },
                       options: { 
                         type: "ARRAY", 
                         items: { type: "STRING" },
-                        description: "Exactly 4 very short, concise options (strictly 1 to 3 words, single key term, or short formula/number each). NEVER write full sentences."
+                        description: "Array of 4 options (or 2 for True/False) with plausible distractors"
                       },
                       correctIndex: { type: "INTEGER", description: "The 0-based index of the correct option" },
-                      category: { type: "STRING", description: "The precise category of the question: choice, matching, fill_blank, theory, or exercise" },
-                      explanation: { type: "STRING", description: "Short, concise explanation (1-2 sentences only)" }
+                      category: { type: "STRING", description: "The category: choice, matching, fill_blank, theory, or exercise" },
+                      explanation: { type: "STRING", description: "Clear and comprehensive explanation for why the answer is correct" },
+                      bloomLevel: { type: "STRING", description: "Bloom's taxonomy: remember, understand, apply, analyze, evaluate, or create" },
+                      difficulty: { type: "STRING", description: "Difficulty: easy, medium, or hard" },
+                      learningObjective: { type: "STRING", description: "Expected learning outcome / objective aligned with MoEYS" },
+                      solutionStepByStep: { type: "STRING", description: "Step by step calculation or proof (Given, Formula, Calculation, Answer)" },
+                      points: { type: "INTEGER", description: "Points allocated for this question" }
                     },
                     required: ["text", "options", "correctIndex", "category"]
                   }
@@ -449,15 +554,38 @@ Please thoroughly analyze all provided resource attachments (images, PDF documen
         throw new Error("គ្មានទិន្នន័យត្រឡប់មកវិញពី Gemini API ទេ។");
       }
 
-      const rawQuestions = JSON.parse(textContent);
+      const cleanJsonStr = textContent
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      let rawQuestions: any[] = [];
+      try {
+        rawQuestions = JSON.parse(cleanJsonStr);
+      } catch {
+        const match = cleanJsonStr.match(/\[[\s\S]*\]/);
+        if (match) {
+          rawQuestions = JSON.parse(match[0]);
+        }
+      }
       return rawQuestions.map((q: any, i: number) => ({
         text: q.text,
         options: q.options,
         correctIndex: q.correctIndex,
         id: `q-${i}-${Date.now()}`,
-        questionType: questionType,
+        questionType: (reqQuestionType as any) || 'general',
         category: q.category || 'choice',
-        explanation: q.explanation || ""
+        explanation: q.explanation || "",
+        grade: q.grade || grade,
+        subject: q.subject || subject,
+        chapter: q.chapter || chapter,
+        lesson: q.lesson || lesson,
+        topic: q.topic || topic,
+        bloomLevel: q.bloomLevel || bloomLevel,
+        difficulty: q.difficulty || difficulty,
+        learningObjective: q.learningObjective || '',
+        solutionStepByStep: q.solutionStepByStep || '',
+        points: q.points || points
       }));
     }
   } catch (error: any) {

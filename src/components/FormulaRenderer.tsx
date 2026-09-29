@@ -54,6 +54,20 @@ const SYMBOL_MAP: Record<string, string> = {
 };
 
 /**
+ * Sanitizes HTML to prevent XSS while allowing safe math formatting tags
+ */
+export function sanitizeMathHtml(html: string): string {
+  if (!html) return "";
+  return html
+    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, "")
+    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, "")
+    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, "")
+    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, "")
+    .replace(/\bon\w+\s*=\s*(?:"[^"]*"|'[^']*'|[^\s>]+)/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+/**
  * Preprocesses a mathematical/chemical formula string to clean up symbols.
  */
 export function preprocessText(text: string): string {
@@ -194,7 +208,7 @@ export function parseFormulaToJSX(text: string): React.ReactNode {
   return (
     <span 
       className="inline-math-container select-text"
-      dangerouslySetInnerHTML={{ __html: htmlText }}
+      dangerouslySetInnerHTML={{ __html: sanitizeMathHtml(htmlText) }}
     />
   );
 }
@@ -237,7 +251,7 @@ export function renderFormulaToHtml(text: string): string {
   htmlText = htmlText.replace(/\^([0-9a-zA-Z+\-≈=#*]+)(?![^<]*>)/g, "<sup>$1</sup>");
   htmlText = htmlText.replace(/_([0-9a-zA-Z\-]+)(?![^<]*>)/g, "<sub>$1</sub>");
 
-  return htmlText;
+  return sanitizeMathHtml(htmlText);
 }
 
 /**

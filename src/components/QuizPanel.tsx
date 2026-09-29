@@ -2016,9 +2016,12 @@ export default function QuizPanel({
     }
   }, [viewMode, savedScrollTop]);
 
+  // Guard to prevent double-answering or duplicate submissions on rapid Enter key presses
+  const isSubmittingAnswerRef = useRef(false);
+
   useEffect(() => {
     let timer: NodeJS.Timeout;
-    if (activeCard && activeCard.status === 'idle' && timeLeft > 0 && !showResult) {
+    if (activeCard && activeCard.status === 'idle' && !activeCard.isRevealed && timeLeft > 0 && !showResult && !isSubmittingAnswerRef.current) {
       timer = setInterval(() => {
         setTimeLeft(prev => {
           if (prev <= 1) {
@@ -2030,15 +2033,16 @@ export default function QuizPanel({
           return prev - 1;
         });
       }, 1000);
-    } else if (timeLeft === 0 && !showResult) {
+    } else if (timeLeft === 0 && !showResult && !isSubmittingAnswerRef.current) {
       playWrongSynth();
       handleAnswer(-1); // Timeout
     }
     return () => clearInterval(timer);
-  }, [activeCard, timeLeft, showResult, soundEnabled]);
+  }, [activeCard?.id, activeCard?.status, activeCard?.isRevealed, timeLeft, showResult, soundEnabled]);
 
   useEffect(() => {
-    if (activeCard?.question) {
+    if (activeCard && activeCard.question && !activeCard.isRevealed && activeCard.status === 'idle') {
+      isSubmittingAnswerRef.current = false;
       const originalOptions = activeCard.question.options;
       const originalCorrect = activeCard.question.correctIndex;
       
@@ -2061,11 +2065,20 @@ export default function QuizPanel({
       setTimeLeft(questionTimerLimit);
       setShowResult(null);
       setShowCorrectFullScreenPopup(false);
+    } else if (!activeCard || activeCard.isRevealed) {
+      isSubmittingAnswerRef.current = false;
+      setShowResult(null);
+      setShowCorrectFullScreenPopup(false);
     }
-  }, [activeCard]);
+  }, [activeCard?.id]);
 
   const handleAnswer = (index: number) => {
-    if (!activeCard?.question || showResult) return;
+    if (!activeCard?.question || showResult !== null || isSubmittingAnswerRef.current || activeCard.isRevealed) return;
+
+    // Immediately remove focus from any button so pressing Enter doesn't trigger a synthetic click
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
 
     const isCorrect = index === correctIndex;
     setShowResult(isCorrect ? 'correct' : 'wrong');
@@ -2099,14 +2112,29 @@ export default function QuizPanel({
   };
 
   const handleContinue = () => {
+    if (isSubmittingAnswerRef.current) return;
     if (showResult !== null) {
+      isSubmittingAnswerRef.current = true;
+      const wasCorrect = showResult === 'correct';
       setShowCorrectFullScreenPopup(false);
-      onAnswer(showResult === 'correct');
+      setShowResult(null);
+      
+      if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+        document.activeElement.blur();
+      }
+      onAnswer(wasCorrect);
     }
   };
 
   const handleCloseModal = () => {
+    if (isSubmittingAnswerRef.current) return;
+    isSubmittingAnswerRef.current = true;
     setShowCorrectFullScreenPopup(false);
+    setShowResult(null);
+    
+    if (typeof document !== 'undefined' && document.activeElement instanceof HTMLElement) {
+      document.activeElement.blur();
+    }
     if (onCloseActiveCard) {
       onCloseActiveCard();
     } else {
@@ -2115,12 +2143,14 @@ export default function QuizPanel({
   };
 
   useEffect(() => {
-    if (!activeCard) return;
+    if (!activeCard || activeCard.isRevealed) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
       if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) return;
 
       if (e.key === 'Escape') {
+        e.preventDefault();
+        e.stopPropagation();
         if (showCorrectFullScreenPopup) {
           setShowCorrectFullScreenPopup(false);
         } else {
@@ -2129,23 +2159,32 @@ export default function QuizPanel({
       } else if (showCorrectFullScreenPopup) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
-          setShowCorrectFullScreenPopup(false);
+          e.stopPropagation();
           handleContinue();
         }
       } else if (showResult !== null) {
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
+          e.stopPropagation();
           handleContinue();
         }
-      } else if (activeCard.status === 'idle') {
+      } else if (activeCard.status === 'idle' && !isSubmittingAnswerRef.current) {
         const key = e.key.toUpperCase();
         if (key === 'A' || key === '1') {
+          e.preventDefault();
+          e.stopPropagation();
           handleAnswer(0);
         } else if (key === 'B' || key === '2') {
+          e.preventDefault();
+          e.stopPropagation();
           handleAnswer(1);
         } else if (key === 'C' || key === '3') {
+          e.preventDefault();
+          e.stopPropagation();
           handleAnswer(2);
         } else if (key === 'D' || key === '4') {
+          e.preventDefault();
+          e.stopPropagation();
           handleAnswer(3);
         }
       }
@@ -2153,7 +2192,7 @@ export default function QuizPanel({
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [activeCard, showResult, correctIndex, onCloseActiveCard]);
+  }, [activeCard?.id, activeCard?.isRevealed, activeCard?.status, showResult, showCorrectFullScreenPopup, correctIndex, onCloseActiveCard]);
 
   const selectedHeaderFontObj = AVAILABLE_FONTS.find(f => f.id === headerFont) || AVAILABLE_FONTS[0];
   const selectedBodyFontObj = AVAILABLE_FONTS.find(f => f.id === bodyFont) || AVAILABLE_FONTS[0];
@@ -4226,7 +4265,7 @@ export default function QuizPanel({
     </div>
 
     {/* Fullscreen Question & Answer Modal with Blurred Glass Backdrop */}
-    {activeCard && typeof document !== 'undefined' && createPortal(
+    {activeCard && !activeCard.isRevealed && typeof document !== 'undefined' && createPortal(
       <AnimatePresence>
         <motion.div
           initial={{ opacity: 0 }}

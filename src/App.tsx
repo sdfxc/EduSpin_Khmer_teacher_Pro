@@ -15,6 +15,7 @@ import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { SettingsMenuDrawer } from './components/SettingsMenuDrawer';
 import { GlassLiquidOverlay } from './components/GlassLiquidCapsule';
 import { ShortcutsHelpModal } from './components/ShortcutsHelpModal';
+import { AppLanguage, getSavedLanguage, saveLanguage, t } from './lib/translations';
 import { isSoundEnabled, setSoundEnabled, playChimeSound } from './lib/soundUtils';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
@@ -32,13 +33,28 @@ import { ClassModal } from './components/ClassModal';
 import SmartNotesApp from './components/smart-notes/SmartNotesApp';
 import { BookOpen } from 'lucide-react';
 import { addActivityPointsToStudent, setActivityScoreForStudent, addGroupWorkPointsToStudent, getCurrentDateScoreSlot } from './lib/scoreUtils';
+import { 
+  GRADE_8K1_CLASS_ID, 
+  GRADE_8K1_CLASS_NAME, 
+  GRADE_8K1_STUDENTS, 
+  GRADE_8K1_SUBJECTS, 
+  seedGrade8DataToLocalStorage, 
+  getGrade8AttendanceSeed 
+} from './lib/grade8SeedData';
 
 // Globally patch localStorage.setItem to gracefully handle QuotaExceededError and auto-sanitize
 function cleanupLocalStorageQuota() {
   try {
+    const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
+
+      // Purge old flawed blacklists that previously caused accidental deletion of classes
+      if (key.startsWith('khmer_teacher_deleted_classes')) {
+        keysToRemove.push(key);
+        continue;
+      }
 
       if (key === 'khmer_teacher_classes' || key.startsWith('khmer_teacher_classes_')) {
         const value = localStorage.getItem(key);
@@ -60,11 +76,12 @@ function cleanupLocalStorageQuota() {
         }
       }
     }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
   } catch (e) {
     console.error('Error during localStorage quota cleanup:', e);
   }
 }
-
+cleanupLocalStorageQuota();
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
@@ -101,46 +118,9 @@ const SAMPLE_STUDENTS: Record<string, Student[]> = {};
 
 const DEFAULT_CLASSES: ClassInfo[] = [];
 
-function getDeletedClassIds(teacherId?: string): Set<string> {
-  const deletedSet = new Set<string>();
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('khmer_teacher_deleted_classes')) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          const arr = JSON.parse(raw);
-          if (Array.isArray(arr)) {
-            arr.forEach(id => {
-              if (id) deletedSet.add(String(id));
-            });
-          }
-        }
-      }
-    }
-  } catch {}
-  return deletedSet;
-}
-
-function markClassAsDeleted(classId: string, teacherId?: string) {
-  if (!classId) return;
-  const strId = String(classId);
-  const deletedSet = getDeletedClassIds(teacherId);
-  deletedSet.add(strId);
-  const arr = Array.from(deletedSet);
-  const json = JSON.stringify(arr);
-  try {
-    localStorage.setItem('khmer_teacher_deleted_classes_local', json);
-    if (teacherId && teacherId !== 'local') {
-      localStorage.setItem(`khmer_teacher_deleted_classes_${teacherId}`, json);
-    }
-  } catch {}
-}
-
-const sortClasses = (classList: ClassInfo[], teacherId?: string): ClassInfo[] => {
-  const deletedSet = getDeletedClassIds(teacherId);
+const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
   const clean = (classList || [])
-    .filter(c => c && c.id && c.name && c.name.trim() !== '' && !(c as any).isDeleted && !deletedSet.has(String(c.id)))
+    .filter(c => c && c.id && c.name && String(c.name).trim() !== '' && !(c as any).isDeleted)
     .map(c => ({
       id: String(c.id),
       name: String(c.name).trim(),
@@ -149,12 +129,9 @@ const sortClasses = (classList: ClassInfo[], teacherId?: string): ClassInfo[] =>
     }));
 
   const uniqueIds = new Set<string>();
-  const uniqueNames = new Set<string>();
   const filtered = clean.filter(c => {
-    const trimmedName = c.name.trim();
-    if (uniqueIds.has(c.id) || uniqueNames.has(trimmedName)) return false;
+    if (uniqueIds.has(c.id)) return false;
     uniqueIds.add(c.id);
-    uniqueNames.add(trimmedName);
     return true;
   });
 
@@ -185,7 +162,6 @@ function getInitialActiveTeacherAndClass() {
       teacherId = teacherObj?.id || '';
     } catch {}
   }
-  const deletedSet = getDeletedClassIds(teacherId);
   const savedActiveId = (teacherId ? localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) : null)
     || localStorage.getItem('khmer_teacher_active_class_id')
     || '';
@@ -197,25 +173,50 @@ function getInitialActiveTeacherAndClass() {
     try {
       const raw = JSON.parse(savedClassesRaw) as ClassInfo[];
       parsedClasses = (raw || [])
-        .filter(c => c && c.id && c.name && c.name.trim() !== '' && !deletedSet.has(String(c.id)))
+        .filter(c => c && c.id && c.name && String(c.name).trim() !== '' && !(c as any).isDeleted)
         .map(c => ({
           id: String(c.id),
           name: String(c.name).trim(),
           order: typeof c.order === 'number' ? c.order : 0,
           isPinned: !!c.isPinned
         }));
-      if (savedActiveId && !deletedSet.has(savedActiveId) && parsedClasses.some(c => c.id === savedActiveId)) {
-        effectiveClassId = savedActiveId;
-      } else if (parsedClasses.length > 0) {
-        effectiveClassId = parsedClasses[0].id;
-      } else {
-        effectiveClassId = '';
-      }
     } catch {}
   }
-  if (!effectiveClassId && parsedClasses.length > 0) {
-    effectiveClassId = parsedClasses[0].id;
+
+  // Ensure ថ្នាក់ទី៨ក១ is present in classes list ONLY in guest mode (not logged in)
+  const hasGrade8k1 = parsedClasses.some(c => 
+    c.name.includes('៨ក១') || c.name.includes('8ក១') || c.name.includes('8K1') || c.name.includes('៨')
+  );
+  if (!hasGrade8k1 && !teacherId) {
+    const grade8ClassId = GRADE_8K1_CLASS_ID;
+    parsedClasses.push({
+      id: grade8ClassId,
+      name: GRADE_8K1_CLASS_NAME,
+      order: 1,
+      isPinned: true
+    });
   }
+
+  // Ensure Grade 8 student data exists in localStorage for guest mode only
+  if (!teacherId) {
+    const existingGrade8Students = localStorage.getItem(`students_class_${GRADE_8K1_CLASS_ID}`);
+    if (!existingGrade8Students || existingGrade8Students === '[]') {
+      seedGrade8DataToLocalStorage();
+    }
+  }
+
+  parsedClasses = sortClasses(parsedClasses);
+
+  if (savedActiveId && parsedClasses.some(c => c.id === savedActiveId)) {
+    effectiveClassId = savedActiveId;
+  } else if (parsedClasses.length > 0) {
+    // If Grade 8k1 was requested, prioritize it if effectiveClassId is empty
+    const g8 = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'));
+    effectiveClassId = g8?.id || parsedClasses[0].id;
+  } else {
+    effectiveClassId = '';
+  }
+
   return {
     teacher: teacherObj,
     activeClassId: effectiveClassId,
@@ -350,6 +351,20 @@ export default function App() {
     const saved = localStorage.getItem('khmer_teacher_dark_mode');
     return saved === 'true';
   });
+
+  const [language, setLanguage] = useState<AppLanguage>(() => getSavedLanguage());
+
+  useEffect(() => {
+    const handleLangChange = (e: any) => {
+      if (e?.detail && (e.detail === 'km' || e.detail === 'en')) {
+        setLanguage(e.detail);
+      }
+    };
+    window.addEventListener('app-language-changed', handleLangChange);
+    return () => {
+      window.removeEventListener('app-language-changed', handleLangChange);
+    };
+  }, []);
 
   const initialClassState = getInitialActiveTeacherAndClass();
   const lastLoadedClassId = useRef<string>(initialClassState.activeClassId);
@@ -769,13 +784,8 @@ export default function App() {
       const teacherDocRef = doc(db, 'teachers', teacher.id);
       unsubTeacher = safeOnSnapshot(teacherDocRef, (teacherSnap: any) => {
         if (teacherSnap && teacherSnap.exists && teacherSnap.exists()) {
-          const cloudTeacher = teacherSnap.data() as TeacherAccount & { deletedClassIds?: string[] };
+          const cloudTeacher = teacherSnap.data() as TeacherAccount;
           if (cloudTeacher) {
-            if (Array.isArray(cloudTeacher.deletedClassIds)) {
-              cloudTeacher.deletedClassIds.forEach((dId: string) => {
-                if (dId) markClassAsDeleted(String(dId), teacher.id);
-              });
-            }
             setTeacher(prev => {
               if (!prev) return cloudTeacher;
               if (
@@ -803,16 +813,13 @@ export default function App() {
 
         let fetchedClasses: ClassInfo[] = [];
         const seenIds = new Set<string>();
-        const deletedSet = getDeletedClassIds(teacher.id);
 
         classesSnap.forEach((docSnap: any) => {
           const clsData = docSnap.data();
           if (!clsData) return;
           const id = clsData.id || docSnap.id;
 
-          if (clsData.isDeleted === true || deletedSet.has(id)) {
-            // Document was marked deleted or in local deleted set! Safely clean up in cloud
-            safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', id)).catch(() => {});
+          if (clsData.isDeleted === true) {
             return;
           }
 
@@ -829,7 +836,9 @@ export default function App() {
           }
         });
 
-        const sortedCloudClasses = sortClasses(fetchedClasses, teacher.id);
+        // Do not force any default classes for logged-in accounts. Keep them completely clean and matching their database state.
+
+        const sortedCloudClasses = sortClasses(fetchedClasses);
         setClasses(prev => {
           const isSame = prev.length === sortedCloudClasses.length &&
             prev.every((c, i) => c.id === sortedCloudClasses[i].id && c.name === sortedCloudClasses[i].name && c.order === sortedCloudClasses[i].order && c.isPinned === sortedCloudClasses[i].isPinned);
@@ -935,22 +944,11 @@ export default function App() {
 
     const loadClassDetails = async () => {
       try {
-        const deletedSet = getDeletedClassIds(teacher.id);
-        if (deletedSet.has(activeClassId)) {
-          setLoadingCloudData(false);
-          return;
-        }
-
         setLoadingCloudData(true);
         
         // 1. Fetch class doc
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         const classSnap = await safeGetDoc(classDocRef);
-        
-        if (getDeletedClassIds(teacher.id).has(activeClassId)) {
-          setLoadingCloudData(false);
-          return;
-        }
         
         let loadedSubjects: QuizSubject[] = [];
         let loadedActiveSubjectId: string | null = null;
@@ -1005,7 +1003,7 @@ export default function App() {
           loadedActiveRoomId = classData.activeRoomId || null;
         } else {
           // Empty or new class in cloud – check if this activeClassId is actually a valid non-deleted class in state
-          const isClassInList = classes.some(c => c.id === activeClassId) && !getDeletedClassIds(teacher.id).has(activeClassId);
+          const isClassInList = classes.some(c => c.id === activeClassId);
           if (!isClassInList) {
             setLoadingCloudData(false);
             return;
@@ -1150,6 +1148,33 @@ export default function App() {
             }
           } catch (e) {}
         }
+
+        // Special Grade 8k1 complete data assurance
+        if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១') || activeClassName?.includes('8K1')) {
+          if (loadedStudents.length === 0) {
+            loadedStudents = GRADE_8K1_STUDENTS;
+            if (teacher?.id) {
+              for (const s of GRADE_8K1_STUDENTS) {
+                safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id), s, { merge: true }).catch(() => {});
+              }
+            }
+          }
+          if (loadedSubjects.length === 0 || (loadedSubjects.length === 1 && loadedSubjects[0].chapters[0]?.rooms[0]?.cards?.length === 0)) {
+            loadedSubjects = GRADE_8K1_SUBJECTS;
+            loadedActiveSubjectId = loadedSubjects[0]?.id || null;
+            loadedChapters = loadedSubjects[0]?.chapters || [];
+            loadedActiveRoomId = loadedChapters[0]?.rooms[0]?.id || null;
+            resolvedCards = loadedChapters[0]?.rooms[0]?.cards || [];
+            setCards(resolvedCards);
+            if (teacher?.id) {
+              safeSetDoc(classDocRef, {
+                subjects: loadedSubjects,
+                activeSubjectId: loadedActiveSubjectId,
+                activeRoomId: loadedActiveRoomId
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        }
         
         setStudents(loadedStudents);
         if (activeClassId) {
@@ -1185,6 +1210,10 @@ export default function App() {
       const activeClassName = activeCls?.name;
 
       if (snapshot.empty) {
+        // If empty in cloud, preserve existing state if it's Grade 8 to prevent flickering
+        if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១')) {
+          return;
+        }
         setStudents([]);
         return;
       }
@@ -1193,11 +1222,7 @@ export default function App() {
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as Student;
         if (data && data.id && !data.id.startsWith('sim-')) {
-          if (isStudentInClass(data, activeClassId, activeClassName)) {
-            loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
-          } else {
-            safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', data.id)).catch(() => {});
-          }
+          loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
         }
       });
       setStudents(loadedStudents);
@@ -1549,7 +1574,16 @@ export default function App() {
     localStorage.setItem(`active_subject_id_${activeClassId}`, currentSubId);
     localStorage.setItem(`active_room_id_${activeClassId}`, currentRoomId);
 
-    // Redundant cloud write removed - syncClassInfo effect handles this throttled.
+    // Save updated questions & rooms to Firestore for this specific class only
+    if (teacher?.id && activeClassId) {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
+        activeSubjectId: currentSubId,
+        activeRoomId: currentRoomId,
+        cards: updatedCards,
+        pickedIds: updatedPickedIds
+      }, { merge: true }).catch(err => console.error('Failed to sync updated questions to Firestore:', err));
+    }
   }, [teacher, activeClassId, activeRoomId, chapters, subjects, activeSubjectId]);
 
   // Helper to save student score updates to Firestore
@@ -2697,25 +2731,18 @@ export default function App() {
       confirmText: 'បាទ/ចាស លុបថ្នាក់',
       variant: 'danger',
       onConfirm: async () => {
-        const currentTeacherId = teacher?.id || 'local';
-        markClassAsDeleted(classId, currentTeacherId);
-
-        const updatedClasses = classes.filter(c => c.id !== classId);
-        const sortedClasses = sortClasses(updatedClasses, currentTeacherId);
-        setClasses(sortedClasses);
-
-        // 1. Mark as deleted and delete from Firestore if teacher is logged in
+        // 1. Delete ONLY this specific class from Firestore if teacher is logged in
         if (teacher?.id) {
           try {
-            await safeSetDoc(doc(db, 'teachers', teacher.id), {
-              deletedClassIds: arrayUnion(classId)
-            }, { merge: true });
-            await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', classId), { isDeleted: true }, { merge: true });
             await safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
           } catch (err) {
             console.error('Failed to delete class from Firestore:', err);
           }
         }
+
+        const updatedClasses = classes.filter(c => c.id !== classId);
+        const sortedClasses = sortClasses(updatedClasses);
+        setClasses(sortedClasses);
 
         // 2. Update localStorage strictly for this teacher
         if (teacher) {
@@ -2730,7 +2757,7 @@ export default function App() {
           }
         }
 
-        // 3. Clear all cached class data from localStorage
+        // 3. Clear all cached class data for ONLY this deleted class
         localStorage.removeItem(`students_class_${classId}`);
         localStorage.removeItem(`quiz_cards_class_${classId}`);
         localStorage.removeItem(`picked_students_class_${classId}`);
@@ -2739,11 +2766,30 @@ export default function App() {
         localStorage.removeItem(`chapters_class_${classId}`);
         localStorage.removeItem(`active_subject_id_${classId}`);
         localStorage.removeItem(`active_room_id_${classId}`);
+        localStorage.removeItem(`khmer_exams_${classId}`);
         
         // 4. Handle active class switch
         if (activeClassId === classId) {
           if (sortedClasses.length > 0) {
-            handleSwitchClass(sortedClasses[0].id);
+            const nextClass = sortedClasses[0];
+            lastLoadedClassId.current = nextClass.id;
+            setActiveClassId(nextClass.id);
+            if (teacher) {
+              localStorage.setItem(`khmer_teacher_active_class_id_${teacher.id}`, nextClass.id);
+            }
+            localStorage.setItem('khmer_teacher_active_class_id', nextClass.id);
+
+            // Load next class cached data
+            try {
+              const cachedStudents = localStorage.getItem(`students_class_${nextClass.id}`);
+              setStudents(cachedStudents ? JSON.parse(cachedStudents) : []);
+              const cachedCards = localStorage.getItem(`quiz_cards_class_${nextClass.id}`);
+              setCards(cachedCards ? JSON.parse(cachedCards) : []);
+              const cachedPicked = localStorage.getItem(`picked_students_class_${nextClass.id}`);
+              setPickedIds(cachedPicked ? JSON.parse(cachedPicked) : []);
+              const cachedManual = localStorage.getItem(`manual_called_students_class_${nextClass.id}`);
+              setManualCalledIds(cachedManual ? JSON.parse(cachedManual) : []);
+            } catch {}
           } else {
             setActiveClassId('');
             setStudents([]);
@@ -3098,6 +3144,13 @@ export default function App() {
 
   const handleAnswer = useCallback((correct: boolean) => {
     if (!activeCardId) return;
+    const currentActiveCardId = activeCardId;
+
+    // Immediately clear active card references and states to prevent re-opening or echo
+    activeCardIdRef.current = null;
+    setActiveCardId(null);
+    lastSyncedQuizRef.current.activeCardId = null;
+    lastSyncedQuizRef.current.activeCardIdOfCard = null;
 
     // Update student score if student is selected
     if (selectedStudentId) {
@@ -3116,16 +3169,24 @@ export default function App() {
 
     // Update card status
     const updatedCards = cards.map(c => {
-      if (c.id === activeCardId) {
-        return { ...c, isRevealed: true, status: correct ? 'correct' : 'wrong' as any };
+      if (c.id === currentActiveCardId) {
+        return { ...c, isRevealed: true, status: (correct ? 'correct' : 'wrong') as any };
       }
       return c;
     });
     setCards(updatedCards);
 
     saveClassMetadata(updatedCards, pickedIds);
-    setActiveCardId(null);
-  }, [activeCardId, selectedStudentId, cards, pickedIds, saveClassMetadata, saveStudentScore]);
+
+    // Immediately clear active presentation card state on Firestore
+    if (teacher?.id && activeClassId) {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        activeCardId: null,
+        activeCard: null,
+        activeCardState: 'answering'
+      }, { merge: true }).catch(() => {});
+    }
+  }, [activeCardId, selectedStudentId, cards, pickedIds, saveClassMetadata, teacher?.id, activeClassId]);
 
   const resetMatch = useCallback(async () => {
     confirmAction({
@@ -3318,15 +3379,15 @@ export default function App() {
         <nav className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
           isDarkMode 
             ? 'bg-[#18181c]/90 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.6)]' 
-            : 'bg-gradient-to-r from-sky-50/90 via-indigo-50/80 to-purple-50/90 border-white/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.8)]'
+            : 'bg-white/80 border-slate-200/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.9)]'
         }`}>
           {[
-            { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass, activeBgLight: 'from-sky-100/95 via-blue-50/95 to-sky-100/95', textLight: 'text-sky-700', activeTextLight: 'text-sky-800' },
-            { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon, activeBgLight: 'from-emerald-100/95 via-teal-50/95 to-emerald-100/95', textLight: 'text-emerald-700', activeTextLight: 'text-emerald-800' },
-            { id: 'students', label: 'គ្រប់គ្រងសិស្ស', icon: UserCog, activeBgLight: 'from-violet-100/95 via-purple-50/95 to-violet-100/95', textLight: 'text-purple-700', activeTextLight: 'text-purple-800' },
-            { id: 'quiz', label: 'ក្ដារសំណួរ', icon: LayoutGrid, activeBgLight: 'from-amber-100/95 via-orange-50/95 to-amber-100/95', textLight: 'text-amber-700', activeTextLight: 'text-amber-800' },
-            { id: 'exams-room', label: 'បន្ទប់វិញ្ញាសា', icon: GraduationCap, activeBgLight: 'from-indigo-100/95 via-blue-50/95 to-indigo-100/95', textLight: 'text-indigo-700', activeTextLight: 'text-indigo-800' },
-            { id: 'student-lobby', label: 'Study game', icon: Sparkles, badge: true, activeBgLight: 'from-rose-100/95 via-pink-50/95 to-rose-100/95', textLight: 'text-rose-700', activeTextLight: 'text-rose-800' },
+            { id: 'wheel', label: language === 'km' ? 'បង្វិលឈ្មោះ' : 'Wheel Spin', icon: Compass, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'groups', label: language === 'km' ? 'បែងចែកក្រុម' : 'Groups', icon: UsersIcon, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'student-lobby', label: 'Study game', icon: Sparkles, badge: true, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -3341,8 +3402,8 @@ export default function App() {
                 transition={{ type: "spring", stiffness: 500, damping: 20 }}
                 className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
                   isActive
-                    ? isDarkMode ? 'text-blue-400 font-extrabold' : `${tab.activeTextLight} font-black`
-                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : `${tab.textLight} hover:bg-white/70`
+                    ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-black'
+                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-700 hover:text-blue-600 hover:bg-slate-100/70'
                 }`}
               >
                 {isActive && (
@@ -3357,7 +3418,7 @@ export default function App() {
                     className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
                       isDarkMode
                         ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
-                        : `bg-gradient-to-r ${tab.activeBgLight} border-white/95 shadow-[0_6px_20px_rgba(0,0,0,0.06),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]`
+                        : `bg-gradient-to-r ${tab.activeBgLight} border-slate-200/90 shadow-[0_4px_16px_rgba(15,23,42,0.08),inset_0_2px_4px_rgba(255,255,255,1),inset_0_-1px_2px_rgba(0,0,0,0.03)]`
                     }`}
                   >
                     {/* Top Specular Glare Dome Reflection */}
@@ -3387,19 +3448,33 @@ export default function App() {
                     y: isActive ? -0.5 : 0
                   }}
                   transition={{ type: "spring", stiffness: 450, damping: 22 }}
-                  className="relative z-10 flex items-center gap-2"
+                  className="relative z-10 flex items-center gap-2.5"
                 >
-                  <Icon className={`w-4 h-4 transition-all duration-300 ${
+                  {/* Circular shape around tab icon */}
+                  <div className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-200 shrink-0 ${
                     isActive
-                      ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : `${tab.activeTextLight} scale-110 drop-shadow-xs`
-                      : isDarkMode ? 'text-slate-400' : 'text-slate-500'
-                  } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
+                      ? isDarkMode 
+                        ? 'border-blue-400 bg-blue-500/10 shadow-[0_0_10px_rgba(96,165,250,0.2)]' 
+                        : 'border-blue-600 bg-blue-500/5 shadow-[0_0_8px_rgba(37,99,235,0.15)]'
+                      : isDarkMode 
+                        ? 'border-neutral-700 bg-transparent' 
+                        : 'border-slate-300 bg-transparent group-hover:border-slate-400'
+                  }`}>
+                    <Icon className={`w-3.5 h-3.5 transition-all duration-300 ${
+                      isActive
+                        ? isDarkMode ? 'text-blue-400 scale-110' : 'text-blue-600 scale-110'
+                        : isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                    } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
+                  </div>
+
                   <span className={
                     isActive 
                       ? isDarkMode 
                         ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
-                        : `${tab.activeTextLight} font-black tracking-wide` 
-                      : 'font-bold'
+                        : 'text-blue-600 font-black tracking-wide' 
+                      : isDarkMode
+                        ? 'text-slate-300 font-bold'
+                        : 'text-slate-700 hover:text-blue-600 font-bold'
                   }>{tab.label}</span>
                   
                   {isStudyGame && pendingStudentsCount > 0 ? (
@@ -3490,7 +3565,7 @@ export default function App() {
                 className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ចូលគណនី</span>
+                <span className="hidden sm:inline">{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
               </button>
               <button
                 onClick={() => {
@@ -3500,7 +3575,7 @@ export default function App() {
                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
               >
                 <User className="w-3.5 h-3.5" />
-                <span>ចុះឈ្មោះគ្រូ</span>
+                <span>{language === 'km' ? 'ចុះឈ្មោះគ្រូ' : 'Register'}</span>
               </button>
             </div>
           )}
@@ -3515,7 +3590,7 @@ export default function App() {
                 ? 'text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50'
                 : (isDarkMode ? 'text-emerald-400 hover:bg-slate-800' : 'text-emerald-600 hover:bg-slate-100')
             }`}
-            title={soundOn ? 'បិទសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'បើកសំឡេងហ្គេម (គ្រាប់ចុច M)'}
+            title={soundOn ? (language === 'km' ? 'បិទសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'Mute Game Sound (Key M)') : (language === 'km' ? 'បើកសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'Turn On Sound (Key M)')}
           >
             {soundOn ? <Volume2 className="w-4.5 h-4.5" /> : <VolumeX className="w-4.5 h-4.5" />}
           </button>
@@ -3528,7 +3603,7 @@ export default function App() {
                 ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400'
                 : (isDarkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
             }`}
-            title={isFullscreen ? 'ចាកចេញពីអេក្រង់ពេញ (គ្រាប់ចុច F)' : 'ពង្រីកពេញអេក្រង់សម្រាប់ Projector/TV (គ្រាប់ចុច F)'}
+            title={isFullscreen ? (language === 'km' ? 'ចាកចេញពីអេក្រង់ពេញ (គ្រាប់ចុច F)' : 'Exit Fullscreen (Key F)') : (language === 'km' ? 'ពង្រីកពេញអេក្រង់សម្រាប់ Projector/TV (គ្រាប់ចុច F)' : 'Enter Fullscreen (Key F)')}
           >
             {isFullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
           </button>
@@ -3541,7 +3616,7 @@ export default function App() {
                 ? 'bg-gradient-to-tr from-blue-900/50 via-indigo-900/50 to-blue-950/50 hover:from-blue-800/80 hover:to-indigo-800/80 text-blue-300 border-blue-400/30 hover:border-blue-400/60 shadow-blue-500/10' 
                 : 'bg-gradient-to-tr from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-600 border-blue-200 hover:border-blue-300 shadow-blue-500/10'
             }`}
-            title="ការកំណត់ & បម្រុងទុកទិន្នន័យ ១០០% (Settings & 100% Full Backup Menu)"
+            title={language === 'km' ? 'ការកំណត់ & បម្រុងទុកទិន្នន័យ (Settings & Backup)' : 'Settings & Backup (ការកំណត់)'}
             aria-label="Settings & Backup"
           >
             <Settings className="w-4.5 h-4.5 text-blue-500 group-hover:rotate-90 transition-transform duration-300" />
@@ -3797,19 +3872,17 @@ export default function App() {
                       >
                         <Pencil className="w-2.5 h-2.5" />
                       </button>
-                      {classes.length > 1 && (
-                        <button
-                          onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
-                          className={`p-0.5 rounded transition-colors ${
-                            isActive
-                              ? 'hover:bg-red-500 text-red-500 hover:text-white'
-                              : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
-                          }`}
-                          title="លុបថ្នាក់"
-                        >
-                          <Trash2 className="w-2.5 h-2.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                        className={`p-0.5 rounded transition-colors ${
+                          isActive
+                            ? 'hover:bg-red-500 text-red-500 hover:text-white'
+                            : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
+                        }`}
+                        title="លុបថ្នាក់"
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </button>
                     </div>
                   </motion.span>
                 </motion.div>
@@ -4021,11 +4094,29 @@ export default function App() {
             }`}>
               <QuizPanel
                 cards={cards}
-                onCardClick={(c) => setActiveCardId(c.id)}
+                onCardClick={(c) => {
+                  if (c.isRevealed) return;
+                  activeCardIdRef.current = c.id;
+                  setActiveCardId(c.id);
+                  lastSyncedQuizRef.current.activeCardId = c.id;
+                  lastSyncedQuizRef.current.activeCardIdOfCard = c.id;
+                }}
                 onAnswer={handleAnswer}
                 onReset={resetMatch}
                 activeCard={activeCard}
-                onCloseActiveCard={() => setActiveCardId(null)}
+                onCloseActiveCard={() => {
+                  activeCardIdRef.current = null;
+                  setActiveCardId(null);
+                  lastSyncedQuizRef.current.activeCardId = null;
+                  lastSyncedQuizRef.current.activeCardIdOfCard = null;
+                  if (teacher?.id && activeClassId) {
+                    safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+                      activeCardId: null,
+                      activeCard: null,
+                      activeCardState: 'answering'
+                    }, { merge: true }).catch(() => {});
+                  }
+                }}
                 selectedStudent={selectedStudent}
                 chapters={chapters}
                 activeRoomId={activeRoomId}
@@ -4184,12 +4275,12 @@ export default function App() {
                   <LogOut className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">ចាកចេញពីគណនី</h3>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{t('confirmLogoutTitle', language)}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Logout Account</p>
                 </div>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ចាកចេញពីគណនីមែនទេ? (រាល់ទិន្នន័យដែលបានរក្សាទុកក្នុង Cloud នឹងមិនបាត់បង់ឡើយ)
+                {t('confirmLogoutDesc', language)}
               </p>
               <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
@@ -4197,7 +4288,7 @@ export default function App() {
                   onClick={() => setIsLogoutModalOpen(false)}
                   className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                 >
-                  បោះបង់
+                  {t('cancel', language)}
                 </button>
                 <button
                   type="button"
@@ -4205,7 +4296,7 @@ export default function App() {
                   className="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl transition-all shadow-md shadow-red-600/20 cursor-pointer flex items-center gap-1.5"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>ចាកចេញ</span>
+                  <span>{t('logout', language)}</span>
                 </button>
               </div>
             </motion.div>
@@ -4233,6 +4324,8 @@ export default function App() {
         }}
         onLogout={() => setIsLogoutModalOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        language={language}
+        onLanguageChange={setLanguage}
         classes={classes}
         students={students}
         subjects={subjects}

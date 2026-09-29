@@ -6,6 +6,7 @@ import {
   FacebookAuthProvider,
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  sendPasswordResetEmail,
   signOut
 } from 'firebase/auth';
 import { 
@@ -25,6 +26,7 @@ import {
   QuerySnapshot
 } from 'firebase/firestore';
 export { doc, setDoc, getDoc, getDocs, collection, deleteDoc, query, where, onSnapshot };
+import { getDeletedClassIds, getDeletedStudentIds, getDeletedExamIds } from './deletionRegistry';
 import firebaseConfig from '../../firebase-applet-config.json';
 
 // Clear any residual quota block key from past runs
@@ -80,6 +82,7 @@ export {
   FacebookAuthProvider, 
   signInWithEmailAndPassword, 
   createUserWithEmailAndPassword, 
+  sendPasswordResetEmail,
   signOut 
 };
 
@@ -229,33 +232,27 @@ export const safeSetDoc = async (docRef: any, data: any, options?: any) => {
     return;
   }
 
-  // Prevent resurrecting deleted classes
+  // Prevent resurrecting deleted classes or deleted students
   if (data && !data.isDeleted && docRef?.path && typeof docRef.path === 'string') {
     const pathParts = docRef.path.split('/');
+    
+    // 1. Check Class Deletion
     const classIdx = pathParts.indexOf('classes');
     if (classIdx >= 0 && pathParts.length > classIdx + 1) {
       const classId = pathParts[classIdx + 1];
-      if (classId) {
-        try {
-          let isDeleted = false;
-          for (let i = 0; i < localStorage.length; i++) {
-            const key = localStorage.key(i);
-            if (key && key.startsWith('khmer_teacher_deleted_classes')) {
-              const raw = localStorage.getItem(key);
-              if (raw) {
-                const arr = JSON.parse(raw);
-                if (Array.isArray(arr) && arr.map(String).includes(String(classId))) {
-                  isDeleted = true;
-                  break;
-                }
-              }
-            }
-          }
-          if (isDeleted) {
-            console.warn(`[Firestore] Intercepted attempt to write to deleted class "${classId}". Operation cancelled.`);
-            return;
-          }
-        } catch {}
+      if (classId && getDeletedClassIds().has(String(classId))) {
+        console.warn(`[Firestore] Intercepted attempt to write to deleted class "${classId}". Operation cancelled.`);
+        return;
+      }
+    }
+
+    // 2. Check Student Deletion
+    const studentIdx = pathParts.indexOf('students');
+    if (studentIdx >= 0 && pathParts.length > studentIdx + 1) {
+      const studentId = pathParts[studentIdx + 1];
+      if (studentId && getDeletedStudentIds().has(String(studentId))) {
+        console.warn(`[Firestore] Intercepted attempt to write to deleted student "${studentId}". Operation cancelled.`);
+        return;
       }
     }
   }
@@ -307,7 +304,8 @@ export const safeOnSnapshot = (docRef: any, callback: any, errorCallback?: any) 
         if (errorCallback) errorCallback(error);
         return;
       }
-      handleFirestoreError(error, OperationType.LIST, docRef?.path || null);
+      const isQuery = !!(docRef?.type === 'collection' || docRef?.type === 'query' || docRef?._query);
+      handleFirestoreError(error, isQuery ? OperationType.LIST : OperationType.GET, docRef?.path || null);
       if (errorCallback) errorCallback(error);
     });
   } catch (err: any) {
@@ -394,13 +392,14 @@ export function handleFirestoreError(error: unknown, operationType: OperationTyp
     return;
   }
 
+  const currentUser = auth?.currentUser;
   const errInfo: FirestoreErrorInfo = {
     error: errMessage,
     authInfo: {
-      userId: null,
-      email: null,
-      emailVerified: null,
-      isAnonymous: null
+      userId: currentUser?.uid || null,
+      email: currentUser?.email || null,
+      emailVerified: currentUser?.emailVerified || null,
+      isAnonymous: currentUser?.isAnonymous || null
     },
     operationType,
     path

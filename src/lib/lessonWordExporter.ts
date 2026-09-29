@@ -438,3 +438,323 @@ export async function exportWordDocContentToDocx(docItem: WordDocItem, schoolNam
   document.body.removeChild(link);
   URL.revokeObjectURL(link.href);
 }
+
+export interface GeneratedLessonArticleData {
+  title: string;
+  subject: string;
+  grade: string;
+  chapter?: string;
+  objectives?: {
+    knowledge?: string[];
+    skills?: string[];
+    attitude?: string[];
+  };
+  introduction?: string;
+  detailedContent: string;
+  summaryContent: string;
+  keyTakeaways?: string[];
+  exercises?: Array<{
+    question: string;
+    answerOrSolution: string;
+    points?: number;
+  }>;
+}
+
+export async function exportGeneratedLessonArticleToDocx(
+  data: GeneratedLessonArticleData,
+  schoolName: string = 'សាលារៀនសុវណ្ណភូមិ',
+  teacherName: string = 'លោកគ្រូ / អ្នកគ្រូ'
+) {
+  const fontBody = 'Khmer OS Content';
+  const fontTitle = 'Khmer OS Muol Light';
+
+  const paragraphs: Paragraph[] = [
+    // Header
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 60 },
+      children: [
+        new TextRun({ text: 'ព្រះរាជាណាចក្រកម្ពុជា', font: fontTitle, size: 26, bold: true, color: '1E3A8A' })
+      ]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 200 },
+      children: [
+        new TextRun({ text: 'ជាតិ សាសនា ព្រះមហាក្សត្រ', font: fontTitle, size: 22, color: '1E3A8A' })
+      ]
+    }),
+    new Paragraph({
+      spacing: { after: 120 },
+      children: [
+        new TextRun({ text: schoolName, font: fontTitle, size: 22, bold: true, color: '0F172A' })
+      ]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { before: 160, after: 120 },
+      children: [
+        new TextRun({ text: 'អត្ថបទបង្រៀន និងសង្ខេបមេរៀន (MoEYS Standard)', font: fontTitle, size: 26, bold: true, color: '1E40AF' })
+      ]
+    }),
+    new Paragraph({
+      alignment: AlignmentType.CENTER,
+      spacing: { after: 240 },
+      children: [
+        new TextRun({ text: data.title, font: fontTitle, size: 28, bold: true, color: '2563EB' })
+      ]
+    }),
+    // Metadata
+    new Paragraph({
+      spacing: { after: 160 },
+      children: [
+        new TextRun({ text: `• មុខវិជ្ជា៖ `, font: fontBody, bold: true, size: 22 }),
+        new TextRun({ text: data.subject, font: fontBody, size: 22 }),
+        new TextRun({ text: `   |   ថ្នាក់ទី៖ `, font: fontBody, bold: true, size: 22 }),
+        new TextRun({ text: data.grade, font: fontBody, size: 22 }),
+        ...(data.chapter ? [
+          new TextRun({ text: `   |   ជំពូក៖ `, font: fontBody, bold: true, size: 22 }),
+          new TextRun({ text: data.chapter, font: fontBody, size: 22 })
+        ] : []),
+        new TextRun({ text: `   |   គ្រូបង្រៀន៖ `, font: fontBody, bold: true, size: 22 }),
+        new TextRun({ text: teacherName, font: fontBody, size: 22 })
+      ]
+    })
+  ];
+
+  // Objectives
+  if (data.objectives && (data.objectives.knowledge?.length || data.objectives.skills?.length || data.objectives.attitude?.length)) {
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 200, after: 100 },
+        children: [
+          new TextRun({ text: 'I. វត្ថុបំណងនៃការបង្រៀន (Learning Objectives)', font: fontTitle, size: 24, bold: true, color: '1E40AF' })
+        ]
+      })
+    );
+
+    if (data.objectives.knowledge?.length) {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { after: 40 },
+          children: [new TextRun({ text: '១. ចំណេះដឹង៖', font: fontBody, bold: true, size: 22 })]
+        })
+      );
+      data.objectives.knowledge.forEach(k => {
+        paragraphs.push(
+          new Paragraph({
+            bullet: { level: 0 },
+            spacing: { after: 40 },
+            children: [new TextRun({ text: k, font: fontBody, size: 22 })]
+          })
+        );
+      });
+    }
+
+    if (data.objectives.skills?.length) {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { before: 80, after: 40 },
+          children: [new TextRun({ text: '២. បំណិន៖', font: fontBody, bold: true, size: 22 })]
+        })
+      );
+      data.objectives.skills.forEach(s => {
+        paragraphs.push(
+          new Paragraph({
+            bullet: { level: 0 },
+            spacing: { after: 40 },
+            children: [new TextRun({ text: s, font: fontBody, size: 22 })]
+          })
+        );
+      });
+    }
+
+    if (data.objectives.attitude?.length) {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { before: 80, after: 40 },
+          children: [new TextRun({ text: '៣. ឥរិយាបថ៖', font: fontBody, bold: true, size: 22 })]
+        })
+      );
+      data.objectives.attitude.forEach(a => {
+        paragraphs.push(
+          new Paragraph({
+            bullet: { level: 0 },
+            spacing: { after: 40 },
+            children: [new TextRun({ text: a, font: fontBody, size: 22 })]
+          })
+        );
+      });
+    }
+  }
+
+  // Introduction
+  if (data.introduction) {
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 240, after: 80 },
+        children: [
+          new TextRun({ text: 'II. សេចក្តីផ្តើម និងសារៈសំខាន់ (Introduction & Context)', font: fontTitle, size: 24, bold: true, color: '1E40AF' })
+        ]
+      }),
+      new Paragraph({
+        spacing: { after: 160, line: 320 },
+        children: [new TextRun({ text: data.introduction, font: fontBody, size: 22 })]
+      })
+    );
+  }
+
+  // Detailed Content
+  paragraphs.push(
+    new Paragraph({
+      spacing: { before: 240, after: 120 },
+      children: [
+        new TextRun({ text: 'III. ខ្លឹមសារមេរៀនលម្អិតសម្រាប់បង្រៀន (Detailed Teaching Content)', font: fontTitle, size: 24, bold: true, color: '1E40AF' })
+      ]
+    })
+  );
+
+  const detailedLines = (data.detailedContent || '').split('\n');
+  for (const line of detailedLines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      paragraphs.push(new Paragraph({ spacing: { after: 60 }, children: [] }));
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      paragraphs.push(new Paragraph({
+        spacing: { before: 200, after: 100 },
+        children: [new TextRun({ text: trimmed.replace('# ', ''), font: fontTitle, size: 26, bold: true, color: '1E3A8A' })]
+      }));
+    } else if (trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+      paragraphs.push(new Paragraph({
+        spacing: { before: 160, after: 80 },
+        children: [new TextRun({ text: trimmed.replace(/^###?\s*/, ''), font: fontTitle, size: 22, bold: true, color: '2563EB' })]
+      }));
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      paragraphs.push(new Paragraph({
+        bullet: { level: 0 },
+        spacing: { after: 40 },
+        children: [new TextRun({ text: trimmed.replace(/^[-*]\s*/, ''), font: fontBody, size: 22 })]
+      }));
+    } else {
+      paragraphs.push(new Paragraph({
+        spacing: { after: 80, line: 320 },
+        children: [new TextRun({ text: trimmed, font: fontBody, size: 22, color: '1E293B' })]
+      }));
+    }
+  }
+
+  // Summary Content
+  paragraphs.push(
+    new Paragraph({
+      spacing: { before: 320, after: 120 },
+      children: [
+        new TextRun({ text: 'IV. មេរៀនសង្ខេបនៅខាងក្រោយ (Lesson Summary Note)', font: fontTitle, size: 24, bold: true, color: '059669' })
+      ]
+    })
+  );
+
+  const summaryLines = (data.summaryContent || '').split('\n');
+  for (const line of summaryLines) {
+    const trimmed = line.trim();
+    if (!trimmed) {
+      paragraphs.push(new Paragraph({ spacing: { after: 60 }, children: [] }));
+      continue;
+    }
+    if (trimmed.startsWith('# ')) {
+      paragraphs.push(new Paragraph({
+        spacing: { before: 180, after: 80 },
+        children: [new TextRun({ text: trimmed.replace('# ', ''), font: fontTitle, size: 24, bold: true, color: '065F46' })]
+      }));
+    } else if (trimmed.startsWith('## ') || trimmed.startsWith('### ')) {
+      paragraphs.push(new Paragraph({
+        spacing: { before: 140, after: 60 },
+        children: [new TextRun({ text: trimmed.replace(/^###?\s*/, ''), font: fontTitle, size: 22, bold: true, color: '059669' })]
+      }));
+    } else if (trimmed.startsWith('- ') || trimmed.startsWith('* ')) {
+      paragraphs.push(new Paragraph({
+        bullet: { level: 0 },
+        spacing: { after: 40 },
+        children: [new TextRun({ text: trimmed.replace(/^[-*]\s*/, ''), font: fontBody, size: 22 })]
+      }));
+    } else {
+      paragraphs.push(new Paragraph({
+        spacing: { after: 80, line: 320 },
+        children: [new TextRun({ text: trimmed, font: fontBody, size: 22, color: '064E3B' })]
+      }));
+    }
+  }
+
+  // Key Takeaways
+  if (data.keyTakeaways && data.keyTakeaways.length > 0) {
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 200, after: 80 },
+        children: [
+          new TextRun({ text: '★ ចំណុចគន្លឹះសំខាន់ៗដែលត្រូវចងចាំ (Key Takeaways)', font: fontTitle, size: 22, bold: true, color: 'B45309' })
+        ]
+      })
+    );
+    data.keyTakeaways.forEach(item => {
+      paragraphs.push(
+        new Paragraph({
+          bullet: { level: 0 },
+          spacing: { after: 40 },
+          children: [new TextRun({ text: item, font: fontBody, size: 22 })]
+        })
+      );
+    });
+  }
+
+  // Exercises
+  if (data.exercises && data.exercises.length > 0) {
+    paragraphs.push(
+      new Paragraph({
+        spacing: { before: 240, after: 100 },
+        children: [
+          new TextRun({ text: 'V. សំណួរ និងលំហាត់ពង្រឹងចំណេះដឹង (Review Exercises & Solutions)', font: fontTitle, size: 24, bold: true, color: '1E40AF' })
+        ]
+      })
+    );
+    data.exercises.forEach((ex, idx) => {
+      paragraphs.push(
+        new Paragraph({
+          spacing: { before: 120, after: 60 },
+          children: [
+            new TextRun({ text: `លំហាត់ទី ${idx + 1} (${ex.points || 2} ពិន្ទុ)៖ `, font: fontBody, bold: true, size: 22 }),
+            new TextRun({ text: ex.question, font: fontBody, size: 22 })
+          ]
+        }),
+        new Paragraph({
+          spacing: { after: 120, line: 320 },
+          children: [
+            new TextRun({ text: `• ដំណោះស្រាយ/ចម្លើយ៖ `, font: fontBody, bold: true, color: '059669', size: 22 }),
+            new TextRun({ text: ex.answerOrSolution, font: fontBody, size: 22 })
+          ]
+        })
+      );
+    });
+  }
+
+  const doc = new Document({
+    sections: [
+      {
+        properties: {
+          page: { margin: { top: 1200, bottom: 1200, left: 1200, right: 1200 } }
+        },
+        children: paragraphs
+      }
+    ]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `មេរៀន_${data.title.replace(/\s+/g, '_')}.docx`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+  URL.revokeObjectURL(link.href);
+}
+

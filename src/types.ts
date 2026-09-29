@@ -50,10 +50,19 @@ export interface Question {
   text: string;
   options: string[];
   correctIndex: number;
-  questionType?: 'general' | 'pisa';
+  questionType?: 'general' | 'pisa' | 'qcm' | 'true_false' | 'short_answer' | 'problem_solving' | 'application' | 'hots' | 'stem';
   category?: 'choice' | 'matching' | 'fill_blank' | 'theory' | 'exercise';
   explanation?: string;
   points?: number;
+  grade?: string;
+  subject?: string;
+  chapter?: string;
+  lesson?: string;
+  topic?: string;
+  bloomLevel?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create' | string;
+  difficulty?: 'easy' | 'medium' | 'hard' | string;
+  learningObjective?: string;
+  solutionStepByStep?: string;
 }
 
 export interface QuizCard {

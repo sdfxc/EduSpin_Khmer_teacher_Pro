@@ -7,7 +7,12 @@ service cloud.firestore {
       allow read, write: if false;
     }
     
-    // Helper functions
+    // Global Helper functions
+    // Supports alphanumeric, underscores, hyphens, dots (e.g. kheng.kheyz), and email symbols (@)
+    function isValidId(id) {
+      return id is string && id.size() > 0 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_.\\-@]+$');
+    }
+    
     function incoming() {
       return request.resource.data;
     }
@@ -15,24 +20,125 @@ service cloud.firestore {
     function existing() {
       return resource.data;
     }
+    
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    // Validation helper for Teacher profile (supports partial updates with merge: true)
+    function isValidTeacher(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128))
+        && (!('name' in data) || (data.name is string && data.name.size() <= 150))
+        && (!('schoolName' in data) || (data.schoolName is string && data.schoolName.size() <= 200))
+        && (!('username' in data) || (data.username is string && data.username.size() <= 100))
+        && (!('password' in data) || (data.password is string && data.password.size() <= 128))
+        && (!('email' in data) || (data.email is string && data.email.size() <= 150))
+        && (!('authProvider' in data) || (data.authProvider is string && data.authProvider.size() <= 50));
+    }
+    
+    // Validation helper for Classroom (supports partial updates with merge: true)
+    function isValidClass(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128))
+        && (!('name' in data) || (data.name is string && data.name.size() <= 150))
+        && (!('order' in data) || data.order is number)
+        && (!('isPinned' in data) || data.isPinned is bool)
+        && (!('subjects' in data) || data.subjects is list)
+        && (!('cards' in data) || data.cards is list)
+        && (!('pickedIds' in data) || data.pickedIds is list);
+    }
+    
+    // Validation helper for Student (supports partial score/answer updates with merge: true)
+    function isValidStudent(data) {
+      return (!('id' in data) || (data.id is string && data.id.size() <= 128))
+        && (!('name' in data) || (data.name is string && data.name.size() <= 150))
+        && (!('score' in data) || (data.score is number && data.score >= 0 && data.score <= 1000000))
+        && (!('gender' in data) || data.gender in ['ប្រុស', 'ស្រី'])
+        && (!('status' in data) || data.status in ['ឆ្នើម', 'សកម្ម', 'កំពុងរីកចម្រើន', 'គួរឲ្យបារម្ភ'])
+        && (!('classId' in data) || (data.classId is string && data.classId.size() <= 128))
+        && (!('studentId' in data) || (data.studentId is string && data.studentId.size() <= 50))
+        && (!('emoji' in data) || (data.emoji is string && data.emoji.size() <= 20))
+        && (!('isApproved' in data) || data.isApproved is bool);
+    }
+
+    // Validation helper for Groups Data
+    function isValidGroupsData(data) {
+      return (!('groups' in data) || data.groups is list)
+        && (!('numGroups' in data) || data.numGroups is number);
+    }
+
+    // Validation helper for Exams Data
+    function isValidExamsData(data) {
+      return (!('exams' in data) || data.exams is list);
+    }
+
+    // Validation helper for Attendance Data
+    function isValidAttendanceData(data) {
+      return (!('classId' in data) || (data.classId is string && data.classId.size() <= 128))
+        && (!('date' in data) || (data.date is string && data.date.size() <= 30));
+    }
+
+    // Validation helper for External Documents
+    function isValidExternalDoc(data) {
+      return (!('classId' in data) || (data.classId is string && data.classId.size() <= 128))
+        && (!('docs' in data) || data.docs is list);
+    }
 
     // Connection health check document
     match /test/{docId} {
-      allow read, write: if true;
+      allow get: if isValidId(docId);
+      allow write: if false;
+    }
+
+    // Teachers collection and subcollections
+    match /teachers/{teacherId} {
+      allow get: if isValidId(teacherId);
+      allow list: if true;
+      allow create, update: if isValidId(teacherId) && isValidTeacher(incoming());
+      allow delete: if isValidId(teacherId);
+      
+      // Classes subcollection
+      match /classes/{classId} {
+        allow get: if isValidId(teacherId) && isValidId(classId);
+        allow list: if isValidId(teacherId);
+        allow create, update: if isValidId(teacherId) && isValidId(classId) && isValidClass(incoming());
+        allow delete: if isValidId(teacherId) && isValidId(classId);
+
+        // Students subcollection inside class
+        match /students/{studentId} {
+          allow get: if isValidId(teacherId) && isValidId(classId) && isValidId(studentId);
+          allow list: if isValidId(teacherId) && isValidId(classId);
+          allow create, update: if isValidId(teacherId) && isValidId(classId) && isValidId(studentId) && isValidStudent(incoming());
+          allow delete: if isValidId(teacherId) && isValidId(classId) && isValidId(studentId);
+        }
+
+        // Groups Data
+        match /groupsData/{docId} {
+          allow get: if isValidId(teacherId) && isValidId(classId) && isValidId(docId);
+          allow list: if isValidId(teacherId) && isValidId(classId);
+          allow write: if isValidId(teacherId) && isValidId(classId) && isValidId(docId) && isValidGroupsData(incoming());
+        }
+
+        // Exams Data
+        match /examsData/{docId} {
+          allow get: if isValidId(teacherId) && isValidId(classId) && isValidId(docId);
+          allow list: if isValidId(teacherId) && isValidId(classId);
+          allow write: if isValidId(teacherId) && isValidId(classId) && isValidId(docId) && isValidExamsData(incoming());
+        }
+
+        // Attendance Data
+        match /attendance/{subjectDateId} {
+          allow get: if isValidId(teacherId) && isValidId(classId) && isValidId(subjectDateId);
+          allow list: if isValidId(teacherId) && isValidId(classId);
+          allow write: if isValidId(teacherId) && isValidId(classId) && isValidId(subjectDateId) && isValidAttendanceData(incoming());
+        }
+      }
     }
 
     // External documents collection (PDFs, PowerPoint metadata per class)
     match /external_docs/{docId} {
-      allow read, write: if true;
-    }
-
-    // Teachers collection and all subcollections (classes, students, groupsData, etc.)
-    match /teachers/{teacherId} {
-      allow read, write: if true;
-      
-      match /{allSubcollections=**} {
-        allow read, write: if true;
-      }
+      allow get: if isValidId(docId);
+      allow list: if true;
+      allow write: if isValidId(docId) && isValidExternalDoc(incoming());
     }
   }
 }

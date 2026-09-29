@@ -1,7 +1,14 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Upload, CheckCircle2, AlertCircle, Database, FileJson, RefreshCw, ShieldCheck, Settings } from 'lucide-react';
+import { X, Download, Upload, CheckCircle2, AlertCircle, Database, FileJson, RefreshCw, ShieldCheck, Settings, Sparkles, BookOpen } from 'lucide-react';
 import { ClassInfo, Student, QuizSubject, QuizCard, QuizChapter, TeacherAccount } from '../types';
+import { 
+  GRADE_8K1_CLASS_ID, 
+  GRADE_8K1_CLASS_NAME, 
+  GRADE_8K1_STUDENTS, 
+  GRADE_8K1_SUBJECTS, 
+  seedGrade8DataToLocalStorage 
+} from '../lib/grade8SeedData';
 
 interface BackupRestoreModalProps {
   isOpen: boolean;
@@ -58,7 +65,10 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
           key.startsWith('active_room_id_') ||
           key.startsWith('khmer_teacher_classes') ||
           key.startsWith('smart_notes_') ||
-          key.startsWith('groupsData_')
+          key.startsWith('groupsData_') ||
+          key.startsWith('edu_spin_attendance_') ||
+          key.startsWith('khmer_exams_') ||
+          key.startsWith('edu_spin_')
         )) {
           try {
             const val = localStorage.getItem(key);
@@ -161,6 +171,58 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
     } catch (err) {
       console.error(err);
       setErrorMessage('បរាជ័យក្នុងការស្ដារទិន្នន័យ!');
+      setIsRestoring(false);
+    }
+  };
+
+  // Direct Seed / Backup All for ថ្នាក់ទី៨ក១
+  const handleSeedGrade8All = async () => {
+    setIsRestoring(true);
+    try {
+      const seeded = seedGrade8DataToLocalStorage();
+      if (seeded) {
+        const g8Class: ClassInfo = {
+          id: GRADE_8K1_CLASS_ID,
+          name: GRADE_8K1_CLASS_NAME,
+          order: 1,
+          isPinned: true
+        };
+        
+        const allClasses = classes.some(c => c.id === GRADE_8K1_CLASS_ID)
+          ? classes
+          : [g8Class, ...classes];
+
+        const backupObj = {
+          classes: allClasses,
+          students: seeded.students,
+          subjects: seeded.subjects,
+          chapters: seeded.chapters,
+          cards: seeded.cards,
+          activeClassId: GRADE_8K1_CLASS_ID,
+          storageDump: {
+            [`students_class_${GRADE_8K1_CLASS_ID}`]: seeded.students,
+            [`subjects_class_${GRADE_8K1_CLASS_ID}`]: seeded.subjects,
+            [`chapters_class_${GRADE_8K1_CLASS_ID}`]: seeded.chapters,
+            [`quiz_cards_class_${GRADE_8K1_CLASS_ID}`]: seeded.cards,
+            [`active_subject_id_${GRADE_8K1_CLASS_ID}`]: seeded.activeSubjectId,
+            [`active_room_id_${GRADE_8K1_CLASS_ID}`]: seeded.activeRoomId,
+            'edu_spin_attendance_records': seeded.attendance,
+            'edu_spin_attendance_reasons': seeded.reasons
+          }
+        };
+
+        await onRestoreData(backupObj);
+        setIsSuccess(true);
+        onShowToast('🎉 បានបញ្ចូល និងស្ដារទិន្នន័យថ្នាក់ទី៨ក១ (សិស្ស, វត្តមាន, ពិន្ទុ, វិញ្ញាសា) ១០០% ជោគជ័យ!');
+        setTimeout(() => {
+          setIsSuccess(false);
+          setIsRestoring(false);
+          onClose();
+        }, 1200);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('បរាជ័យក្នុងការបញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១!');
       setIsRestoring(false);
     }
   };
@@ -353,6 +415,37 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
                 <span>បានស្ដារទិន្នន័យជោគជ័យ ១០០%!</span>
               </div>
             )}
+          </div>
+
+          <div className={`h-px ${isDarkMode ? 'bg-blue-500/20' : 'bg-slate-200'}`} />
+
+          {/* Special Grade 8k1 Full Seed & Backup Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-500 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>៣. ស្ដារ និងបញ្ចូលទិន្នន័យ «ថ្នាក់ទី៨ក១» ពេញលេញ</span>
+              </h3>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                Grade 8ក១ All-In-One
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              បញ្ចូលទិន្នន័យសិស្សទាំងអស់ (៣០+ នាក់) ព្រមទាំង <strong>បញ្ជីវត្តមាន, ពិន្ទុគ្រប់ខែ/សប្ដាហ៍, មុខវិជ្ជា & សំណួរវិញ្ញាសា</strong> សម្រាប់ថ្នាក់ទី៨ក១ ដោយស្វ័យប្រវត្តក្នុង ១ ចុច។
+            </p>
+            <button
+              type="button"
+              disabled={isRestoring}
+              onClick={handleSeedGrade8All}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer border border-amber-300 active:scale-98 disabled:opacity-50"
+            >
+              {isRestoring ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+              ) : (
+                <BookOpen className="w-4 h-4 text-slate-950" />
+              )}
+              <span>{isRestoring ? 'កំពុងបញ្ចូលទិន្នន័យ...' : 'បញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១ ពេញលេញ (Backup All for ថ្នាក់ទី៨ក១)'}</span>
+            </button>
           </div>
         </div>
 

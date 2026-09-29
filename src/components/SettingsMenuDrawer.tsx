@@ -22,10 +22,12 @@ import {
   Sparkles, 
   User, 
   LogOut, 
-  Layers
+  Layers,
+  Globe
 } from 'lucide-react';
 import { ClassInfo, Student, QuizSubject, QuizCard, QuizChapter, TeacherAccount } from '../types';
 import { GlassLiquidOverlay } from './GlassLiquidCapsule';
+import { AppLanguage, getSavedLanguage, saveLanguage, t } from '../lib/translations';
 
 interface SettingsMenuDrawerProps {
   isOpen: boolean;
@@ -43,6 +45,8 @@ interface SettingsMenuDrawerProps {
   onOpenAuth: (mode: 'login' | 'register') => void;
   onLogout: () => void;
   onOpenProfile: () => void;
+  language?: AppLanguage;
+  onLanguageChange?: (lang: AppLanguage) => void;
   // Full Data context for 100% Backup & Restore
   classes: ClassInfo[];
   students: Student[];
@@ -70,6 +74,8 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
   onOpenAuth,
   onLogout,
   onOpenProfile,
+  language,
+  onLanguageChange,
   classes,
   students,
   subjects,
@@ -85,6 +91,24 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
   const [isRestoring, setIsRestoring] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'settings' | 'backup'>('settings');
+
+  const [internalLang, setInternalLang] = useState<AppLanguage>(() => language || getSavedLanguage());
+  const currentLang = language || internalLang;
+
+  React.useEffect(() => {
+    if (language) {
+      setInternalLang(language);
+    }
+  }, [language]);
+
+  const handleSelectLang = (newLang: AppLanguage) => {
+    setInternalLang(newLang);
+    saveLanguage(newLang);
+    if (onLanguageChange) {
+      onLanguageChange(newLang);
+    }
+    onShowToast(newLang === 'km' ? '🇰🇭 បានប្ដូរភាសាទៅជា ភាសាខ្មែរ' : '🇬🇧 Language switched to English');
+  };
 
   // Collect 100% of all data from state and localStorage
   const handleExportFullBackup = () => {
@@ -256,14 +280,14 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                 <div>
                   <div className="flex items-center gap-2">
                     <h2 className={`text-base font-black tracking-tight ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
-                      ការកំណត់ & Menu
+                      {t('settingsAndMenu', currentLang)}
                     </h2>
                     <span className="px-2 py-0.5 rounded-full text-[9px] font-black bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30 uppercase tracking-wide">
                       iOS Style
                     </span>
                   </div>
                   <p className={`text-[11px] font-semibold mt-0.5 ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                    Control Center & 100% Data Vault
+                    {t('controlCenterSubtitle', currentLang)}
                   </p>
                 </div>
               </div>
@@ -301,7 +325,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                     <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
                   )}
                   <Layers className={`w-3.5 h-3.5 relative z-10 ${activeSubTab === 'settings' ? (isDarkMode ? 'text-indigo-400' : 'text-indigo-600') : 'text-neutral-400'}`} />
-                  <span className="relative z-10">ការកំណត់ប្រព័ន្ធ (Controls)</span>
+                  <span className="relative z-10">{t('systemControls', currentLang)}</span>
                 </button>
 
                 {/* Tab 2 (Right): Backup & Restore (Clean 3D Liquid Glass Capsule) */}
@@ -318,7 +342,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                     <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
                   )}
                   <Database className={`w-3.5 h-3.5 relative z-10 ${activeSubTab === 'backup' ? (isDarkMode ? 'text-blue-400' : 'text-blue-600') : 'text-neutral-400'}`} />
-                  <span className="relative z-10">បម្រុងទុក & ស្ដារ (Backup)</span>
+                  <span className="relative z-10">{t('backupAndRestore', currentLang)}</span>
                 </button>
               </div>
             </div>
@@ -352,11 +376,11 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                           </div>
                           <div>
                             <h4 className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-slate-900'}`}>
-                              {teacher ? teacher.name : 'មិនទាន់ចូលគណនី'}
+                              {teacher ? teacher.name : t('notLoggedIn', currentLang)}
                             </h4>
                             <p className={`text-[10.5px] font-semibold flex items-center gap-1.5 mt-0.5 ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>
                               <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block shrink-0" />
-                              <span>{teacher ? (teacher.schoolName || 'គ្រូបង្រៀន') : 'ដំណើរការលើ Local Storage'}</span>
+                              <span>{teacher ? (teacher.schoolName || (currentLang === 'km' ? 'គ្រូបង្រៀន' : 'Teacher')) : t('runningOnLocal', currentLang)}</span>
                             </p>
                           </div>
                         </div>
@@ -372,7 +396,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                                   : 'bg-indigo-50 hover:bg-indigo-100 text-indigo-700 border-indigo-200'
                               }`}
                             >
-                              Profile
+                              {t('profile', currentLang)}
                             </button>
                             <button
                               type="button"
@@ -382,7 +406,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                                   ? 'bg-red-950/30 hover:bg-red-950/60 text-red-400 border-red-900/50' 
                                   : 'bg-red-50 hover:bg-red-100 text-red-600 border-red-200'
                               }`}
-                              title="ចាកចេញ"
+                              title={t('logout', currentLang)}
                             >
                               <LogOut className="w-4 h-4" />
                             </button>
@@ -399,10 +423,80 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                               }`}
                             >
                               <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
-                              <span className="relative z-10">ចូលគណនី</span>
+                              <span className="relative z-10">{t('signIn', currentLang)}</span>
                             </button>
                           </div>
                         )}
+                      </div>
+                    </div>
+
+                    {/* Language Option Selector Card: 🇰🇭 ភាសាខ្មែរ / 🇬🇧 English */}
+                    <div className={`p-4 rounded-3xl border backdrop-blur-2xl transition-all shadow-xs ${
+                      isDarkMode 
+                        ? 'bg-neutral-800/60 border-neutral-700/80 shadow-[0_4px_20px_rgba(0,0,0,0.3)]' 
+                        : 'bg-white border-neutral-200/90 shadow-sm'
+                    }`}>
+                      <div className="flex items-center justify-between mb-3">
+                        <div className="flex items-center gap-2.5">
+                          <div className="w-8 h-8 rounded-xl bg-blue-500/15 flex items-center justify-center text-blue-500 border border-blue-500/30 shadow-2xs">
+                            <Globe className="w-4.5 h-4.5" />
+                          </div>
+                          <div>
+                            <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
+                              {t('language', currentLang)}
+                            </div>
+                            <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
+                              {currentLang === 'km' ? 'ភាសាខ្មែរ (Khmer)' : 'English (អង់គ្លេស)'}
+                            </div>
+                          </div>
+                        </div>
+                        <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-600 dark:text-blue-400 border border-blue-500/30">
+                          {currentLang === 'km' ? '🇰🇭 KM' : '🇬🇧 EN'}
+                        </span>
+                      </div>
+
+                      <div className={`p-1 rounded-2xl border flex items-center gap-1.5 ${
+                        isDarkMode ? 'bg-neutral-950/80 border-neutral-800' : 'bg-neutral-100/90 border-neutral-200/90'
+                      }`}>
+                        {/* Option 1: 🇰🇭 ភាសាខ្មែរ */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectLang('km')}
+                          className={`relative flex-1 py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer overflow-hidden isolate ${
+                            currentLang === 'km'
+                              ? (isDarkMode ? 'text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]' : 'text-neutral-900 shadow-[0_2px_12px_rgba(0,0,0,0.08)]')
+                              : (isDarkMode ? 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60')
+                          }`}
+                        >
+                          {currentLang === 'km' && (
+                            <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
+                          )}
+                          <span className="text-base relative z-10">🇰🇭</span>
+                          <span className="relative z-10 font-bold">ភាសាខ្មែរ</span>
+                          {currentLang === 'km' && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 relative z-10 ml-auto shrink-0" />
+                          )}
+                        </button>
+
+                        {/* Option 2: 🇬🇧 English */}
+                        <button
+                          type="button"
+                          onClick={() => handleSelectLang('en')}
+                          className={`relative flex-1 py-2.5 px-3 rounded-xl text-xs font-black flex items-center justify-center gap-2 transition-all cursor-pointer overflow-hidden isolate ${
+                            currentLang === 'en'
+                              ? (isDarkMode ? 'text-white shadow-[0_4px_16px_rgba(0,0,0,0.4)]' : 'text-neutral-900 shadow-[0_2px_12px_rgba(0,0,0,0.08)]')
+                              : (isDarkMode ? 'text-neutral-400 hover:text-neutral-200 hover:bg-neutral-800/50' : 'text-neutral-600 hover:text-neutral-900 hover:bg-white/60')
+                          }`}
+                        >
+                          {currentLang === 'en' && (
+                            <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
+                          )}
+                          <span className="text-base relative z-10">🇬🇧</span>
+                          <span className="relative z-10 font-bold">English</span>
+                          {currentLang === 'en' && (
+                            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500 relative z-10 ml-auto shrink-0" />
+                          )}
+                        </button>
                       </div>
                     </div>
 
@@ -423,12 +517,12 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                             {isDarkMode ? <Sun className="w-4.5 h-4.5" /> : <Moon className="w-4.5 h-4.5" />}
                           </div>
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 border border-amber-500/30">
-                            {isDarkMode ? 'Dark ON' : 'Light'}
+                            {isDarkMode ? t('darkOn', currentLang) : t('lightOn', currentLang)}
                           </span>
                         </div>
                         <div>
-                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>ពន្លឺ / ងងឹត</div>
-                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>ប្ដូរ Theme កម្មវិធី</div>
+                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>{t('lightDarkTheme', currentLang)}</div>
+                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('switchTheme', currentLang)}</div>
                         </div>
                       </button>
 
@@ -447,12 +541,12 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                             {soundOn ? <Volume2 className="w-4.5 h-4.5" /> : <VolumeX className="w-4.5 h-4.5 text-neutral-400" />}
                           </div>
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                            {soundOn ? 'បើក (M)' : 'បិទ'}
+                            {soundOn ? t('soundOn', currentLang) : t('soundOff', currentLang)}
                           </span>
                         </div>
                         <div>
-                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>សំឡេងហ្គេម</div>
-                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>SFX & Chimes</div>
+                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>{t('gameSound', currentLang)}</div>
+                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('sfxChimes', currentLang)}</div>
                         </div>
                       </button>
 
@@ -471,12 +565,12 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                             {isFullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
                           </div>
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-blue-500/15 text-blue-700 dark:text-blue-300 border border-blue-500/30">
-                            {isFullscreen ? 'Full' : 'Window'}
+                            {isFullscreen ? t('full', currentLang) : t('window', currentLang)}
                           </span>
                         </div>
                         <div>
-                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>ពេញអេក្រង់ (F)</div>
-                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>សម្រាប់ TV/Projector</div>
+                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>{t('fullscreen', currentLang)}</div>
+                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('forTvProjector', currentLang)}</div>
                         </div>
                       </button>
 
@@ -495,12 +589,12 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                             <Keyboard className="w-4.5 h-4.5" />
                           </div>
                           <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-purple-500/15 text-purple-700 dark:text-purple-300 border border-purple-500/30">
-                            ចុច ?
+                            {t('pressQuestion', currentLang)}
                           </span>
                         </div>
                         <div>
-                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>គ្រាប់ចុចកាត់</div>
-                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>Shortcuts List</div>
+                          <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>{t('shortcuts', currentLang)}</div>
+                          <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('shortcutsList', currentLang)}</div>
                         </div>
                       </button>
                     </div>
@@ -521,10 +615,10 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                         </div>
                         <div className="text-left">
                           <div className={`text-xs font-black ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
-                            បង្កើតសំណួរ AI (Lesson Modal)
+                            {t('aiQuestions', currentLang)}
                           </div>
                           <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                            ទាញយកសំណួរពីមេរៀនស្វ័យប្រវត្ត
+                            {t('aiQuestionsSubtitle', currentLang)}
                           </div>
                         </div>
                       </div>
@@ -542,7 +636,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                       }`}
                     >
                       <RotateCcw className="w-3.5 h-3.5 text-red-500" />
-                      <span>កំណត់កម្មវិធីឡើងវិញ (Reset All Data)</span>
+                      <span>{t('resetAllData', currentLang)}</span>
                     </button>
                   </div>
                 </>
@@ -559,10 +653,10 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                         <div className="w-6 h-6 rounded-lg bg-emerald-500/15 flex items-center justify-center text-emerald-500 border border-emerald-500/30">
                           <ShieldCheck className="w-4 h-4" />
                         </div>
-                        <span>ទិន្នន័យក្នុងប្រព័ន្ធ (100% Full State)</span>
+                        <span>{t('systemData100', currentLang)}</span>
                       </div>
                       <span className="text-[10px] font-bold px-2.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                        ● Live Ready
+                        {t('liveReady', currentLang)}
                       </span>
                     </div>
 
@@ -571,19 +665,19 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
                       }`}>
                         <div className="text-xl font-black text-blue-600 dark:text-blue-400">{classes.length}</div>
-                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>ថ្នាក់រៀន</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('classrooms', currentLang)}</div>
                       </div>
                       <div className={`p-3 rounded-2xl border ${
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
                       }`}>
                         <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">{students.length}</div>
-                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>សិស្សសរុប</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('totalStudents', currentLang)}</div>
                       </div>
                       <div className={`p-3 rounded-2xl border ${
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
                       }`}>
                         <div className="text-xl font-black text-amber-600 dark:text-amber-400">{cards.length || subjects.length}</div>
-                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>សំណួរ/មុខវិជ្ជា</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('quizQuestions', currentLang)}</div>
                       </div>
                     </div>
                   </div>
@@ -599,12 +693,12 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                         ១
                       </div>
                       <h3 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
-                        ទាញយកទិន្នន័យបម្រុងទុក (Backup)
+                        {t('exportBackupTitle', currentLang)}
                       </h3>
                     </div>
                     
                     <p className={`text-[11.5px] leading-relaxed ${isDarkMode ? 'text-neutral-300' : 'text-neutral-600'}`}>
-                      ទាញយកទិន្នន័យគ្រប់គម្លៀតទាំងអស់ (ថ្នាក់, បញ្ជីសិស្សគ្រប់ថ្នាក់, ពិន្ទុ, កាតសំណួរ, ក្រុម, មេរៀន, និងការកំណត់) ទៅជាឯកសារ <code className="px-1.5 py-0.5 rounded font-bold bg-neutral-100 dark:bg-neutral-900 text-blue-600 dark:text-blue-400 border border-neutral-200 dark:border-neutral-700">.json</code> ទុកលើទូរស័ព្ទ ឬកុំព្យូទ័រ។
+                      {t('exportBackupDesc', currentLang)}
                     </p>
 
                     <button
@@ -618,7 +712,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                     >
                       <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
                       <Download className={`w-4 h-4 relative z-10 group-hover:-translate-y-0.5 transition-transform ${isDarkMode ? 'text-blue-400' : 'text-blue-600'}`} />
-                      <span className="relative z-10">ទាញយកឯកសារបម្រុងទុក (Backup)</span>
+                      <span className="relative z-10">{t('downloadBackupBtn', currentLang)}</span>
                     </button>
                   </div>
 
@@ -633,12 +727,12 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                         ២
                       </div>
                       <h3 className={`text-xs font-black uppercase tracking-wider ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>
-                        ស្ដារទិន្នន័យឡើងវិញ (Restore)
+                        {t('restoreBackupTitle', currentLang)}
                       </h3>
                     </div>
 
                     <p className={`text-[11.5px] leading-relaxed ${isDarkMode ? 'text-neutral-300' : 'text-neutral-600'}`}>
-                      ជ្រើសរើសឯកសារ <code className="px-1.5 py-0.5 rounded font-bold bg-neutral-100 dark:bg-neutral-900 text-emerald-600 dark:text-emerald-400 border border-neutral-200 dark:border-neutral-700">.json</code> ដែលបានទាញយក ដើម្បីស្ដារអ្វីៗគ្រប់យ៉ាងឱ្យត្រឡប់មកដូចដើមវិញ ១០០%។
+                      {t('restoreBackupDesc', currentLang)}
                     </p>
 
                     <input
@@ -661,7 +755,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                       >
                         <Upload className={`w-6 h-6 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'} group-hover:scale-110 transition-transform`} />
                         <span className={`text-xs font-black ${isDarkMode ? 'text-neutral-200' : 'text-neutral-700'}`}>
-                          ចុចទីនេះដើម្បីជ្រើសរើសឯកសារ Backup .json
+                          {t('chooseBackupFile', currentLang)}
                         </span>
                       </button>
                     ) : (
@@ -674,9 +768,9 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                               <FileJson className="w-4.5 h-4.5" />
                             </div>
                             <div>
-                              <div className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>ឯកសារត្រៀមស្ដារ៖</div>
+                              <div className={`text-xs font-bold ${isDarkMode ? 'text-white' : 'text-neutral-900'}`}>{t('fileReadyToRestore', currentLang)}</div>
                               <div className={`text-[10px] font-semibold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>
-                                {importPreview.app || 'EduSpin'} • {importPreview.exportedAt ? new Date(importPreview.exportedAt).toLocaleDateString() : 'កាលបរិច្ឆេទ'}
+                                {importPreview.app || 'EduSpin'} • {importPreview.exportedAt ? new Date(importPreview.exportedAt).toLocaleDateString() : t('fileDate', currentLang)}
                               </div>
                             </div>
                           </div>
@@ -694,19 +788,19 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                             <div className="font-black text-blue-600 dark:text-blue-400">
                               {Array.isArray(importPreview.classes) ? importPreview.classes.length : 0}
                             </div>
-                            <div className={`text-[9.5px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>ថ្នាក់រៀន</div>
+                            <div className={`text-[9.5px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('classrooms', currentLang)}</div>
                           </div>
                           <div className={`p-2 rounded-xl border ${isDarkMode ? 'bg-neutral-800/80 border-neutral-700' : 'bg-white border-neutral-200 shadow-2xs'}`}>
                             <div className="font-black text-emerald-600 dark:text-emerald-400">
                               {Array.isArray(importPreview.students) ? importPreview.students.length : 0}
                             </div>
-                            <div className={`text-[9.5px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>សិស្ស</div>
+                            <div className={`text-[9.5px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('studentsUnit', currentLang)}</div>
                           </div>
                           <div className={`p-2 rounded-xl border ${isDarkMode ? 'bg-neutral-800/80 border-neutral-700' : 'bg-white border-neutral-200 shadow-2xs'}`}>
                             <div className="font-black text-purple-600 dark:text-purple-400">
                               {Array.isArray(importPreview.cards) ? importPreview.cards.length : (Array.isArray(importPreview.subjects) ? importPreview.subjects.length : 0)}
                             </div>
-                            <div className={`text-[9.5px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>សំណួរ</div>
+                            <div className={`text-[9.5px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'}`}>{t('questionsUnit', currentLang)}</div>
                           </div>
                         </div>
 
@@ -726,7 +820,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                           ) : (
                             <RefreshCw className={`w-4 h-4 relative z-10 ${isDarkMode ? 'text-emerald-400' : 'text-emerald-600'}`} />
                           )}
-                          <span className="relative z-10">{isRestoring ? 'កំពុងស្ដារទិន្នន័យ...' : 'យល់ព្រមស្ដារទិន្នន័យ (Restore Now)'}</span>
+                          <span className="relative z-10">{isRestoring ? t('restoring', currentLang) : t('restoreNowBtn', currentLang)}</span>
                         </button>
                       </div>
                     )}
@@ -741,7 +835,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                     {isSuccess && (
                       <div className="p-3 rounded-2xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs flex items-center gap-2 font-bold">
                         <CheckCircle2 className="w-4 h-4 shrink-0 text-emerald-500" />
-                        <span>បានស្ដារទិន្នន័យឡើងវិញ ១០០% ជោគជ័យ!</span>
+                        <span>{t('restoreSuccess', currentLang)}</span>
                       </div>
                     )}
                   </div>
@@ -764,7 +858,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                 }`}
               >
                 <GlassLiquidOverlay isDarkMode={isDarkMode} variant="liquid-glass" />
-                <span className="relative z-10">រួចរាល់ (Done)</span>
+                <span className="relative z-10">{t('done', currentLang)}</span>
               </button>
             </div>
           </motion.div>
