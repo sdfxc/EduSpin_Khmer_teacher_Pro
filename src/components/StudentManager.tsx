@@ -1640,11 +1640,7 @@ export default function StudentManager({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex items-center justify-between group ${
                     isDarkMode 
-<<<<<<< HEAD
                       ? 'bg-[#272525] border-slate-800/80 hover:border-slate-700' 
-=======
-                      ? 'bg-[#0e1524] border-slate-800/80 hover:border-slate-700' 
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       : 'bg-white border-slate-200/80 hover:border-slate-300'
                   }`}
                 >
@@ -1778,11 +1774,7 @@ export default function StudentManager({
             isDarkMode ? 'border-slate-800' : 'border-slate-200'
           }`}>
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
-=======
-              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សសរុប</p>
@@ -1796,11 +1788,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
-=======
-              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សស្រី</p>
@@ -1814,11 +1802,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
-=======
-              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedClassName}</p>
@@ -1832,11 +1816,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
-=======
-              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ឆ្នើម (Outstanding)</p>
@@ -2342,18 +2322,25 @@ export default function StudentManager({
             <div className={`border rounded-3xl overflow-hidden shadow-sm ${
               isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
             }`}>
-            <div className="overflow-x-auto">
-              <table className="w-full text-left border-collapse">
+            <div className="overflow-x-auto relative">
+              <table className="w-full text-left border-separate border-spacing-0">
                 <thead>
-                  <tr className={`border-b text-[11px] font-black uppercase tracking-wider ${
-                    isDarkMode ? 'bg-slate-950/80 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
+                  <tr className={`text-[11px] font-black uppercase tracking-wider ${
+                    isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
                   }`}>
-                    <th className="p-4 w-14 text-center">ល.រ</th>
+                    {/* ល.រ (Pinned Left at 0: រូបទី៣ វត្តមាន សូមpin ល.រ និងឈ្មោះ) */}
+                    <th className={`p-3.5 w-[48px] min-w-[48px] max-w-[48px] text-center sticky top-0 left-0 z-30 border-r border-b border-slate-200 dark:border-slate-800 ${
+                      isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
+                    } shadow-2xs`}>
+                      ល.រ
+                    </th>
 
-                    {/* ID Column Sortable */}
+                    {/* ID Column Sortable (NOT Pinned Horizontally: រូបទី២/៣ សូមកុំpin ID) */}
                     <th 
                       onClick={() => handleSortModeChange(studentSortMode === 'id' ? 'name' : 'id')}
-                      className="p-4 w-28 text-center cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
+                      className={`p-3.5 w-24 min-w-[96px] max-w-[96px] text-center cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group sticky top-0 z-10 border-r border-b border-slate-200 dark:border-slate-800 ${
+                        isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
+                      }`}
                       title="ចុចដើម្បីតម្រៀបតាម ID (0-9 / A-Z) — ផ្លាស់ប្ដូរទាំងវត្តមាន និងពិន្ទុសិស្ស"
                     >
                       <div className="flex items-center justify-center gap-1.5">
@@ -2362,10 +2349,12 @@ export default function StudentManager({
                       </div>
                     </th>
 
-                    {/* Name Column Sortable */}
+                    {/* Name Column Sortable (Pinned Left at 48px right after ល.រ: រូបទី៣ វត្តមាន សូមpin ល.រ និងឈ្មោះ) */}
                     <th 
                       onClick={() => handleSortModeChange(studentSortMode === 'name' ? 'id' : 'name')}
-                      className="p-4 cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
+                      className={`p-3.5 min-w-[160px] max-w-[220px] cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group sticky top-0 left-[48px] z-30 border-r-2 border-b border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] ${
+                        isDarkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-800'
+                      }`}
                       title="ចុចដើម្បីតម្រៀបតាមអក្ខរក្រម (ក-អ) — ផ្លាស់ប្ដូរទាំងវត្តមាន និងពិន្ទុសិស្ស"
                     >
                       <div className="flex items-center gap-2">
@@ -2375,8 +2364,16 @@ export default function StudentManager({
                       </div>
                     </th>
 
-                    <th className="p-4 w-24 text-center">ភេទ</th>
-                    <th className="p-4 text-center">ស្ថានភាពវត្តមានប្រចាំថ្ងៃ</th>
+                    <th className={`p-3.5 w-24 min-w-[90px] text-center sticky top-0 z-10 border-r border-b border-slate-200 dark:border-slate-800 ${
+                      isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
+                    }`}>
+                      ភេទ
+                    </th>
+                    <th className={`p-3.5 text-center min-w-[320px] sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 ${
+                      isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
+                    }`}>
+                      ស្ថានភាពវត្តមានប្រចាំថ្ងៃ
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y dark:divide-slate-800 text-xs font-bold">
@@ -2391,11 +2388,18 @@ export default function StudentManager({
                       const currentStatus = currentClassAttendance[student.id] || 'present';
                       const currentReason = currentClassReasons[student.id] || '';
                       return (
-                        <tr key={student.id} className={`transition-colors ${
+                        <tr key={student.id} className={`group/att transition-colors ${
                           isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'
                         }`}>
-                          <td className="p-4 text-center text-slate-400 font-mono font-bold">{index + 1}</td>
-                          <td className="p-3 text-center">
+                          {/* ល.រ (Pinned Left at 0) */}
+                          <td className={`p-3 text-center text-slate-400 font-mono font-bold w-[48px] min-w-[48px] max-w-[48px] sticky left-0 z-20 border-r border-b border-slate-200 dark:border-slate-800 ${
+                            isDarkMode ? 'bg-slate-950' : 'bg-white'
+                          } group-hover/att:bg-slate-100 dark:group-hover/att:bg-slate-900 transition-colors shadow-2xs`}>
+                            {index + 1}
+                          </td>
+
+                          {/* ID Column (NOT Pinned Horizontally: scrolls) */}
+                          <td className="p-2.5 text-center w-24 min-w-[96px] max-w-[96px] border-r border-b border-slate-200 dark:border-slate-800">
                             <input
                               type="text"
                               value={student.studentId || ''}
@@ -2405,13 +2409,17 @@ export default function StudentManager({
                                   onUpdateStudentDetail(student.id, { studentId: e.target.value });
                                 }
                               }}
-                              className="w-24 text-center py-1.5 px-2 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 rounded-xl font-mono font-black text-slate-800 dark:text-slate-100 text-xs border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-2xs"
+                              className="w-20 text-center py-1.5 px-2 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 rounded-xl font-mono font-black text-slate-800 dark:text-slate-100 text-xs border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-2xs"
                               title="កែប្រែ ID សិស្ស (បញ្ចូលតែម្ដង ភ្ជាប់ទាំងពិន្ទុ និងវត្តមាន)"
                             />
                           </td>
-                          <td className="p-4">
-                            <div className="flex items-center gap-3">
-                              <div className="w-9 h-9 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-sm shadow-xs shrink-0">
+
+                          {/* ឈ្មោះសិស្ស (Pinned Left at 48px right after ល.រ) */}
+                          <td className={`p-3 min-w-[160px] max-w-[220px] sticky left-[48px] z-20 border-r-2 border-b border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] ${
+                            isDarkMode ? 'bg-slate-950' : 'bg-white'
+                          } group-hover/att:bg-slate-100 dark:group-hover/att:bg-slate-900 transition-colors`}>
+                            <div className="flex items-center gap-2.5">
+                              <div className="w-8 h-8 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-xs shadow-xs shrink-0">
                                 {student.avatarUrl ? (
                                   <img src={student.avatarUrl} alt="" className="w-full h-full object-cover rounded-xl" />
                                 ) : student.emoji ? (
@@ -2420,12 +2428,14 @@ export default function StudentManager({
                                   <span>{student.name.charAt(0)}</span>
                                 )}
                               </div>
-                              <div>
-                                <div className="font-extrabold text-sm">{student.name}</div>
+                              <div className="truncate">
+                                <div className="font-extrabold text-sm truncate">{student.name}</div>
                               </div>
                             </div>
                           </td>
-                          <td className="p-3 text-center">
+
+                          {/* ភេទ */}
+                          <td className="p-3 text-center border-r border-b border-slate-200 dark:border-slate-800">
                             <GenderBadgePicker
                               gender={student.gender || 'ប្រុស'}
                               onChange={(newGender) => {
@@ -2436,7 +2446,9 @@ export default function StudentManager({
                               isDarkMode={isDarkMode}
                             />
                           </td>
-                          <td className="p-4">
+
+                          {/* ស្ថានភាពវត្តមានប្រចាំថ្ងៃ */}
+                          <td className="p-3 border-b border-slate-200 dark:border-slate-800">
                             <div className="flex items-center justify-center gap-2">
                               {/* រូបទី៣៖ ប៊ូតុងវត្តមានទាំង ៤ */}
                               <div className="flex items-center justify-center gap-1.5 shrink-0">

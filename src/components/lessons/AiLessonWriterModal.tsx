@@ -28,11 +28,7 @@ import {
   exportGeneratedLessonArticleToDocx,
   GeneratedLessonArticleData
 } from '../../lib/lessonWordExporter';
-<<<<<<< HEAD
 import { getSavedApiKey, saveApiKey, generateLessonArticle } from '../../lib/gemini';
-=======
-import { getSavedApiKey, saveApiKey } from '../../lib/gemini';
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
 interface AiLessonWriterModalProps {
   isOpen: boolean;
@@ -190,7 +186,6 @@ export default function AiLessonWriterModal({
       .map(f => ({ name: f.name, mimeType: f.mimeType, data: f.data }));
 
     try {
-<<<<<<< HEAD
       const data = await generateLessonArticle({
         subject,
         grade,
@@ -207,43 +202,6 @@ export default function AiLessonWriterModal({
 
       if (!data || (!data.detailedContent && !data.summaryContent)) {
         throw new Error('មានបញ្ហាក្នុងការបង្កើតអត្ថបទមេរៀន');
-=======
-      const apiKey = getSavedApiKey() || localStorage.getItem('khmer_ai_gemini_api_key') || '';
-      const response = await fetch('/api/generate-lesson-article', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey
-        },
-        body: JSON.stringify({
-          subject,
-          grade,
-          chapter,
-          lessonTitle: lessonTitle.trim() || 'មេរៀនថ្មី',
-          lessonText: lessonNotes,
-          images: imagesPayload,
-          pdfs: pdfsPayload,
-          officeFiles: officePayload,
-          customInstructions,
-          schoolName,
-          teacherName
-        })
-      });
-
-      let data: any;
-      const responseText = await response.text();
-      try {
-        data = JSON.parse(responseText);
-      } catch (jsonErr) {
-        if (!response.ok) {
-          throw new Error(`ម៉ាស៊ីនបម្រើឆ្លើយតបកំហុស (${response.status})៖ ${responseText.slice(0, 150)}`);
-        }
-        throw new Error('ការឆ្លើយតបពី Server មិនត្រឹមត្រូវជាទម្រង់ JSON ទេ។ សូមព្យាយាមម្តងទៀត។');
-      }
-
-      if (!response.ok || data.error) {
-        throw new Error(data.error || 'មានបញ្ហាក្នុងការបង្កើតអត្ថបទមេរៀន');
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
       }
 
       setGeneratedResult(data);

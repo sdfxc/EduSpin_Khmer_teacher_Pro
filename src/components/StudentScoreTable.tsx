@@ -1031,11 +1031,7 @@ export function StudentScoreTable({
       {/* ===================== VIEW 1: OFFICIAL TABLE SHEET VIEW WITH SCROLL ===================== */}
       {activeViewMode === 'table' && (
         <div className={`border rounded-3xl overflow-hidden shadow-lg flex flex-col ${
-<<<<<<< HEAD
           isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/90'
-=======
-          isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/90'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         }`}>
           
           {/* Official MoEYS / Sovannaphumi School Header Banner */}
@@ -1084,11 +1080,11 @@ export function StudentScoreTable({
                     ល.រ
                   </th>
                   
-                  {/* ID Column (Pinned Left) */}
+                  {/* ID Column (NOT Pinned Horizontally: "សូមកុំpin ID") */}
                   <th 
                     rowSpan={3} 
                     onClick={() => handleSortChange(sortMode === 'id' ? 'name' : 'id')}
-                    className={`p-2.5 border-r border-b border-slate-200 dark:border-slate-800 w-[58px] min-w-[58px] max-w-[58px] sticky top-0 left-[45px] z-40 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group`}
+                    className={`p-2.5 border-r border-b border-slate-200 dark:border-slate-800 w-[58px] min-w-[58px] max-w-[58px] sticky top-0 z-30 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group`}
                     title="ចុចដើម្បីតម្រៀបតាម ID (0-9 / A-Z)"
                   >
                     <div className="flex items-center justify-center gap-1">
@@ -1097,11 +1093,11 @@ export function StudentScoreTable({
                     </div>
                   </th>
 
-                  {/* ឈ្មោះសិស្ស (Pinned Left) */}
+                  {/* ឈ្មោះសិស្ស (Pinned Left at 45px right after ល.រ) */}
                   <th 
                     rowSpan={3} 
                     onClick={() => handleSortChange(sortMode === 'name' ? 'id' : 'name')}
-                    className={`p-2.5 border-r border-b border-slate-200 dark:border-slate-800 w-[145px] min-w-[145px] max-w-[145px] text-left pl-3.5 sticky top-0 left-[103px] z-40 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} ${pinnedMode === 'basic' ? 'border-r-2 border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]' : ''} cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group`}
+                    className={`p-2.5 border-r border-b border-slate-200 dark:border-slate-800 w-[145px] min-w-[145px] max-w-[145px] text-left pl-3.5 sticky top-0 left-[45px] z-40 ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} ${pinnedMode === 'basic' ? 'border-r-2 border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]' : ''} cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group`}
                     title="ចុចដើម្បីតម្រៀបតាមឈ្មោះ (ក-អ / A-Z)"
                   >
                     <div className="flex items-center gap-1.5">
@@ -1113,7 +1109,7 @@ export function StudentScoreTable({
                   {/* ភេទ (រូបទី១ Pinned Left) */}
                   <th 
                     rowSpan={3} 
-                    className={`p-2.5 border-r border-b border-slate-200 dark:border-slate-800 w-[58px] min-w-[58px] max-w-[58px] ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} ${pinnedMode !== 'basic' ? 'sticky top-0 left-[248px] z-40' : ''}`}
+                    className={`p-2.5 border-r border-b border-slate-200 dark:border-slate-800 w-[58px] min-w-[58px] max-w-[58px] ${isDarkMode ? 'bg-slate-950 text-slate-100' : 'bg-slate-100 text-slate-800'} ${pinnedMode !== 'basic' ? 'sticky top-0 left-[190px] z-40' : ''}`}
                   >
                     ភេទ
                   </th>
@@ -1121,7 +1117,7 @@ export function StudentScoreTable({
                   {/* Column 1: សរុប (ដក Exam) (រូបទី១ Pinned Left) */}
                   <th 
                     rowSpan={3} 
-                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${isDarkMode ? 'bg-[#064e3b] text-emerald-200' : 'bg-[#d1fae5] text-emerald-800'} font-black text-center ${pinnedMode !== 'basic' ? 'sticky top-0 left-[306px] z-40' : ''}`}
+                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${isDarkMode ? 'bg-[#064e3b] text-emerald-200' : 'bg-[#d1fae5] text-emerald-800'} font-black text-center ${pinnedMode !== 'basic' ? 'sticky top-0 left-[248px] z-40' : ''}`}
                     title="ពិន្ទុសរុបនៃសកម្មភាព Weeks, Quiz, និងសៀវភៅ (មិនរាប់បញ្ចូល Monthly Exam)"
                   >
                     <div className="flex flex-col items-center justify-center leading-tight">
@@ -1134,7 +1130,7 @@ export function StudentScoreTable({
                   <th 
                     rowSpan={3} 
                     onClick={() => handleSortChange(sortMode === 'score-desc' ? 'score-asc' : 'score-desc')}
-                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[82px] min-w-[82px] max-w-[82px] ${isDarkMode ? 'bg-[#451a03] text-amber-200' : 'bg-[#fef3c7] text-amber-800'} font-black text-center cursor-pointer hover:opacity-90 transition-colors select-none group ${pinnedMode !== 'basic' ? 'sticky top-0 left-[384px] z-40' : ''}`}
+                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[82px] min-w-[82px] max-w-[82px] ${isDarkMode ? 'bg-[#451a03] text-amber-200' : 'bg-[#fef3c7] text-amber-800'} font-black text-center cursor-pointer hover:opacity-90 transition-colors select-none group ${pinnedMode !== 'basic' ? 'sticky top-0 left-[326px] z-40' : ''}`}
                     title="ពិន្ទុសរុបប្រចាំខែពេញលេញ (ចុចដើម្បីតម្រៀបពិន្ទុ)"
                   >
                     <div className="flex flex-col items-center justify-center leading-tight">
@@ -1150,7 +1146,7 @@ export function StudentScoreTable({
                   <th 
                     rowSpan={3} 
                     onClick={() => handleSortChange(sortMode === 'avg-desc' ? 'avg-asc' : 'avg-desc')}
-                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${isDarkMode ? 'bg-[#172554] text-blue-200' : 'bg-[#dbeafe] text-blue-800'} font-black text-center cursor-pointer hover:opacity-90 transition-colors select-none group ${pinnedMode !== 'basic' ? 'sticky top-0 left-[466px] z-40' : ''} ${pinnedMode === 'all' ? 'border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]' : ''}`}
+                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${isDarkMode ? 'bg-[#172554] text-blue-200' : 'bg-[#dbeafe] text-blue-800'} font-black text-center cursor-pointer hover:opacity-90 transition-colors select-none group ${pinnedMode !== 'basic' ? 'sticky top-0 left-[408px] z-40' : ''} ${pinnedMode === 'all' ? 'border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]' : ''}`}
                     title="មធ្យមភាគប្រចាំខែ (ចុចដើម្បីតម្រៀប)"
                   >
                     <div className="flex flex-col items-center justify-center leading-tight">
@@ -1166,7 +1162,7 @@ export function StudentScoreTable({
                   <th 
                     rowSpan={3} 
                     onClick={() => handleSortChange(sortMode === 'rank-asc' ? 'default' : 'rank-asc')}
-                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[72px] min-w-[72px] max-w-[72px] ${isDarkMode ? 'bg-[#2e1065] text-purple-200' : 'bg-[#ede9fe] text-purple-800'} font-black text-center cursor-pointer hover:opacity-90 transition-colors select-none group ${pinnedMode === 'with-rank' ? 'sticky top-0 left-[544px] z-40 border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]' : ''}`}
+                    className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 w-[72px] min-w-[72px] max-w-[72px] ${isDarkMode ? 'bg-[#2e1065] text-purple-200' : 'bg-[#ede9fe] text-purple-800'} font-black text-center cursor-pointer hover:opacity-90 transition-colors select-none group ${pinnedMode === 'with-rank' ? 'sticky top-0 left-[486px] z-40 border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]' : ''}`}
                     title="ចំណាត់ថ្នាក់ស្វ័យប្រវត្តិតាមពិន្ទុសរុប (ចុចដើម្បីតម្រៀប)"
                   >
                     <div className="flex flex-col items-center justify-center leading-tight">
@@ -1284,8 +1280,8 @@ export function StudentScoreTable({
                           {idx + 1}
                         </td>
 
-                        {/* ID Column - Pinned Left */}
-                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 sticky left-[45px] z-20 w-[58px] min-w-[58px] max-w-[58px] ${rowBg} group-hover/row:bg-indigo-50/90 dark:group-hover/row:bg-slate-900 transition-colors`}>
+                        {/* ID Column (NOT Pinned Horizontally: "សូមកុំpin ID") */}
+                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[58px] min-w-[58px] max-w-[58px] ${rowBg} group-hover/row:bg-indigo-50/90 dark:group-hover/row:bg-slate-900 transition-colors`}>
                           <input
                             type="text"
                             value={student.studentId || ''}
@@ -1296,13 +1292,13 @@ export function StudentScoreTable({
                           />
                         </td>
 
-                        {/* Name - Pinned Left */}
-                        <td className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 text-left pl-3.5 font-black text-slate-800 dark:text-slate-100 whitespace-nowrap sticky left-[103px] z-20 w-[145px] min-w-[145px] max-w-[145px] ${rowBg} ${pinnedMode === 'basic' ? 'border-r-2 border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]' : ''} group-hover/row:bg-indigo-50/90 dark:group-hover/row:bg-slate-900 transition-colors`}>
+                        {/* Name - Pinned Left at 45px right after ល.រ */}
+                        <td className={`p-2 border-r border-b border-slate-200 dark:border-slate-800 text-left pl-3.5 font-black text-slate-800 dark:text-slate-100 whitespace-nowrap sticky left-[45px] z-20 w-[145px] min-w-[145px] max-w-[145px] ${rowBg} ${pinnedMode === 'basic' ? 'border-r-2 border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.15)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)]' : ''} group-hover/row:bg-indigo-50/90 dark:group-hover/row:bg-slate-900 transition-colors`}>
                           {student.name}
                         </td>
 
                         {/* Gender (រូបទី១ Pinned Left) */}
-                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-center w-[58px] min-w-[58px] max-w-[58px] ${pinnedMode !== 'basic' ? `sticky left-[248px] z-20 ${rowBg}` : ''}`}>
+                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 font-bold text-center w-[58px] min-w-[58px] max-w-[58px] ${pinnedMode !== 'basic' ? `sticky left-[190px] z-20 ${rowBg}` : ''}`}>
                           <GenderBadgePicker
                             gender={student.gender || 'ប្រុស'}
                             compact={true}
@@ -1316,7 +1312,7 @@ export function StudentScoreTable({
                         </td>
 
                         {/* Column 1: សរុប (ដក Exam) (រូបទី១ Pinned Left) */}
-                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${emeraldBg} ${pinnedMode !== 'basic' ? 'sticky left-[306px] z-20' : ''}`}>
+                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${emeraldBg} ${pinnedMode !== 'basic' ? 'sticky left-[248px] z-20' : ''}`}>
                           <div className="relative group">
                             <input
                               type="number"
@@ -1337,7 +1333,7 @@ export function StudentScoreTable({
                         </td>
 
                         {/* Column 2: សរុប ១ខែ (រូបទី១ Pinned Left) */}
-                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[82px] min-w-[82px] max-w-[82px] ${amberBg} ${pinnedMode !== 'basic' ? 'sticky left-[384px] z-20' : ''}`}>
+                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[82px] min-w-[82px] max-w-[82px] ${amberBg} ${pinnedMode !== 'basic' ? 'sticky left-[326px] z-20' : ''}`}>
                           <div className="relative group">
                             <input
                               type="number"
@@ -1358,7 +1354,7 @@ export function StudentScoreTable({
                         </td>
 
                         {/* Column 3: មធ្យមភាគ (Average) (រូបទី១ Pinned Left) */}
-                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${blueBg} ${pinnedMode !== 'basic' ? 'sticky left-[466px] z-20' : ''} ${pinnedMode === 'all' ? 'border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]' : ''}`}>
+                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[78px] min-w-[78px] max-w-[78px] ${blueBg} ${pinnedMode !== 'basic' ? 'sticky left-[408px] z-20' : ''} ${pinnedMode === 'all' ? 'border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]' : ''}`}>
                           <div className="relative group">
                             <input
                               type="number"
@@ -1381,7 +1377,7 @@ export function StudentScoreTable({
                         </td>
 
                         {/* Column 4: ចំណាត់ថ្នាក់ (Rank) */}
-                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[72px] min-w-[72px] max-w-[72px] text-center font-black ${pinnedMode === 'with-rank' ? `sticky left-[544px] z-20 ${purpleBg} border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]` : 'bg-purple-500/10 dark:bg-purple-950/30'}`}>
+                        <td className={`p-1 border-r border-b border-slate-200 dark:border-slate-800 w-[72px] min-w-[72px] max-w-[72px] text-center font-black ${pinnedMode === 'with-rank' ? `sticky left-[486px] z-20 ${purpleBg} border-r-2 border-indigo-400/60 dark:border-indigo-500/60 shadow-[5px_0_12px_-2px_rgba(0,0,0,0.18)] dark:shadow-[5px_0_12px_-2px_rgba(0,0,0,0.55)]` : 'bg-purple-500/10 dark:bg-purple-950/30'}`}>
                           {grandTotal > 0 ? (
                             <div className="flex items-center justify-center">
                               {rank === 1 ? (
@@ -1664,11 +1660,7 @@ export function StudentScoreTable({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3 ${
                     isDarkMode 
-<<<<<<< HEAD
                       ? 'bg-[#272525] border-slate-800/80 hover:border-slate-700' 
-=======
-                      ? 'bg-[#0e1524] border-slate-800/80 hover:border-slate-700' 
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       : 'bg-white border-slate-200/80'
                   }`}
                 >

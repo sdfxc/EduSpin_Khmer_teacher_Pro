@@ -168,7 +168,6 @@ function getInitialActiveTeacherAndClass() {
       teacherId = teacherObj?.id || '';
     } catch {}
   }
-<<<<<<< HEAD
 
   // If not logged in, but user connected Google Account (e.g. for Sheets), auto-restore teacher
   if (!teacherObj) {
@@ -188,8 +187,6 @@ function getInitialActiveTeacherAndClass() {
     }
   }
 
-=======
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   const savedActiveId = (teacherId ? localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) : null)
     || localStorage.getItem('khmer_teacher_active_class_id')
     || '';
@@ -211,19 +208,11 @@ function getInitialActiveTeacherAndClass() {
     } catch {}
   }
 
-<<<<<<< HEAD
   // Always ensure ថ្នាក់ទី៨ក១ is present in classes list
   const hasGrade8k1 = parsedClasses.some(c => 
     c.name.includes('៨ក១') || c.name.includes('8ក១') || c.name.includes('8K1') || c.name.includes('៨')
   );
   if (!hasGrade8k1) {
-=======
-  // Ensure ថ្នាក់ទី៨ក១ is present in classes list ONLY in guest mode (not logged in)
-  const hasGrade8k1 = parsedClasses.some(c => 
-    c.name.includes('៨ក១') || c.name.includes('8ក១') || c.name.includes('8K1') || c.name.includes('៨')
-  );
-  if (!hasGrade8k1 && !teacherId) {
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     const grade8ClassId = GRADE_8K1_CLASS_ID;
     parsedClasses.push({
       id: grade8ClassId,
@@ -233,20 +222,11 @@ function getInitialActiveTeacherAndClass() {
     });
   }
 
-<<<<<<< HEAD
   // Ensure Grade 8 student data exists in localStorage
   const grade8TargetId = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'))?.id || GRADE_8K1_CLASS_ID;
   const existingGrade8Students = localStorage.getItem(`students_class_${grade8TargetId}`);
   if (!existingGrade8Students || existingGrade8Students === '[]') {
     seedGrade8DataToLocalStorage();
-=======
-  // Ensure Grade 8 student data exists in localStorage for guest mode only
-  if (!teacherId) {
-    const existingGrade8Students = localStorage.getItem(`students_class_${GRADE_8K1_CLASS_ID}`);
-    if (!existingGrade8Students || existingGrade8Students === '[]') {
-      seedGrade8DataToLocalStorage();
-    }
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   }
 
   parsedClasses = sortClasses(parsedClasses);
@@ -258,11 +238,7 @@ function getInitialActiveTeacherAndClass() {
     const g8 = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'));
     effectiveClassId = g8?.id || parsedClasses[0].id;
   } else {
-<<<<<<< HEAD
     effectiveClassId = GRADE_8K1_CLASS_ID;
-=======
-    effectiveClassId = '';
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   }
 
   return {
@@ -607,6 +583,62 @@ export default function App() {
   const [toastMessage, setToastMessage] = useState<string | null>(null);
   const [isMobileAuthDropdownOpen, setIsMobileAuthDropdownOpen] = useState(false);
   const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  // Desktop / Tablet horizontal tab scrolling & mouse-drag support ("សូមអាចអូសបានផង ព្រោះពេលខ្លះផ្ទាំងអេក្រង់តូច... លើ ipad, laptop, pc")
+  const desktopNavRef = useRef<HTMLElement>(null);
+  const [canScrollNavLeft, setCanScrollNavLeft] = useState(false);
+  const [canScrollNavRight, setCanScrollNavRight] = useState(false);
+  const isDraggingNav = useRef(false);
+  const navDragStartX = useRef(0);
+  const navDragScrollLeft = useRef(0);
+  const hasDraggedNavDistance = useRef(false);
+
+  const checkNavScrollOverflow = useCallback(() => {
+    const el = desktopNavRef.current;
+    if (!el) return;
+    const { scrollLeft, scrollWidth, clientWidth } = el;
+    setCanScrollNavLeft(scrollLeft > 4);
+    setCanScrollNavRight(scrollLeft < scrollWidth - clientWidth - 4);
+  }, []);
+
+  useEffect(() => {
+    const el = desktopNavRef.current;
+    if (!el) return;
+    checkNavScrollOverflow();
+
+    const handleScroll = () => checkNavScrollOverflow();
+    el.addEventListener('scroll', handleScroll, { passive: true });
+
+    // Window resize observer
+    const resizeObserver = new ResizeObserver(() => checkNavScrollOverflow());
+    resizeObserver.observe(el);
+
+    // Mousewheel vertical to horizontal
+    const handleWheel = (e: WheelEvent) => {
+      if (el.scrollWidth > el.clientWidth && Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+        e.preventDefault();
+        el.scrollLeft += e.deltaY * 0.9;
+      }
+    };
+    el.addEventListener('wheel', handleWheel, { passive: false });
+
+    return () => {
+      el.removeEventListener('scroll', handleScroll);
+      el.removeEventListener('wheel', handleWheel);
+      resizeObserver.disconnect();
+    };
+  }, [checkNavScrollOverflow]);
+
+  // Auto-scroll active tab into view when activeTab changes
+  useEffect(() => {
+    const el = desktopNavRef.current;
+    if (!el) return;
+    const activeEl = el.querySelector('[data-active="true"]') as HTMLElement | null;
+    if (activeEl) {
+      activeEl.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'center' });
+    }
+    checkNavScrollOverflow();
+  }, [activeTab, checkNavScrollOverflow]);
 
   const [googleSheetsCustomPayload, setGoogleSheetsCustomPayload] = useState<{
     classId?: string;
@@ -959,7 +991,6 @@ export default function App() {
           }
         });
 
-<<<<<<< HEAD
         // If cloud collection is currently empty for this teacher, restore from local cache or seed Grade 8k1
         if (fetchedClasses.length === 0) {
           const savedLocalRaw = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
@@ -988,9 +1019,6 @@ export default function App() {
             }, { merge: true }).catch(() => {});
           }
         }
-=======
-        // Do not force any default classes for logged-in accounts. Keep them completely clean and matching their database state.
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
         const sortedCloudClasses = sortClasses(fetchedClasses);
         setClasses(prev => {
@@ -1368,7 +1396,6 @@ export default function App() {
       const activeClassName = activeCls?.name;
 
       if (snapshot.empty) {
-<<<<<<< HEAD
         // If empty in cloud, check local storage before clearing to prevent data loss!
         const localRaw = localStorage.getItem(`students_class_${activeClassId}`);
         if (localRaw) {
@@ -1385,10 +1412,6 @@ export default function App() {
         }
         if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១')) {
           setStudents(GRADE_8K1_STUDENTS);
-=======
-        // If empty in cloud, preserve existing state if it's Grade 8 to prevent flickering
-        if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១')) {
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
           return;
         }
         setStudents([]);
@@ -3587,125 +3610,187 @@ export default function App() {
           </button>
         </div>
 
-        {/* Dynamic Soft Light Pastel iOS Glass Navigation Tabs (Laptop, PC, iPad: រក្សាទម្រង់នៅដដែល ១០០%) */}
-        <nav className={`hidden md:flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
-          isDarkMode 
-            ? 'bg-[#18181c]/90 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.6)]' 
-            : 'bg-white/80 border-slate-200/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.9)]'
-        }`}>
-          {[
-            { id: 'wheel', label: language === 'km' ? 'បង្វិលឈ្មោះ' : 'Wheel Spin', icon: Compass, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
-            { id: 'groups', label: language === 'km' ? 'បែងចែកក្រុម' : 'Groups', icon: UsersIcon, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
-            { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
-            { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
-            { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
-<<<<<<< HEAD
-=======
-            { id: 'student-lobby', label: 'Study game', icon: Sparkles, badge: true, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
-          ].map((tab) => {
-            const Icon = tab.icon;
-            const isActive = activeTab === tab.id;
+        {/* Dynamic Soft Light Pastel iOS Glass Navigation Tabs (Laptop, PC, iPad: អាចអូសបាន Touch Swipe & Mouse Drag & Scroll Arrows) */}
+        <div className="hidden md:flex items-center flex-1 min-w-0 justify-center max-w-2xl mx-1 sm:mx-3 relative group/nav">
+          {/* Left Scroll Indicator Arrow */}
+          {canScrollNavLeft && (
+            <button
+              type="button"
+              onClick={() => desktopNavRef.current?.scrollBy({ left: -160, behavior: 'smooth' })}
+              className={`absolute -left-2 z-20 w-6 h-6 rounded-full border shadow-md flex items-center justify-center transition-all cursor-pointer hover:scale-110 active:scale-95 ${
+                isDarkMode 
+                  ? 'bg-slate-800/95 border-slate-700 text-slate-200 hover:bg-slate-700' 
+                  : 'bg-white/95 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+              title="អូសទៅឆ្វេង (Scroll Left)"
+            >
+              <ChevronLeft className="w-3.5 h-3.5" />
+            </button>
+          )}
 
-            return (
-              <motion.button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id as any)}
-                whileHover={{ scale: 1.03 }}
-                whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
-                transition={{ type: "spring", stiffness: 500, damping: 20 }}
-                className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
-                  isActive
-                    ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-black'
-                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-700 hover:text-blue-600 hover:bg-slate-100/70'
-                }`}
-              >
-                {isActive && (
-                  <motion.div
-                    layoutId="telegramWaterDroplet"
-                    transition={{
-                      type: "spring",
-                      stiffness: 350,
-                      damping: 22,
-                      mass: 0.65
-                    }}
-                    className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
-                      isDarkMode
-                        ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
-                        : `bg-gradient-to-r ${tab.activeBgLight} border-slate-200/90 shadow-[0_4px_16px_rgba(15,23,42,0.08),inset_0_2px_4px_rgba(255,255,255,1),inset_0_-1px_2px_rgba(0,0,0,0.03)]`
-                    }`}
-                  >
-                    {/* Top Specular Glare Dome Reflection */}
-                    <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
-                      isDarkMode 
-                        ? 'from-white/50 via-white/12 to-transparent' 
-                        : 'from-white/95 via-white/40 to-transparent'
-                    }`} />
+          <nav 
+            ref={desktopNavRef}
+            onMouseDown={(e) => {
+              if (e.button !== 0) return;
+              isDraggingNav.current = true;
+              hasDraggedNavDistance.current = false;
+              navDragStartX.current = e.pageX - (desktopNavRef.current?.offsetLeft || 0);
+              navDragScrollLeft.current = desktopNavRef.current?.scrollLeft || 0;
+            }}
+            onMouseMove={(e) => {
+              if (!isDraggingNav.current || !desktopNavRef.current) return;
+              const x = e.pageX - (desktopNavRef.current.offsetLeft || 0);
+              const walk = (x - navDragStartX.current) * 1.3;
+              if (Math.abs(walk) > 4) {
+                hasDraggedNavDistance.current = true;
+              }
+              desktopNavRef.current.scrollLeft = navDragScrollLeft.current - walk;
+            }}
+            onMouseUp={() => {
+              isDraggingNav.current = false;
+            }}
+            onMouseLeave={() => {
+              isDraggingNav.current = false;
+            }}
+            className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar scroll-smooth touch-pan-x max-w-full select-none relative z-10 cursor-grab active:cursor-grabbing ${
+              isDarkMode 
+                ? 'bg-[#18181c]/90 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.6)]' 
+                : 'bg-white/80 border-slate-200/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.9)]'
+            }`}
+          >
+            {[
+              { id: 'wheel', label: language === 'km' ? 'បង្វិលឈ្មោះ' : 'Wheel Spin', icon: Compass, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+              { id: 'groups', label: language === 'km' ? 'បែងចែកក្រុម' : 'Groups', icon: UsersIcon, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+              { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+              { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+              { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            ].map((tab) => {
+              const Icon = tab.icon;
+              const isActive = activeTab === tab.id;
 
-                    {/* Central Radial Light Core */}
-                    <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
-                      isDarkMode
-                        ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
-                        : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
-                    }`} />
-
-                    {/* Bottom Droplet Meniscus Light Rim */}
-                    <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
-                      isDarkMode ? 'via-white/50' : 'via-white/90'
-                    }`} />
-                  </motion.div>
-                )}
-
-                <motion.span
-                  animate={{ 
-                    scale: isActive ? 1.05 : 1,
-                    y: isActive ? -0.5 : 0
+              return (
+                <motion.button
+                  key={tab.id}
+                  data-active={isActive ? 'true' : 'false'}
+                  onClick={() => {
+                    if (hasDraggedNavDistance.current) {
+                      hasDraggedNavDistance.current = false;
+                      return;
+                    }
+                    setActiveTab(tab.id as any);
                   }}
-                  transition={{ type: "spring", stiffness: 450, damping: 22 }}
-                  className="relative z-10 flex items-center gap-2.5"
-                >
-                  {/* Circular shape around tab icon */}
-                  <div className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-200 shrink-0 ${
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.94, scaleY: 0.9, scaleX: 1.05 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 20 }}
+                  className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none shrink-0 ${
                     isActive
-                      ? isDarkMode 
-                        ? 'border-blue-400 bg-blue-500/10 shadow-[0_0_10px_rgba(96,165,250,0.2)]' 
-                        : 'border-blue-600 bg-blue-500/5 shadow-[0_0_8px_rgba(37,99,235,0.15)]'
-                      : isDarkMode 
-                        ? 'border-neutral-700 bg-transparent' 
-                        : 'border-slate-300 bg-transparent group-hover:border-slate-400'
-                  }`}>
-                    <Icon className={`w-3.5 h-3.5 transition-all duration-300 ${
-                      isActive
-                        ? isDarkMode ? 'text-blue-400 scale-110' : 'text-blue-600 scale-110'
-                        : isDarkMode ? 'text-slate-400' : 'text-slate-600'
-                    } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
-                  </div>
+                      ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-black'
+                      : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-700 hover:text-blue-600 hover:bg-slate-100/70'
+                  }`}
+                >
+                  {isActive && (
+                    <motion.div
+                      layoutId="telegramWaterDroplet"
+                      transition={{
+                        type: "spring",
+                        stiffness: 350,
+                        damping: 22,
+                        mass: 0.65
+                      }}
+                      className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
+                        isDarkMode
+                          ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
+                          : `bg-gradient-to-r ${tab.activeBgLight} border-slate-200/90 shadow-[0_4px_16px_rgba(15,23,42,0.08),inset_0_2px_4px_rgba(255,255,255,1),inset_0_-1px_2px_rgba(0,0,0,0.03)]`
+                      }`}
+                    >
+                      {/* Top Specular Glare Dome Reflection */}
+                      <div className={`absolute top-0 inset-x-1 h-[48%] bg-gradient-to-b rounded-t-xl pointer-events-none ${
+                        isDarkMode 
+                          ? 'from-white/50 via-white/12 to-transparent' 
+                          : 'from-white/95 via-white/40 to-transparent'
+                      }`} />
 
-                  <span className={
-                    isActive 
-                      ? isDarkMode 
-                        ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
-                        : 'text-blue-600 font-black tracking-wide' 
-                      : isDarkMode
-                        ? 'text-slate-300 font-bold'
-                        : 'text-slate-700 hover:text-blue-600 font-bold'
-                  }>{tab.label}</span>
-                  
-                  {tab.id === 'wheel' && pendingStudentsCount > 0 ? (
-                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce shadow-xs">
-                      +{pendingStudentsCount}
-                    </span>
-                  ) : (tab as any).badge ? (
-                    <span className="flex h-2 w-2 relative ml-0.5">
-                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-                      <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
-                    </span>
-                  ) : null}
-                </motion.span>
-              </motion.button>
-            );
-          })}
-        </nav>
+                      {/* Central Radial Light Core */}
+                      <div className={`absolute top-1 left-1/2 -translate-x-1/2 w-3/4 h-2.5 pointer-events-none ${
+                        isDarkMode
+                          ? 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.3)_0%,_transparent_75%)]'
+                          : 'bg-[radial-gradient(ellipse_at_center,_rgba(255,255,255,0.95)_0%,_transparent_75%)]'
+                      }`} />
+
+                      {/* Bottom Droplet Meniscus Light Rim */}
+                      <div className={`absolute bottom-0 inset-x-2 h-[1px] bg-gradient-to-r from-transparent to-transparent pointer-events-none ${
+                        isDarkMode ? 'via-white/50' : 'via-white/90'
+                      }`} />
+                    </motion.div>
+                  )}
+
+                  <motion.span
+                    animate={{ 
+                      scale: isActive ? 1.05 : 1,
+                      y: isActive ? -0.5 : 0
+                    }}
+                    transition={{ type: "spring", stiffness: 450, damping: 22 }}
+                    className="relative z-10 flex items-center gap-2.5"
+                  >
+                    {/* Circular shape around tab icon */}
+                    <div className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-200 shrink-0 ${
+                      isActive
+                        ? isDarkMode 
+                          ? 'border-blue-400 bg-blue-500/10 shadow-[0_0_10px_rgba(96,165,250,0.2)]' 
+                          : 'border-blue-600 bg-blue-500/5 shadow-[0_0_8px_rgba(37,99,235,0.15)]'
+                        : isDarkMode 
+                          ? 'border-neutral-700 bg-transparent' 
+                          : 'border-slate-300 bg-transparent group-hover:border-slate-400'
+                    }`}>
+                      <Icon className={`w-3.5 h-3.5 transition-all duration-300 ${
+                        isActive
+                          ? isDarkMode ? 'text-blue-400 scale-110' : 'text-blue-600 scale-110'
+                          : isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                      } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
+                    </div>
+
+                    <span className={
+                      isActive 
+                        ? isDarkMode 
+                          ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
+                          : 'text-blue-600 font-black tracking-wide' 
+                        : isDarkMode
+                          ? 'text-slate-300 font-bold'
+                          : 'text-slate-700 hover:text-blue-600 font-bold'
+                    }>{tab.label}</span>
+                    
+                    {tab.id === 'wheel' && pendingStudentsCount > 0 ? (
+                      <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce shadow-xs">
+                        +{pendingStudentsCount}
+                      </span>
+                    ) : (tab as any).badge ? (
+                      <span className="flex h-2 w-2 relative ml-0.5">
+                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                        <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
+                      </span>
+                    ) : null}
+                  </motion.span>
+                </motion.button>
+              );
+            })}
+          </nav>
+
+          {/* Right Scroll Indicator Arrow */}
+          {canScrollNavRight && (
+            <button
+              type="button"
+              onClick={() => desktopNavRef.current?.scrollBy({ left: 160, behavior: 'smooth' })}
+              className={`absolute -right-2 z-20 w-6 h-6 rounded-full border shadow-md flex items-center justify-center transition-all cursor-pointer hover:scale-110 active:scale-95 ${
+                isDarkMode 
+                  ? 'bg-slate-800/95 border-slate-700 text-slate-200 hover:bg-slate-700' 
+                  : 'bg-white/95 border-slate-200 text-slate-700 hover:bg-slate-100'
+              }`}
+              title="អូសទៅស្ដាំ (Scroll Right)"
+            >
+              <ChevronRight className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
 
         {/* Action and Profile Controls */}
         <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
@@ -3779,11 +3864,7 @@ export default function App() {
                 className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
-<<<<<<< HEAD
                 <span>{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
-=======
-                <span className="hidden sm:inline">{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
               </button>
               <button
                 onClick={() => {
@@ -3973,44 +4054,7 @@ export default function App() {
             </button>
           </div>
         </div>
-      ) : (
-        <div className="md:hidden px-3.5 py-2 bg-slate-100/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0 z-20">
-          <div 
-            onClick={() => setIsProfileModalOpen(true)}
-            className="flex items-center gap-2 min-w-0 cursor-pointer"
-          >
-            <div className="relative shrink-0">
-              <div className="w-7 h-7 rounded-full overflow-hidden border border-emerald-500 bg-emerald-500 flex items-center justify-center text-white text-xs font-black">
-                {teacher.avatarUrl ? (
-                  <img src={teacher.avatarUrl} alt={teacher.name} className="w-full h-full object-cover" />
-                ) : (
-                  <User className="w-3.5 h-3.5" />
-                )}
-              </div>
-              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-indigo-600 text-white rounded-full flex items-center justify-center border border-white dark:border-slate-900">
-                <Camera className="w-1.5 h-1.5" />
-              </span>
-            </div>
-            <div className="min-w-0">
-              <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
-                {teacher.name}
-              </p>
-              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">
-                {teacher.schoolName || 'សាលារៀនសុវណ្ណភូមិ'}
-              </p>
-            </div>
-          </div>
-          <button
-            type="button"
-            onClick={handleLogout}
-            className="px-2.5 py-1 rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 flex items-center gap-1 cursor-pointer transition-colors"
-            title="ចាកចេញពីគណនី"
-          >
-            <LogOut className="w-3 h-3" />
-            <span>ចាកចេញ</span>
-          </button>
-        </div>
-      )}
+      ) : null}
 
       {/* Firestore Quota Exceeded / Offline Notice Banner */}
       {quotaExceeded && !quotaBannerDismissed && (
@@ -4230,11 +4274,7 @@ export default function App() {
                             ? 'hover:bg-red-500 text-red-500 hover:text-white'
                             : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
                         }`}
-<<<<<<< HEAD
                         title={t('deleteClass', language)}
-=======
-                        title="លុបថ្នាក់"
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </button>

@@ -774,11 +774,7 @@ export default function StudentLobby({
     const isRevealed = activeCardState === 'revealed';
     
     return (
-<<<<<<< HEAD
       <div className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#272525] relative transition-colors duration-300">
-=======
-      <div className="flex-1 flex flex-col p-6 overflow-y-auto custom-scrollbar bg-slate-50 dark:bg-[#0b0f19] relative transition-colors duration-300">
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         {/* Host Control Deck Header */}
         <div className="flex flex-col md:flex-row items-center justify-between mb-6 gap-4 border-b border-slate-200 dark:border-slate-800 pb-4">
           <div>
@@ -991,11 +987,7 @@ export default function StudentLobby({
 
   return (
     <div className={`flex-1 flex flex-col p-4 md:p-6 overflow-y-auto custom-scrollbar relative transition-colors duration-300 ${
-<<<<<<< HEAD
       isDarkMode ? 'bg-[#272525] text-white' : 'bg-slate-50 text-slate-800'
-=======
-      isDarkMode ? 'bg-[#0b0f19] text-white' : 'bg-slate-50 text-slate-800'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     }`}>
       {/* Background visual effects for game feel */}
       <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(99,102,241,0.08)_0%,transparent_50%)] pointer-events-none" />

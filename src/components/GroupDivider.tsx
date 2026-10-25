@@ -561,17 +561,13 @@ export default function GroupDivider({
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Sub-Tabs Switcher */}
-      <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-fit shadow-xs ${
-<<<<<<< HEAD
+      <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-full overflow-x-auto no-scrollbar shadow-xs ${
         isDarkMode ? 'bg-[#272525] border-slate-800/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
-=======
-        isDarkMode ? 'bg-[#0e1524] border-slate-800/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
       }`}>
         <button
           type="button"
           onClick={() => setActiveSubTab('groups')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
             activeSubTab === 'groups'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
               : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -584,7 +580,7 @@ export default function GroupDivider({
         <button
           type="button"
           onClick={() => setActiveSubTab('scores')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
             activeSubTab === 'scores'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25'
               : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
@@ -597,27 +593,14 @@ export default function GroupDivider({
         <button
           type="button"
           onClick={() => setActiveSubTab('stopwatch')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
             activeSubTab === 'stopwatch'
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-600/25'
               : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
           }`}
         >
           <Timer className="w-4 h-4 text-cyan-400 animate-pulse" />
-          <span>{language === 'km' ? 'Stopwatch & Timer ក្នុងក្រុម' : 'Group Stopwatch & Timer'}</span>
-        </button>
-
-        <button
-          type="button"
-          onClick={() => setActiveSubTab('examtimer')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
-            activeSubTab === 'examtimer'
-              ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-md shadow-purple-600/25'
-              : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
-          }`}
-        >
-          <GraduationCap className="w-4 h-4 text-purple-400 animate-pulse" />
-          <span>{language === 'km' ? 'Exam Timer (នាឡិកាប្រឡង)' : 'Exam Timer'}</span>
+          <span>Stopwatch & Timer</span>
         </button>
       </div>
 
@@ -629,15 +612,6 @@ export default function GroupDivider({
           className={activeClassName}
           onNavigateTab={onNavigateTab}
           initialWidget="stopwatch"
-        />
-      ) : activeSubTab === 'examtimer' ? (
-        <StopwatchPanel
-          isDarkMode={isDarkMode}
-          teacher={teacher}
-          activeClassId={activeClassId}
-          className={activeClassName}
-          onNavigateTab={onNavigateTab}
-          initialWidget="examtimer"
         />
       ) : activeSubTab === 'scores' ? (
         <div className="space-y-4">
@@ -664,11 +638,7 @@ export default function GroupDivider({
         <>
           {/* Set Number of Teams Panel */}
           <div className={`p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 border transition-all duration-300 ${
-<<<<<<< HEAD
             isDarkMode ? 'bg-[#272525] border-slate-800/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
-=======
-            isDarkMode ? 'bg-[#0e1524] border-slate-800/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
->>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
           }`}>
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-305 duration-300 ${
