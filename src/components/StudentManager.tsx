@@ -1640,7 +1640,11 @@ export default function StudentManager({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex items-center justify-between group ${
                     isDarkMode 
+<<<<<<< HEAD
                       ? 'bg-[#272525] border-slate-800/80 hover:border-slate-700' 
+=======
+                      ? 'bg-[#0e1524] border-slate-800/80 hover:border-slate-700' 
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       : 'bg-white border-slate-200/80 hover:border-slate-300'
                   }`}
                 >
@@ -1774,7 +1778,11 @@ export default function StudentManager({
             isDarkMode ? 'border-slate-800' : 'border-slate-200'
           }`}>
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+=======
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សសរុប</p>
@@ -1788,7 +1796,11 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+=======
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សស្រី</p>
@@ -1802,7 +1814,11 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+=======
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedClassName}</p>
@@ -1816,7 +1832,11 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
+<<<<<<< HEAD
               isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+=======
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ឆ្នើម (Outstanding)</p>

@@ -1031,7 +1031,11 @@ export function StudentScoreTable({
       {/* ===================== VIEW 1: OFFICIAL TABLE SHEET VIEW WITH SCROLL ===================== */}
       {activeViewMode === 'table' && (
         <div className={`border rounded-3xl overflow-hidden shadow-lg flex flex-col ${
+<<<<<<< HEAD
           isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/90'
+=======
+          isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/90'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         }`}>
           
           {/* Official MoEYS / Sovannaphumi School Header Banner */}
@@ -1660,7 +1664,11 @@ export function StudentScoreTable({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex flex-col justify-between gap-3 ${
                     isDarkMode 
+<<<<<<< HEAD
                       ? 'bg-[#272525] border-slate-800/80 hover:border-slate-700' 
+=======
+                      ? 'bg-[#0e1524] border-slate-800/80 hover:border-slate-700' 
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       : 'bg-white border-slate-200/80'
                   }`}
                 >

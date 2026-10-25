@@ -168,6 +168,7 @@ function getInitialActiveTeacherAndClass() {
       teacherId = teacherObj?.id || '';
     } catch {}
   }
+<<<<<<< HEAD
 
   // If not logged in, but user connected Google Account (e.g. for Sheets), auto-restore teacher
   if (!teacherObj) {
@@ -187,6 +188,8 @@ function getInitialActiveTeacherAndClass() {
     }
   }
 
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   const savedActiveId = (teacherId ? localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) : null)
     || localStorage.getItem('khmer_teacher_active_class_id')
     || '';
@@ -208,11 +211,19 @@ function getInitialActiveTeacherAndClass() {
     } catch {}
   }
 
+<<<<<<< HEAD
   // Always ensure ថ្នាក់ទី៨ក១ is present in classes list
   const hasGrade8k1 = parsedClasses.some(c => 
     c.name.includes('៨ក១') || c.name.includes('8ក១') || c.name.includes('8K1') || c.name.includes('៨')
   );
   if (!hasGrade8k1) {
+=======
+  // Ensure ថ្នាក់ទី៨ក១ is present in classes list ONLY in guest mode (not logged in)
+  const hasGrade8k1 = parsedClasses.some(c => 
+    c.name.includes('៨ក១') || c.name.includes('8ក១') || c.name.includes('8K1') || c.name.includes('៨')
+  );
+  if (!hasGrade8k1 && !teacherId) {
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     const grade8ClassId = GRADE_8K1_CLASS_ID;
     parsedClasses.push({
       id: grade8ClassId,
@@ -222,11 +233,20 @@ function getInitialActiveTeacherAndClass() {
     });
   }
 
+<<<<<<< HEAD
   // Ensure Grade 8 student data exists in localStorage
   const grade8TargetId = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'))?.id || GRADE_8K1_CLASS_ID;
   const existingGrade8Students = localStorage.getItem(`students_class_${grade8TargetId}`);
   if (!existingGrade8Students || existingGrade8Students === '[]') {
     seedGrade8DataToLocalStorage();
+=======
+  // Ensure Grade 8 student data exists in localStorage for guest mode only
+  if (!teacherId) {
+    const existingGrade8Students = localStorage.getItem(`students_class_${GRADE_8K1_CLASS_ID}`);
+    if (!existingGrade8Students || existingGrade8Students === '[]') {
+      seedGrade8DataToLocalStorage();
+    }
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   }
 
   parsedClasses = sortClasses(parsedClasses);
@@ -238,7 +258,11 @@ function getInitialActiveTeacherAndClass() {
     const g8 = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'));
     effectiveClassId = g8?.id || parsedClasses[0].id;
   } else {
+<<<<<<< HEAD
     effectiveClassId = GRADE_8K1_CLASS_ID;
+=======
+    effectiveClassId = '';
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   }
 
   return {
@@ -935,6 +959,7 @@ export default function App() {
           }
         });
 
+<<<<<<< HEAD
         // If cloud collection is currently empty for this teacher, restore from local cache or seed Grade 8k1
         if (fetchedClasses.length === 0) {
           const savedLocalRaw = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
@@ -963,6 +988,9 @@ export default function App() {
             }, { merge: true }).catch(() => {});
           }
         }
+=======
+        // Do not force any default classes for logged-in accounts. Keep them completely clean and matching their database state.
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
         const sortedCloudClasses = sortClasses(fetchedClasses);
         setClasses(prev => {
@@ -1340,6 +1368,7 @@ export default function App() {
       const activeClassName = activeCls?.name;
 
       if (snapshot.empty) {
+<<<<<<< HEAD
         // If empty in cloud, check local storage before clearing to prevent data loss!
         const localRaw = localStorage.getItem(`students_class_${activeClassId}`);
         if (localRaw) {
@@ -1356,6 +1385,10 @@ export default function App() {
         }
         if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១')) {
           setStudents(GRADE_8K1_STUDENTS);
+=======
+        // If empty in cloud, preserve existing state if it's Grade 8 to prevent flickering
+        if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១')) {
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
           return;
         }
         setStudents([]);
@@ -3566,6 +3599,10 @@ export default function App() {
             { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
             { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
             { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+<<<<<<< HEAD
+=======
+            { id: 'student-lobby', label: 'Study game', icon: Sparkles, badge: true, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
@@ -3742,7 +3779,11 @@ export default function App() {
                 className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
+<<<<<<< HEAD
                 <span>{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
+=======
+                <span className="hidden sm:inline">{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
               </button>
               <button
                 onClick={() => {
@@ -4189,7 +4230,11 @@ export default function App() {
                             ? 'hover:bg-red-500 text-red-500 hover:text-white'
                             : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
                         }`}
+<<<<<<< HEAD
                         title={t('deleteClass', language)}
+=======
+                        title="លុបថ្នាក់"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       >
                         <Trash2 className="w-2.5 h-2.5" />
                       </button>

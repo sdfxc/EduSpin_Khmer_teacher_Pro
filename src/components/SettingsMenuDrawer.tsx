@@ -28,7 +28,10 @@ import {
 import { ClassInfo, Student, QuizSubject, QuizCard, QuizChapter, TeacherAccount } from '../types';
 import { GlassLiquidOverlay } from './GlassLiquidCapsule';
 import { AppLanguage, getSavedLanguage, saveLanguage, t } from '../lib/translations';
+<<<<<<< HEAD
 import { calculateSystemStats } from '../lib/systemStats';
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
 interface SettingsMenuDrawerProps {
   isOpen: boolean;
@@ -93,6 +96,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'settings' | 'backup'>('settings');
 
+<<<<<<< HEAD
   const systemStats = React.useMemo(() => {
     return calculateSystemStats({
       classes,
@@ -105,6 +109,8 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
     });
   }, [classes, activeClassId, students, subjects, cards, chapters, teacher]);
 
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   const [internalLang, setInternalLang] = useState<AppLanguage>(() => language || getSavedLanguage());
   const currentLang = language || internalLang;
 
@@ -679,6 +685,7 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                       <div className={`p-3 rounded-2xl border ${
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
                       }`}>
+<<<<<<< HEAD
                         <div className="text-xl font-black text-blue-600 dark:text-blue-400">
                           {systemStats.totalClassesCount}
                         </div>
@@ -705,6 +712,22 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                         <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>
                           {currentLang === 'km' ? `សំណួរ (${systemStats.totalSubjectsCount} មុខវិជ្ជា)` : t('quizQuestions', currentLang)}
                         </div>
+=======
+                        <div className="text-xl font-black text-blue-600 dark:text-blue-400">{classes.length}</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('classrooms', currentLang)}</div>
+                      </div>
+                      <div className={`p-3 rounded-2xl border ${
+                        isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
+                      }`}>
+                        <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">{students.length}</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('totalStudents', currentLang)}</div>
+                      </div>
+                      <div className={`p-3 rounded-2xl border ${
+                        isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
+                      }`}>
+                        <div className="text-xl font-black text-amber-600 dark:text-amber-400">{cards.length || subjects.length}</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('quizQuestions', currentLang)}</div>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       </div>
                     </div>
 

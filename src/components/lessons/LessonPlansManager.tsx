@@ -25,7 +25,11 @@ import {
 import { LessonPlanItem } from '../../types/lessonMaterials';
 import { exportLessonPlanToDocx } from '../../lib/lessonWordExporter';
 import { useConfirm } from '../../context/ConfirmContext';
+<<<<<<< HEAD
 import { getSavedApiKey, generateLessonPlan } from '../../lib/gemini';
+=======
+import { getSavedApiKey } from '../../lib/gemini';
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
 interface LessonPlansManagerProps {
   plans: LessonPlanItem[];
@@ -136,6 +140,7 @@ export default function LessonPlansManager({
     setAiError(null);
 
     try {
+<<<<<<< HEAD
       const generatedPlan = await generateLessonPlan({
         subject: aiSubject,
         grade: aiGrade,
@@ -151,6 +156,42 @@ export default function LessonPlansManager({
         throw new Error('បរាជ័យក្នុងការបង្កើតកិច្ចតែងការដោយ AI');
       }
 
+=======
+      const apiKey = getSavedApiKey() || localStorage.getItem('khmer_ai_gemini_api_key') || '';
+      const res = await fetch('/api/generate-lesson-plan', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'x-api-key': apiKey
+        },
+        body: JSON.stringify({
+          subject: aiSubject,
+          grade: aiGrade,
+          chapter: aiChapter,
+          lessonTitle: aiLessonTitle,
+          duration: aiDuration,
+          schoolName: schoolName,
+          teacherName: teacherName,
+          extraInstructions: aiExtraInstructions
+        })
+      });
+
+      const responseText = await res.text();
+      let generatedPlan: any;
+      try {
+        generatedPlan = JSON.parse(responseText);
+      } catch (jsonErr) {
+        if (!res.ok) {
+          throw new Error(`កំហុសម៉ាស៊ីនបម្រើ (${res.status})៖ ${responseText.slice(0, 150)}`);
+        }
+        throw new Error('ការឆ្លើយតបពី Server មិនត្រឹមត្រូវជាទម្រង់ JSON ទេ។');
+      }
+
+      if (!res.ok || generatedPlan.error) {
+        throw new Error(generatedPlan.error || 'បរាជ័យក្នុងការបង្កើតកិច្ចតែងការដោយ AI');
+      }
+
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
       const newPlan: LessonPlanItem = {
         id: `plan-${Date.now()}`,
         title: generatedPlan.title || `កិច្ចតែងការបង្រៀន៖ ${aiLessonTitle}`,

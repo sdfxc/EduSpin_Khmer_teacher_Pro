@@ -9,8 +9,11 @@ import {
   GRADE_8K1_SUBJECTS, 
   seedGrade8DataToLocalStorage 
 } from '../lib/grade8SeedData';
+<<<<<<< HEAD
 import { useLanguage } from '../context/LanguageContext';
 import { calculateSystemStats } from '../lib/systemStats';
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
 interface BackupRestoreModalProps {
   isOpen: boolean;
@@ -252,6 +255,58 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
     }
   };
 
+  // Direct Seed / Backup All for ថ្នាក់ទី៨ក១
+  const handleSeedGrade8All = async () => {
+    setIsRestoring(true);
+    try {
+      const seeded = seedGrade8DataToLocalStorage();
+      if (seeded) {
+        const g8Class: ClassInfo = {
+          id: GRADE_8K1_CLASS_ID,
+          name: GRADE_8K1_CLASS_NAME,
+          order: 1,
+          isPinned: true
+        };
+        
+        const allClasses = classes.some(c => c.id === GRADE_8K1_CLASS_ID)
+          ? classes
+          : [g8Class, ...classes];
+
+        const backupObj = {
+          classes: allClasses,
+          students: seeded.students,
+          subjects: seeded.subjects,
+          chapters: seeded.chapters,
+          cards: seeded.cards,
+          activeClassId: GRADE_8K1_CLASS_ID,
+          storageDump: {
+            [`students_class_${GRADE_8K1_CLASS_ID}`]: seeded.students,
+            [`subjects_class_${GRADE_8K1_CLASS_ID}`]: seeded.subjects,
+            [`chapters_class_${GRADE_8K1_CLASS_ID}`]: seeded.chapters,
+            [`quiz_cards_class_${GRADE_8K1_CLASS_ID}`]: seeded.cards,
+            [`active_subject_id_${GRADE_8K1_CLASS_ID}`]: seeded.activeSubjectId,
+            [`active_room_id_${GRADE_8K1_CLASS_ID}`]: seeded.activeRoomId,
+            'edu_spin_attendance_records': seeded.attendance,
+            'edu_spin_attendance_reasons': seeded.reasons
+          }
+        };
+
+        await onRestoreData(backupObj);
+        setIsSuccess(true);
+        onShowToast('🎉 បានបញ្ចូល និងស្ដារទិន្នន័យថ្នាក់ទី៨ក១ (សិស្ស, វត្តមាន, ពិន្ទុ, វិញ្ញាសា) ១០០% ជោគជ័យ!');
+        setTimeout(() => {
+          setIsSuccess(false);
+          setIsRestoring(false);
+          onClose();
+        }, 1200);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage('បរាជ័យក្នុងការបញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១!');
+      setIsRestoring(false);
+    }
+  };
+
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/65 backdrop-blur-md">
       <motion.div
@@ -485,16 +540,24 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
             <div className="flex items-center justify-between">
               <h3 className="text-xs font-black text-slate-500 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+<<<<<<< HEAD
                 <span>{language === 'km' ? '៣. ស្ដារ និងបញ្ចូលទិន្នន័យ «ថ្នាក់ទី៨ក១» ពេញលេញ' : '3. Load Sample / Seed Grade 8K1'}</span>
+=======
+                <span>៣. ស្ដារ និងបញ្ចូលទិន្នន័យ «ថ្នាក់ទី៨ក១» ពេញលេញ</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
               </h3>
               <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
                 Grade 8ក១ All-In-One
               </span>
             </div>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+<<<<<<< HEAD
               {language === 'km' 
                 ? <>បញ្ចូលទិន្នន័យសិស្សទាំងអស់ (៣០+ នាក់) ព្រមទាំង <strong>បញ្ជីវត្តមាន, ពិន្ទុគ្រប់ខែ/សប្ដាហ៍, មុខវិជ្ជា & សំណួរវិញ្ញាសា</strong> សម្រាប់ថ្នាក់ទី៨ក១ ដោយស្វ័យប្រវត្តក្នុង ១ ចុច។</>
                 : <>Load complete roster (30+ students) with attendance, scores, subjects & quiz cards for Grade 8K1 automatically.</>}
+=======
+              បញ្ចូលទិន្នន័យសិស្សទាំងអស់ (៣០+ នាក់) ព្រមទាំង <strong>បញ្ជីវត្តមាន, ពិន្ទុគ្រប់ខែ/សប្ដាហ៍, មុខវិជ្ជា & សំណួរវិញ្ញាសា</strong> សម្រាប់ថ្នាក់ទី៨ក១ ដោយស្វ័យប្រវត្តក្នុង ១ ចុច។
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             </p>
             <button
               type="button"
@@ -507,7 +570,11 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
               ) : (
                 <BookOpen className="w-4 h-4 text-slate-950" />
               )}
+<<<<<<< HEAD
               <span>{isRestoring ? (language === 'km' ? 'កំពុងបញ្ចូលទិន្នន័យ...' : 'Loading Grade 8K1...') : (language === 'km' ? 'បញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១ ពេញលេញ (Backup All for ថ្នាក់ទី៨ក១)' : 'Load Full Grade 8K1 Dataset')}</span>
+=======
+              <span>{isRestoring ? 'កំពុងបញ្ចូលទិន្នន័យ...' : 'បញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១ ពេញលេញ (Backup All for ថ្នាក់ទី៨ក១)'}</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             </button>
           </div>
         </div>

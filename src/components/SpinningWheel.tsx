@@ -379,13 +379,21 @@ export default function SpinningWheel({
         </button>
       </div>
 
+<<<<<<< HEAD
       {/* Control Buttons */}
+=======
+      {/* របារបញ្ជា៖ Reset | Re-pick | ហៅសិស្សបន្ត */}
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
       <div className="flex items-center gap-2 sm:gap-3 w-full max-w-sm justify-center mb-3">
         {/* Reset */}
         <button
           onClick={handleResetPicked}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all cursor-pointer shadow-2xs active:scale-95"
+<<<<<<< HEAD
           title="Reset"
+=======
+          title="កំណត់ឡើងវិញ / Reset"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         >
           <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <span>Reset</span>
@@ -396,18 +404,30 @@ export default function SpinningWheel({
           onClick={handleRepick}
           disabled={isSpinning || students.length === 0}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+<<<<<<< HEAD
           title="Re-pick"
+=======
+          title="រើសម្តងទៀត / Re-pick"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         >
           <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           <span>Re-pick</span>
         </button>
 
+<<<<<<< HEAD
         {/* Call Next */}
+=======
+        {/* ហៅសិស្សបន្ត */}
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         <button
           onClick={handleCallNext}
           disabled={isSpinning || students.length === 0}
           className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-semibold text-xs transition-all cursor-pointer shadow-sm shadow-indigo-500/20 disabled:opacity-50 whitespace-nowrap"
+<<<<<<< HEAD
           title={t('callNext')}
+=======
+          title="ហៅសិស្សបន្ត"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         >
           <Play className="w-3.5 h-3.5 fill-white shrink-0" />
           <span>{t('callNext')}</span>

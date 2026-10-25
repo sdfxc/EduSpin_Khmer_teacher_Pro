@@ -9,10 +9,18 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
+<<<<<<< HEAD
     <LanguageProvider>
       <ConfirmProvider>
         <App />
       </ConfirmProvider>
     </LanguageProvider>
+=======
+    <ConfirmProvider>
+      <LanguageProvider>
+        <App />
+      </LanguageProvider>
+    </ConfirmProvider>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   </StrictMode>,
 );

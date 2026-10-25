@@ -5018,7 +5018,11 @@ export default function ExamsPanel({
                   }`}
                 >
                   <BookOpen className="w-4 h-4" />
+<<<<<<< HEAD
                   <span>{language === 'kh' ? '១. កម្មវិធីសិក្សាជាតិ (MoEYS)' : '1. Curriculum (MoEYS)'}</span>
+=======
+                  <span>១. កម្មវិធីសិក្សាជាតិ (MoEYS)</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                 </button>
 
                 <button
@@ -5031,7 +5035,11 @@ export default function ExamsPanel({
                   }`}
                 >
                   <Layers className="w-4 h-4" />
+<<<<<<< HEAD
                   <span>{language === 'kh' ? '២. ផ្នែកវិញ្ញាសា & ចំនួនសំណួរ' : '2. Sections & Questions'}</span>
+=======
+                  <span>២. ផ្នែកវិញ្ញាសា & ចំនួនសំណួរ</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                 </button>
 
                 <button
@@ -5044,7 +5052,11 @@ export default function ExamsPanel({
                   }`}
                 >
                   <Sliders className="w-4 h-4" />
+<<<<<<< HEAD
                   <span>{language === 'kh' ? '៣. កម្រិតវិភាគ & លក្ខខណ្ឌ' : '3. Bloom Levels & Specs'}</span>
+=======
+                  <span>៣. កម្រិតវិភាគ & លក្ខខណ្ឌ</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                 </button>
 
                 <button
@@ -5057,7 +5069,11 @@ export default function ExamsPanel({
                   }`}
                 >
                   <Paperclip className="w-4 h-4" />
+<<<<<<< HEAD
                   <span>{language === 'kh' ? '៤. ឯកសារ & រូបភាពជំនួយ' : '4. Reference Files & Notes'}</span>
+=======
+                  <span>៤. ឯកសារ & រូបភាពជំនួយ</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                   {(expertAiUploadedImages.length > 0 || expertAiUploadedPdfs.length > 0 || expertAiUploadedOfficeFiles.length > 0) && (
                     <span className="w-2 h-2 rounded-full bg-pink-400 animate-ping"></span>
                   )}
@@ -5077,16 +5093,26 @@ export default function ExamsPanel({
                       <div className="md:col-span-4 space-y-1.5">
                         <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
                           <GraduationCap className="w-3.5 h-3.5 text-indigo-500" />
+<<<<<<< HEAD
                           <span>{language === 'kh' ? 'កម្រិតថ្នាក់ (Grade Level)' : 'Grade Level'}</span>
+=======
+                          <span>កម្រិតថ្នាក់ (Grade Level)</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <select
                           value={expertAiGrade}
                           onChange={(e) => setExpertAiGrade(e.target.value)}
                           className="w-full px-3.5 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-black dark:text-white focus:ring-2 focus:ring-indigo-500 shadow-xs"
                         >
+<<<<<<< HEAD
                           {MOEYS_GRADES.map((g, idx) => (
                             <option key={g} value={g}>
                               {language === 'kh' ? g : `Grade ${idx + 1}`}
+=======
+                          {MOEYS_GRADES.map((g) => (
+                            <option key={g} value={g}>
+                              {g}
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                             </option>
                           ))}
                         </select>
@@ -5096,12 +5122,19 @@ export default function ExamsPanel({
                       <div className="md:col-span-8 space-y-1.5">
                         <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
                           <BookOpen className="w-3.5 h-3.5 text-purple-500" />
+<<<<<<< HEAD
                           <span>{language === 'kh' ? 'មុខវិជ្ជាក្រសួងអប់រំ (MoEYS Subject)' : 'MoEYS Subject'}</span>
+=======
+                          <span>មុខវិជ្ជាក្រសួងអប់រំ (MoEYS Subject)</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-1.5 max-h-36 overflow-y-auto p-1.5 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800">
                           {MOEYS_SUBJECTS.map((sub) => {
                             const isSelected = expertAiSubject === sub.name;
+<<<<<<< HEAD
                             const displayName = t('subj_' + sub.id) || sub.name;
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                             return (
                               <button
                                 key={sub.id}
@@ -5114,7 +5147,11 @@ export default function ExamsPanel({
                                 }`}
                               >
                                 <span className="text-sm">{sub.icon}</span>
+<<<<<<< HEAD
                                 <span className="truncate">{displayName}</span>
+=======
+                                <span className="truncate">{sub.name}</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                               </button>
                             );
                           })}
@@ -5126,39 +5163,63 @@ export default function ExamsPanel({
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-3 p-4 bg-slate-50/80 dark:bg-slate-950/40 rounded-2xl border border-slate-200 dark:border-slate-800/80">
                       <div>
                         <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+<<<<<<< HEAD
                           {language === 'kh' ? 'ជំពូក (Chapter / Unit)' : 'Chapter / Unit'}
+=======
+                          ជំពូក (Chapter / Unit)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <input
                           type="text"
                           value={expertAiChapter}
                           onChange={(e) => setExpertAiChapter(e.target.value)}
+<<<<<<< HEAD
                           placeholder={language === 'kh' ? 'ឧ. ជំពូកទី ១ ឬ ចលនាត្រង់' : 'e.g. Chapter 1 or Linear Motion'}
+=======
+                          placeholder="ឧ. ជំពូកទី ១ ឬ ចលនាត្រង់"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white"
                         />
                       </div>
 
                       <div>
                         <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+<<<<<<< HEAD
                           {language === 'kh' ? 'មេរៀន (Lesson / Topic)' : 'Lesson / Topic'}
+=======
+                          មេរៀន (Lesson / Topic)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <input
                           type="text"
                           value={expertAiLesson}
                           onChange={(e) => setExpertAiLesson(e.target.value)}
+<<<<<<< HEAD
                           placeholder={language === 'kh' ? 'ឧ. មេរៀនទី ២ ឬ ច្បាប់ញូតុន' : "e.g. Lesson 2 or Newton's Laws"}
+=======
+                          placeholder="ឧ. មេរៀនទី ២ ឬ ច្បាប់ញូតុន"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white"
                         />
                       </div>
 
                       <div>
                         <label className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase block mb-1">
+<<<<<<< HEAD
                           {language === 'kh' ? 'ចំណងជើងរង ឬប្រធានបទគន្លឹះ (Specific Focus)' : 'Subtopic or Key Focus'}
+=======
+                          ចំណងជើងរង ឬប្រធានបទគន្លឹះ (Specific Focus)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <input
                           type="text"
                           value={expertAiTopic}
                           onChange={(e) => setExpertAiTopic(e.target.value)}
+<<<<<<< HEAD
                           placeholder={language === 'kh' ? 'ឧ. កម្លាំងកកិត និងច្បាប់រក្សាថាមពល' : 'e.g. Friction forces & Conservation of Energy'}
+=======
+                          placeholder="ឧ. កម្លាំងកកិត និងច្បាប់រក្សាថាមពល"
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           className="w-full px-3 py-2 border rounded-xl text-xs font-bold dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white"
                         />
                       </div>
@@ -5169,18 +5230,28 @@ export default function ExamsPanel({
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
                           <CheckCircle2 className="w-3.5 h-3.5 text-emerald-500" />
+<<<<<<< HEAD
                           <span>{language === 'kh' ? 'ប្រភេទសំណួរ (Question Assessment Types)' : 'Question Assessment Types'}</span>
                         </label>
                         <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
                           {t('qt_' + expertAiQuestionType + '_name') || (language === 'kh' ? 'សំណួរចម្រុះ' : 'Mixed Types')}
+=======
+                          <span>ប្រភេទសំណួរ (Question Assessment Types)</span>
+                        </label>
+                        <span className="text-[10px] font-bold text-indigo-600 dark:text-indigo-400">
+                          {QUESTION_TYPES.find(t => t.id === expertAiQuestionType)?.name || 'សំណួរចម្រុះ'}
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </span>
                       </div>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-2.5">
                         {QUESTION_TYPES.map((type) => {
                           const isSelected = expertAiQuestionType === type.id;
+<<<<<<< HEAD
                           const qName = t('qt_' + type.id + '_name') || type.name;
                           const qDesc = t('qt_' + type.id + '_desc') || type.desc;
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           return (
                             <button
                               key={type.id}
@@ -5201,11 +5272,19 @@ export default function ExamsPanel({
                               </div>
                               <div className="flex-1 min-w-0">
                                 <div className="text-xs font-black truncate text-slate-800 dark:text-slate-100 flex items-center justify-between">
+<<<<<<< HEAD
                                   <span>{qName}</span>
                                   {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
                                 </div>
                                 <div className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-0.5 leading-relaxed font-medium">
                                   {qDesc}
+=======
+                                  <span>{type.name}</span>
+                                  {isSelected && <Check className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 shrink-0" />}
+                                </div>
+                                <div className="text-[10px] text-slate-400 dark:text-slate-500 line-clamp-2 mt-0.5 leading-relaxed font-medium">
+                                  {type.desc}
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                                 </div>
                               </div>
                             </button>
@@ -5598,25 +5677,44 @@ export default function ExamsPanel({
                           <div>
                             <h4 className="text-xs font-black text-emerald-800 dark:text-emerald-400 flex items-center gap-1.5">
                               <Award className="w-3.5 h-3.5 text-emerald-500 animate-bounce" />
+<<<<<<< HEAD
                               <span>{language === 'kh' ? 'សង្ខេបការកំណត់ផ្នែកវិញ្ញាសា (Sections Summary)' : 'Sections Configuration Summary'}</span>
                             </h4>
                             <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-medium">
                               {language === 'kh' ? 'ផ្នែកដែលបានកំណត់នឹងមានលក្ខណៈដូចខាងលើ ដោយគណនាពិន្ទុរួមស្វ័យប្រវត្តិ។' : 'The configured sections will be generated accordingly with automatic score calculation.'}
+=======
+                              <span>សង្ខេបការកំណត់ផ្នែកវិញ្ញាសា (Sections Summary)</span>
+                            </h4>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 mt-0.5 leading-relaxed font-medium">
+                              ផ្នែកដែលបានកំណត់នឹងមានលក្ខណៈដូចខាងលើ ដោយគណនាពិន្ទុរួមស្វ័យប្រវត្តិ។
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                             </p>
                           </div>
 
                           <div className="flex items-center gap-4 text-xs font-black text-slate-800 dark:text-white">
                             <div className="text-right">
+<<<<<<< HEAD
                               <span className="text-slate-400 font-bold block text-[9px] uppercase">{language === 'kh' ? 'សំណួរសរុប' : 'Total Questions'}</span>
                               <span className="font-mono text-base text-indigo-600 dark:text-indigo-400">
                                 {expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise} {language === 'kh' ? 'សំណួរ' : 'questions'}
+=======
+                              <span className="text-slate-400 font-bold block text-[9px] uppercase">សំណួរសរុប</span>
+                              <span className="font-mono text-base text-indigo-600 dark:text-indigo-400">
+                                {expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise} សំណួរ
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                               </span>
                             </div>
                             <div className="h-8 w-[1px] bg-slate-200 dark:bg-slate-800"></div>
                             <div className="text-right">
+<<<<<<< HEAD
                               <span className="text-slate-400 font-bold block text-[9px] uppercase">{language === 'kh' ? 'ពិន្ទុសរុប' : 'Total Points'}</span>
                               <span className="font-mono text-base text-emerald-600 dark:text-emerald-400">
                                 {expertAiSectionPoints.choice * expertAiSectionCounts.choice + expertAiSectionPoints.matching * expertAiSectionCounts.matching + expertAiSectionPoints.fill_blank * expertAiSectionCounts.fill_blank + expertAiSectionPoints.theory * expertAiSectionCounts.theory + expertAiSectionPoints.exercise * expertAiSectionCounts.exercise} {language === 'kh' ? 'ពិន្ទុ' : 'pts'}
+=======
+                              <span className="text-slate-400 font-bold block text-[9px] uppercase">ពិន្ទុសរុប</span>
+                              <span className="font-mono text-base text-emerald-600 dark:text-emerald-400">
+                                {expertAiSectionPoints.choice * expertAiSectionCounts.choice + expertAiSectionPoints.matching * expertAiSectionCounts.matching + expertAiSectionPoints.fill_blank * expertAiSectionCounts.fill_blank + expertAiSectionPoints.theory * expertAiSectionCounts.theory + expertAiSectionPoints.exercise * expertAiSectionCounts.exercise} ពិន្ទុ
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                               </span>
                             </div>
                           </div>
@@ -5627,7 +5725,11 @@ export default function ExamsPanel({
                       <div className="space-y-4 p-5 bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800">
                         <div className="space-y-1.5">
                           <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase">
+<<<<<<< HEAD
                             {language === 'kh' ? 'ចំនួនសំណួរដែលត្រូវបង្កើត (Total Questions)' : 'Total Questions to Generate'}
+=======
+                            ចំនួនសំណួរដែលត្រូវបង្កើត (Total Questions)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           </label>
                           <div className="flex items-center gap-1.5">
                             {[5, 10, 15, 20, 25, 30].map((count) => (
@@ -5649,7 +5751,11 @@ export default function ExamsPanel({
 
                         <div className="space-y-1.5 pt-3 border-t dark:border-slate-800">
                           <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase">
+<<<<<<< HEAD
                             {language === 'kh' ? 'ពិន្ទុក្នុង ១ សំណួរ (Points per Question)' : 'Points per Question'}
+=======
+                            ពិន្ទុក្នុង ១ សំណួរ (Points per Question)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           </label>
                           <div className="flex items-center gap-1.5">
                             {[1, 2, 3, 5, 10].map((pt) => (
@@ -5663,7 +5769,11 @@ export default function ExamsPanel({
                                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                                 }`}
                               >
+<<<<<<< HEAD
                                 {pt} {language === 'kh' ? 'ពិន្ទុ' : 'pts'}
+=======
+                                {pt} ពិន្ទុ
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                               </button>
                             ))}
                           </div>
@@ -5686,7 +5796,10 @@ export default function ExamsPanel({
                       <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-6 gap-2">
                         {BLOOM_LEVELS.map((bloom) => {
                           const isSelected = expertAiBloomLevel === bloom.id;
+<<<<<<< HEAD
                           const bloomName = t(bloom.id) || (language === 'kh' ? bloom.name : bloom.id);
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           return (
                             <button
                               key={bloom.id}
@@ -5699,7 +5812,11 @@ export default function ExamsPanel({
                               }`}
                             >
                               <span className="text-base">{bloom.icon}</span>
+<<<<<<< HEAD
                               <span className="text-[11px] font-black">{bloomName}</span>
+=======
+                              <span className="text-[11px] font-black">{t(bloom.id)}</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                               <span className="text-[8px] opacity-75 font-mono">
                                 {bloom.id === 'all' ? 'L1-L6' : `${language === 'kh' ? 'កម្រិត ' : 'Level '}${bloom.id === 'remember' ? '1' : bloom.id === 'understand' ? '2' : bloom.id === 'apply' ? '3' : bloom.id === 'analyze' ? '4' : bloom.id === 'evaluate' ? '5' : '6'}`}
                               </span>
@@ -5720,7 +5837,10 @@ export default function ExamsPanel({
                         <div className="grid grid-cols-4 gap-1.5">
                           {DIFFICULTY_LEVELS.map((dif) => {
                             const isSelected = expertAiDifficulty === dif.id;
+<<<<<<< HEAD
                             const diffName = t(dif.id) || (language === 'kh' ? dif.name : (dif.id === 'all' ? 'Mixed' : dif.id.charAt(0).toUpperCase() + dif.id.slice(1)));
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                             return (
                               <button
                                 key={dif.id}
@@ -5732,7 +5852,11 @@ export default function ExamsPanel({
                                     : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-300'
                                 }`}
                               >
+<<<<<<< HEAD
                                 {diffName}
+=======
+                                {t(dif.id)}
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                               </button>
                             );
                           })}
@@ -5750,7 +5874,11 @@ export default function ExamsPanel({
                           onChange={(e) => setExpertAiExamType(e.target.value)}
                           className="w-full px-3 py-2.5 bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-2xl text-xs font-black dark:text-white"
                         >
+<<<<<<< HEAD
                           <option value="monthly">{language === 'kh' ? 'វិញ្ញាសាប្រចាំខែ (Monthly Assessment)' : 'Monthly Exam Assessment'}</option>
+=======
+                          <option value="monthly">{t('exam_context_monthly')}</option>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           <option value="semester">{language === 'kh' ? 'វិញ្ញាសាប្រឡងឆមាស' : 'Semester Exam Assessment'}</option>
                           <option value="national">{language === 'kh' ? 'វិញ្ញាសាសាកល្បងឌីប្លូម / បាក់ឌុប' : 'Mock National Exam Assessment'}</option>
                           <option value="olympiad">{language === 'kh' ? 'វិញ្ញាសាសិស្សពូកែ' : 'Outstanding Student / Olympiad Assessment'}</option>
@@ -5762,7 +5890,11 @@ export default function ExamsPanel({
                     <div className="p-4 bg-slate-50 dark:bg-slate-950/60 rounded-2xl border border-slate-200 dark:border-slate-800 space-y-3">
                       <div className="flex items-center justify-between">
                         <label className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase">
+<<<<<<< HEAD
                           {language === 'kh' ? 'ចំនួនសំណួរដែលត្រូវបង្កើត (Total Questions)' : 'Total Questions to Generate'}
+=======
+                          ចំនួនសំណួរដែលត្រូវបង្កើត (Total Questions)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <div className="flex items-center gap-1.5">
                           {[5, 10, 15, 20, 25, 30].map((count) => (
@@ -5784,7 +5916,11 @@ export default function ExamsPanel({
 
                       <div className="flex items-center justify-between pt-2 border-t dark:border-slate-800">
                         <label className="text-[11px] font-black text-slate-600 dark:text-slate-300 uppercase">
+<<<<<<< HEAD
                           {language === 'kh' ? 'ពិន្ទុក្នុង ១ សំណួរ (Points per Question)' : 'Points per Question'}
+=======
+                          ពិន្ទុក្នុង ១ សំណួរ (Points per Question)
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         </label>
                         <div className="flex items-center gap-1.5">
                           {[1, 2, 3, 5, 10].map((pt) => (
@@ -5798,7 +5934,11 @@ export default function ExamsPanel({
                                   : 'bg-white dark:bg-slate-900 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                               }`}
                             >
+<<<<<<< HEAD
                               {pt} {language === 'kh' ? 'ពិន្ទុ' : 'pts'}
+=======
+                              {pt} ពិន្ទុ
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                             </button>
                           ))}
                         </div>
@@ -5815,7 +5955,11 @@ export default function ExamsPanel({
                     <div className="space-y-2">
                       <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
                         <Upload className="w-3.5 h-3.5 text-pink-500" />
+<<<<<<< HEAD
                         <span>{language === 'kh' ? 'ឯកសារយោង និងរូបភាពសៀវភៅពុម្ព (Reference Files & Images)' : 'Reference Files & Textbook Images'}</span>
+=======
+                        <span>ឯកសារយោង និងរូបភាពសៀវភៅពុម្ព (Reference Files & Images)</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       </label>
 
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -5830,10 +5974,17 @@ export default function ExamsPanel({
                           />
                           <ImageIcon className="w-6 h-6 text-indigo-500 mb-1.5" />
                           <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+<<<<<<< HEAD
                             {language === 'kh' ? 'បញ្ចូលរូបភាព (Images / Photos)' : 'Upload Images / Photos'}
                           </span>
                           <span className="text-[10px] text-slate-400 mt-0.5">
                             {language === 'kh' ? 'រូបទំព័រសៀវភៅពុម្ព, លំហាត់ ឬក្រាហ្វិក' : 'Textbook pages, exercises, diagrams'}
+=======
+                            បញ្ចូលរូបភាព (Images / Photos)
+                          </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            រូបទំព័រសៀវភៅពុម្ព, លំហាត់ ឬក្រាហ្វិក
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           </span>
                         </div>
 
@@ -5848,10 +5999,17 @@ export default function ExamsPanel({
                           />
                           <FileText className="w-6 h-6 text-purple-500 mb-1.5" />
                           <span className="text-xs font-black text-slate-700 dark:text-slate-200">
+<<<<<<< HEAD
                             {language === 'kh' ? 'បញ្ចូលឯកសារ PDF / Word / PPTX' : 'Upload PDF / Word / PPTX'}
                           </span>
                           <span className="text-[10px] text-slate-400 mt-0.5">
                             {language === 'kh' ? 'កម្រងវិញ្ញាសាចាស់ៗ, កិច្ចតែងការ, ឯកសារក្រសួង' : 'Past exams, lesson plans, curriculum docs'}
+=======
+                            បញ្ចូលឯកសារ PDF / Word / PPTX
+                          </span>
+                          <span className="text-[10px] text-slate-400 mt-0.5">
+                            កម្រងវិញ្ញាសាចាស់ៗ, កិច្ចតែងការ, ឯកសារក្រសួង
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           </span>
                         </div>
                       </div>
@@ -5859,12 +6017,20 @@ export default function ExamsPanel({
                       {/* Display Uploaded Files */}
                       {(expertAiUploadedImages.length > 0 || expertAiUploadedPdfs.length > 0 || expertAiUploadedOfficeFiles.length > 0) && (
                         <div className="p-3 bg-slate-50 dark:bg-slate-950 rounded-2xl border dark:border-slate-800 space-y-2">
+<<<<<<< HEAD
                           <span className="text-[10px] font-black text-slate-400 uppercase">{language === 'kh' ? 'ឯកសារដែលបានបញ្ចូល៖' : 'Uploaded Files:'}</span>
+=======
+                          <span className="text-[10px] font-black text-slate-400 uppercase">ឯកសារដែលបានបញ្ចូល៖</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                           <div className="flex flex-wrap gap-1.5">
                             {expertAiUploadedImages.map((img, i) => (
                               <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-indigo-500/10 text-indigo-600 dark:text-indigo-400 border border-indigo-500/20 rounded-xl text-xs font-bold">
                                 <ImageIcon className="w-3 h-3" />
+<<<<<<< HEAD
                                 <span className="max-w-[120px] truncate">{img.name || `${language === 'kh' ? 'រូបភាព' : 'Image'} ${i+1}`}</span>
+=======
+                                <span className="max-w-[120px] truncate">{img.name || `រូបភាព ${i+1}`}</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                                 <button type="button" onClick={() => removeExpertImage(i)} className="text-slate-400 hover:text-red-500">
                                   <X className="w-3 h-3" />
                                 </button>
@@ -5882,7 +6048,11 @@ export default function ExamsPanel({
                             {expertAiUploadedOfficeFiles.map((doc, i) => (
                               <div key={i} className="flex items-center gap-1.5 px-2.5 py-1 bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20 rounded-xl text-xs font-bold">
                                 <FileText className="w-3 h-3" />
+<<<<<<< HEAD
                                 <span className="max-w-[120px] truncate">{doc.name || `${language === 'kh' ? 'ឯកសារ' : 'Doc'} ${i+1}`}</span>
+=======
+                                <span className="max-w-[120px] truncate">{doc.name || `ឯកសារ ${i+1}`}</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                                 <button type="button" onClick={() => removeExpertOfficeFile(i)} className="text-slate-400 hover:text-red-500">
                                   <X className="w-3 h-3" />
                                 </button>
@@ -5897,11 +6067,19 @@ export default function ExamsPanel({
                     <div className="space-y-1.5">
                       <label className="text-[11px] font-black text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1.5">
                         <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+<<<<<<< HEAD
                         <span>{language === 'kh' ? 'សេចក្ដីណែនាំគន្លឹះបន្ថែមរបស់លោកគ្រូ អ្នកគ្រូ (Custom Prompt)' : 'Additional Teacher Instructions (Custom Prompt)'}</span>
                       </label>
                       <textarea
                         rows={3}
                         placeholder={language === 'kh' ? 'ឧ. សូមសង្កត់ធ្ងន់លើលំហាត់គណនាសមីការគីមី និងទ្រឹស្ដីដែលមានក្នុងសៀវភៅពុម្ពទំព័រ ២៥-៣០...' : 'e.g. Focus on chemical equation calculations and key concepts from textbook pages 25-30...'}
+=======
+                        <span>សេចក្ដីណែនាំគន្លឹះបន្ថែមរបស់លោកគ្រូ អ្នកគ្រូ (Custom Prompt)</span>
+                      </label>
+                      <textarea
+                        rows={3}
+                        placeholder="ឧ. សូមសង្កត់ធ្ងន់លើលំហាត់គណនាសមីការគីមី និងទ្រឹស្ដីដែលមានក្នុងសៀវភៅពុម្ពទំព័រ ២៥-៣០..."
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                         value={expertAiInstructions}
                         onChange={(e) => setExpertAiInstructions(e.target.value)}
                         className="w-full px-3.5 py-2.5 border rounded-2xl text-xs font-medium dark:bg-slate-900 border-slate-200 dark:border-slate-800 dark:text-white focus:ring-2 focus:ring-indigo-500"
@@ -5918,10 +6096,17 @@ export default function ExamsPanel({
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
                   {expertAiSectionMode === 'by_section' ? (
                     <span>
+<<<<<<< HEAD
                       {expertAiGrade} • {expertAiSubject} • {language === 'kh' ? 'សរុប' : 'Total'} {expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise} {language === 'kh' ? 'សំណួរ' : 'questions'} ({expertAiSectionPoints.choice * expertAiSectionCounts.choice + expertAiSectionPoints.matching * expertAiSectionCounts.matching + expertAiSectionPoints.fill_blank * expertAiSectionCounts.fill_blank + expertAiSectionPoints.theory * expertAiSectionCounts.theory + expertAiSectionPoints.exercise * expertAiSectionCounts.exercise} {language === 'kh' ? 'ពិន្ទុសរុប' : 'total pts'})
                     </span>
                   ) : (
                     <span>{expertAiGrade} • {expertAiSubject} • {expertAiCount} {language === 'kh' ? 'សំណួរ' : 'questions'} ({expertAiPointsPerQuestion} {language === 'kh' ? 'ពិន្ទុ/សំណួរ' : 'pts/question'})</span>
+=======
+                      {expertAiGrade} • {expertAiSubject} • សរុប {expertAiSectionCounts.choice + expertAiSectionCounts.matching + expertAiSectionCounts.fill_blank + expertAiSectionCounts.theory + expertAiSectionCounts.exercise} សំណួរ ({expertAiSectionPoints.choice * expertAiSectionCounts.choice + expertAiSectionPoints.matching * expertAiSectionCounts.matching + expertAiSectionPoints.fill_blank * expertAiSectionCounts.fill_blank + expertAiSectionPoints.theory * expertAiSectionCounts.theory + expertAiSectionPoints.exercise * expertAiSectionCounts.exercise} ពិន្ទុសរុប)
+                    </span>
+                  ) : (
+                    <span>{expertAiGrade} • {expertAiSubject} • {expertAiCount} សំណួរ ({expertAiPointsPerQuestion} ពិន្ទុ/សំណួរ)</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                   )}
                 </div>
 
@@ -5931,7 +6116,11 @@ export default function ExamsPanel({
                     onClick={() => setIsExpertAiModalOpen(false)}
                     className="px-4 py-2.5 text-xs font-bold text-slate-400 hover:text-slate-600 dark:hover:text-white border-none cursor-pointer bg-transparent"
                   >
+<<<<<<< HEAD
                     {t('cancel') || (language === 'kh' ? 'បោះបង់' : 'Cancel')}
+=======
+                    បោះបង់
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                   </button>
 
                   <button
@@ -5943,12 +6132,20 @@ export default function ExamsPanel({
                     {isExpertGenerating ? (
                       <>
                         <span className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin"></span>
+<<<<<<< HEAD
                         <span>{language === 'kh' ? 'កំពុងវិភាគ & បង្កើតសំណួរវិញ្ញាសារ...' : 'Analyzing & Generating Exam Questions...'}</span>
+=======
+                        <span>កំពុងវិភាគ & បង្កើតសំណួរវិញ្ញាសារ...</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       </>
                     ) : (
                       <>
                         <Sparkles className="w-4 h-4 text-white animate-pulse" />
+<<<<<<< HEAD
                         <span>{language === 'kh' ? '✨ ចាប់ផ្ដើមបង្កើតវិញ្ញាសារ (AI Expert)' : '✨ Generate Exam Assessment (AI Expert)'}</span>
+=======
+                        <span>✨ ចាប់ផ្ដើមបង្កើតវិញ្ញាសារ (AI Expert)</span>
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
                       </>
                     )}
                   </button>

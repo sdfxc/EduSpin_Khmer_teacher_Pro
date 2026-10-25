@@ -68,10 +68,14 @@ service cloud.firestore {
 
     // Validation helper for Exams Data
     function isValidExamsData(data) {
+<<<<<<< HEAD
       return (!('exams' in data) || data.exams is list)
         && (!('customRules' in data) || data.customRules is list)
         && (!('regulations' in data) || data.regulations is list)
         && (!('examTitle' in data) || (data.examTitle is string && data.examTitle.size() <= 200));
+=======
+      return (!('exams' in data) || data.exams is list);
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     }
 
     // Validation helper for Attendance Data

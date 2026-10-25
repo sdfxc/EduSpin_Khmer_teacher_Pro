@@ -466,7 +466,11 @@ export default function StudentPanel({
             type="text"
             value={newName}
             onChange={(e) => setNewName(e.target.value)}
+<<<<<<< HEAD
             placeholder={language === 'km' ? 'បញ្ចូលឈ្មោះសិស្ស...' : 'Enter student name...'}
+=======
+            placeholder="បញ្ចូលឈ្មោះសិស្ស..."
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
             className="flex-1 px-4 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-[#0e1524] focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500"
           />
           <button

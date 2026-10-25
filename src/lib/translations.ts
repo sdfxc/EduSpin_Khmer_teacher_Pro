@@ -56,7 +56,10 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     systemData100: 'ទិន្នន័យក្នុងប្រព័ន្ធ (100% Full State)',
     liveReady: '● Live Ready',
     classrooms: 'ថ្នាក់រៀន',
+<<<<<<< HEAD
     classroom: 'ថ្នាក់រៀន',
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     totalStudents: 'សិស្សសរុប',
     quizQuestions: 'សំណួរ/មុខវិជ្ជា',
     exportBackupTitle: 'ទាញយកទិន្នន័យបម្រុងទុក (Backup)',
@@ -73,6 +76,7 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     systemMenuFooter: 'EduSpin Pro • iOS System Menu',
 
     // Main App Navigation
+<<<<<<< HEAD
     tabWheel: 'បង្វិលឈ្មោះ',
     wheelSubTabWheel: 'កងបង្វិលឈ្មោះ',
     wheelSubTabGames: 'មុខងារសប្បាយៗ',
@@ -83,6 +87,15 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     tabStudents: 'គ្រប់គ្រងសិស្ស',
     tabStudentLobby: 'Study game',
     tabExamsRoom: 'បន្ទប់វិញ្ញាសា',
+=======
+    tabWheel: 'កងបង្វិល',
+    tabQuiz: 'ឆ្លើយសំណួរ',
+    tabGroups: 'បែងចែកក្រុម',
+    tabStopwatch: 'នាឡិកា',
+    tabStudents: 'គ្រប់គ្រងសិស្ស',
+    tabStudentLobby: 'បន្ទប់សិស្ស',
+    tabExamsRoom: 'បន្ទប់ប្រឡង',
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     tabSmartNotes: 'កំណត់ត្រា',
     studyGame: 'Study Game',
     registerTeacher: 'ចុះឈ្មោះគ្រូ',
@@ -90,6 +103,7 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     questionsUnit: 'សំណួរ',
     fileDate: 'កាលបរិច្ឆេទ',
     cancel: 'បោះបង់',
+<<<<<<< HEAD
     confirm: 'យល់ព្រម',
     save: 'រក្សាទុក',
     delete: 'លុប',
@@ -97,10 +111,13 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     search: 'ស្វែងរក',
     all: 'ទាំងអស់',
     close: 'បិទ',
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     confirmLogoutTitle: 'ចាកចេញពីគណនី',
     confirmLogoutDesc: 'តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ចាកចេញពីគណនីមែនទេ? (រាល់ទិន្នន័យដែលបានរក្សាទុកក្នុង Cloud នឹងមិនបាត់បង់ឡើយ)',
     profileTooltip: 'ចុចដើម្បីមើល ឬកែប្រែព័ត៌មាន Profile',
     changeAvatarTooltip: 'ចុចដើម្បីប្ដូររូបភាព Profile ពីទូរស័ព្ទ ឬកុំព្យូទ័រ',
+<<<<<<< HEAD
     settingsTooltip: 'ការកំណត់ & បម្រុងទុកទិន្នន័យ (Settings & Backup)',
 
     // Workspace & Classes Sub-bar
@@ -366,6 +383,9 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     confirmDeleteTitle: 'តើអ្នកពិតជាចង់លុបមែនឬទេ?',
     confirmDeleteMsg: 'តើអ្នកប្រាកដជាចង់លុបទិន្នន័យនេះមែនទេ? សកម្មភាពនេះមិនអាចត្រឡប់វិញបានឡើយ។',
     confirmDeleteClassMsg: 'តើអ្នកប្រាកដជាចង់លុបថ្នាក់នេះមែនទេ? រាល់ទិន្នន័យសិស្សក្នុងថ្នាក់នេះនឹងត្រូវលុប។'
+=======
+    settingsTooltip: 'ការកំណត់ & បម្រុងទុកទិន្នន័យ (Settings & Backup)'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   },
   en: {
     // General & Header
@@ -403,7 +423,10 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     systemData100: 'System Data Vault (100% Full State)',
     liveReady: '● Live Ready',
     classrooms: 'Classes',
+<<<<<<< HEAD
     classroom: 'Class',
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     totalStudents: 'Total Students',
     quizQuestions: 'Questions/Subjects',
     exportBackupTitle: 'Export Backup File',
@@ -421,9 +444,12 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
 
     // Main App Navigation
     tabWheel: 'Wheel Spin',
+<<<<<<< HEAD
     wheelSubTabWheel: 'Spinning Wheel',
     wheelSubTabGames: 'Fun Games',
     duckRaceGame: 'Duck Race',
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     tabQuiz: 'Quiz Board',
     tabGroups: 'Groups',
     tabStopwatch: 'Stopwatch',
@@ -437,6 +463,7 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     questionsUnit: 'Questions',
     fileDate: 'Date',
     cancel: 'Cancel',
+<<<<<<< HEAD
     confirm: 'Confirm',
     save: 'Save',
     delete: 'Delete',
@@ -444,10 +471,13 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     search: 'Search',
     all: 'All',
     close: 'Close',
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     confirmLogoutTitle: 'Log Out',
     confirmLogoutDesc: 'Are you sure you want to log out? (All your data stored in Cloud will remain safe)',
     profileTooltip: 'Click to view or edit profile',
     changeAvatarTooltip: 'Click to change profile avatar',
+<<<<<<< HEAD
     settingsTooltip: 'Settings & Data Backup',
 
     // Workspace & Classes Sub-bar
@@ -713,6 +743,9 @@ export const translations: Record<AppLanguage, Record<string, string>> = {
     confirmDeleteTitle: 'Are you sure you want to delete?',
     confirmDeleteMsg: 'Are you sure you want to delete this? This action cannot be undone.',
     confirmDeleteClassMsg: 'Are you sure you want to delete this class? All students in this class will also be removed.'
+=======
+    settingsTooltip: 'Settings & Data Backup'
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
   }
 };
 

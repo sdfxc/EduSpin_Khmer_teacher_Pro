@@ -155,6 +155,7 @@ function extractClientExcel(base64Data: string): string {
   }
 }
 
+<<<<<<< HEAD
 function cleanJsonString(str: string): string {
   return str
     .replace(/^```json\s*/i, "")
@@ -167,6 +168,8 @@ function cleanJsonString(str: string): string {
 // 1. GENERATE QUESTIONS (QUIZ & EXAMS)
 // =========================================================================
 
+=======
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 export interface GenerateQuestionsOptions {
   lessonText?: string;
   count?: number;
@@ -210,6 +213,61 @@ export async function generateQuestions(
         categoryCounts
       }
     : lessonTextOrOptions;
+<<<<<<< HEAD
+=======
+
+  const {
+    lessonText = '',
+    count: reqCount = 25,
+    images: reqImages = [],
+    pdfs: reqPdfs = [],
+    officeFiles: reqOfficeFiles = [],
+    questionType: reqQuestionType = 'general',
+    pisaLanguage: reqPisaLanguage = 'khmer',
+    categoryCounts: reqCategoryCounts,
+    grade = '',
+    subject = '',
+    chapter = '',
+    lesson = '',
+    topic = '',
+    bloomLevel = 'all',
+    difficulty = 'medium',
+    points = 2,
+    includeExplanation = true,
+    customInstructions = ''
+  } = options;
+
+  try {
+    // 1. First, try to request the custom backend server proxy
+    try {
+      const response = await fetch("/api/generate-questions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "x-api-key": getSavedApiKey()
+        },
+        body: JSON.stringify({ 
+          lessonText, 
+          count: reqCount, 
+          images: reqImages, 
+          pdfs: reqPdfs, 
+          officeFiles: reqOfficeFiles, 
+          questionType: reqQuestionType, 
+          pisaLanguage: reqPisaLanguage, 
+          categoryCounts: reqCategoryCounts,
+          grade,
+          subject,
+          chapter,
+          lesson,
+          topic,
+          bloomLevel,
+          difficulty,
+          points,
+          includeExplanation,
+          customInstructions
+        })
+      });
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
 
   const {
     lessonText = '',
@@ -305,13 +363,18 @@ export async function generateQuestions(
           extractedClientText += `\n[Word Document: ${name}]\n${txt}\n`;
         } else if (name.toLowerCase().endsWith(".pptx") || rawType.includes("presentationml")) {
           const txt = await extractClientPptx(of.data);
+<<<<<<< HEAD
           extractedClientText += `\n[PowerPoint: ${name}]\n${txt}\n`;
         } else if (name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".csv") || rawType.includes("spreadsheet")) {
+=======
+        } else if (name.toLowerCase().endsWith(".xlsx") || name.toLowerCase().endsWith(".xls") || name.toLowerCase().endsWith(".csv") || rawType.includes("spreadsheet") || rawType.includes("excel")) {
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
           const txt = extractClientExcel(of.data);
           extractedClientText += `\n[Excel: ${name}]\n${txt}\n`;
         }
       }
 
+<<<<<<< HEAD
       const prompt = `អ្នកជាអ្នកឯកទេសកម្មវិធីសិក្សាកម្ពុជា MoEYS Cambodia។
 បង្កើតសំណួរ ចម្លើយ ស្របតាមកម្មវិធីសិក្សាថ្មី៖
 - មុខវិជ្ជា៖ ${subject || 'ទូទៅ'}
@@ -339,6 +402,231 @@ ${extractedClientText ? `\nឯកសារភ្ជាប់៖\n${extractedClie
 
       const modelsToTry = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
       for (const m of modelsToTry) {
+=======
+      const isBilingual = reqPisaLanguage === 'bilingual';
+      const isEnglish = reqPisaLanguage === 'english';
+      
+      let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the Cambodian curriculum context.`;
+      if (isEnglish) {
+        languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST be written entirely in English language because this is an international standard evaluation. Do not use Khmer. Everything must be high-quality, clear, correct academic English translation.`;
+      } else if (isBilingual) {
+        languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST have both Khmer and English side-by-side (English support) because this is an international standard evaluation. For every question text, each option, and explanation text, write the Khmer text first, immediately followed by the English translation in parentheses. Example format:
+- Question: "តើអ្វីទៅជាប្រភពថាមពលចម្បងរបស់ផែនដី? (What is the main energy source of the Earth?)"
+- Options:
+  1. "ព្រះអាទិត្យ (The Sun)"
+  2. "ធ្យូងថ្ម (Coal)"
+  3. "ខ្យល់ (Wind)"
+  4. "ប្រេងកាត (Petroleum)"
+- Explanation: "ព្រះអាទិត្យគឺជាប្រភពថាមពលចម្បងដោយសារ... (The sun is the main source of energy because...)"
+Make sure everything including the options represents exact equivalent translations so that students can understand both Khmer and English.`;
+      }
+
+      let categoryRatiosPrompt = "";
+      let totalRequestedCount = reqCount;
+
+      if (reqCategoryCounts) {
+        const { choice = 0, matching = 0, fill_blank = 0, theory = 0, exercise = 0 } = reqCategoryCounts;
+        totalRequestedCount = choice + matching + fill_blank + theory + exercise;
+        categoryRatiosPrompt = `
+CRITICAL QUANTITY AND CATEGORY REQUIREMENTS:
+You MUST generate exactly:
+- Choice: ${choice} questions
+- Matching: ${matching} questions
+- Fill Blank: ${fill_blank} questions
+- Theory: ${theory} questions
+- Exercise: ${exercise} questions
+
+For each question, "category" field MUST be "choice", "matching", "fill_blank", "theory", or "exercise".`;
+      }
+
+      const bloomPrompt = bloomLevel && bloomLevel !== 'all' 
+        ? `BLOOM'S TAXONOMY LEVEL: Strictly generate questions targeting Bloom's Level: ${bloomLevel.toUpperCase()} (Remember, Understand, Apply, Analyze, Evaluate, or Create).` 
+        : `BLOOM'S TAXONOMY LEVEL: Provide a balanced progression across Bloom's Taxonomy Levels (Remember, Understand, Apply, Analyze, Evaluate, Create).`;
+
+      const questionTypeDescription = (reqQuestionType === 'all_mixed' || reqQuestionType === 'mixed' || reqQuestionType === 'all')
+        ? 'ចម្រុះគ្រប់ប្រភេទទាំងអស់ (Mixed Assessment Types: Balanced combination of QCM/MCQ, True/False, Short Answer, Problem Solving, Application & Scenario, HOTS, PISA-style, and STEM projects)'
+        : reqQuestionType;
+
+      const prompt = `
+# SYSTEM IDENTITY & ROLE:
+អ្នកគឺជា "AI Educational Assessment Expert សម្រាប់កម្មវិធីសិក្សាកម្ពុជា" (Cambodian MoEYS Curriculum Assessment Expert).
+ភារកិច្ចរបស់អ្នកគឺបង្កើត សំណួរ ចម្លើយ លំហាត់ QCM/MCQ, True/False, Short Answer, Problem Solving, Application, HOTS, PISA-style និង STEM questions ស្របតាមកម្មវិធីសិក្សា និងឯកសារផ្លូវការរបស់ក្រសួងអប់រំ យុវជន និងកីឡា (MoEYS Cambodia: https://sala.moeys.gov.kh/).
+
+# 1. ព័ត៌មាននៃការបង្កើត (INPUT CONTEXT):
+- ថ្នាក់ទី (Grade): ${grade || 'គ្រប់កម្រិតថ្នាក់ MoEYS'}
+- មុខវិជ្ជា (Subject): ${subject || 'មុខវិជ្ជាទូទៅ'}
+- ជំពូក (Chapter): ${chapter || 'ជំពូកពាក់ព័ន្ធ'}
+- មេរៀន (Lesson): ${lesson || 'មេរៀនពាក់ព័ន្ធ'}
+- ប្រធានបទ (Topic): ${topic || 'ប្រធានបទគោល'}
+- ចំនួនសំណួរដែលត្រូវបង្កើត (Total Count): ${totalRequestedCount} សំណួរ
+- ប្រភេទសំណួរ (Question Type): ${questionTypeDescription}
+- កម្រិតលំបាក (Difficulty): ${difficulty}
+- ពិន្ទុក្នុងមួយសំណួរ (Points): ${points} ពិន្ទុ
+- បង្ហាញដំណោះស្រាយលម្អិត (Include Step-by-Step Solutions): ${includeExplanation ? 'Yes' : 'No'}
+${customInstructions ? `- ការណែនាំបន្ថែមពិសេសពីគ្រូ (Custom Teacher Directive): ${customInstructions}` : ''}
+
+# 2. ប្រភពចំណេះដឹងដែលត្រូវគោរពតាមលំដាប់អាទិភាព៖
+1. កម្មវិធីសិក្សាលម្អិតរបស់ក្រសួងអប់រំ យុវជន និងកីឡា (MoEYS Detailed Curriculum)
+2. សៀវភៅសិក្សាគោលរបស់ក្រសួង (Official MoEYS Textbooks)
+3. សៀវភៅគ្រូ / Teacher Guide
+4. ឯកសារពិសោធន៍ និងឯកសារ STEM របស់ MoEYS
+5. ឯកសារសំណួរ និងការវាយតម្លៃ PISA របស់ MoEYS (https://sala.moeys.gov.kh/)
+
+${bloomPrompt}
+
+# 3. គោលការណ៍តាមមុខវិជ្ជាជាក់លាក់ (SUBJECT-SPECIFIC RULES):
+- គណិតវិទ្យា (Math): បង្ហាញ Given (បម្រាប់), Formula (រូបមន្ត), Calculation (ការគណនា), Answer (ចម្លើយ) និងផ្ទៀងផ្ទាត់លេខនព្វន្តឱ្យបានត្រឹមត្រូវ ១០០%។
+- រូបវិទ្យា (Physics): បង្ហាញ Known (បម្រាប់), Find (ស្វែងរក), Formula (រូបមន្ត), Substitution (ជំនួសលេខ), Calculation, SI Unit (ឯកតា), Final Answer។ ពិនិត្យ dimensional consistency។
+- គីមីវិទ្យា (Chemistry): ពិនិត្យ Chemical formula, Chemical equation, Balance equation, Valency, Mole calculation, Concentration, pH, Reaction type។
+- ជីវវិទ្យា (Biology): ផ្តោតលើ Structure, Function, Biological Process, Human/Plant biology, Ecology, Genetics, Environment។
+- ផែនដីវិទ្យា (Earth Science): Earth structure, Rocks, Minerals, Plate tectonics, Weather, Climate, Natural resources of Cambodia។
+- ភូមិវិទ្យា (Geography): ផែនទីកម្ពុជា, ប្រព័ន្ធទន្លេមេគង្គ-បឹងទន្លេសាប, កសិកម្ម, អាកាសធាតុ, ធនធានធម្មជាតិ, ASEAN និងពិភពលោក។
+- ប្រវត្តិវិទ្យា (History): សម័យបុរេប្រវត្តិ, នគរភ្នំ (Funan), ចេនឡា (Chenla), មហានគរ (Angkor), ក្រោយអង្គរ, កាលបរិច្ឆេទ, តួអង្គប្រវត្តិសាស្ត្រ, សារៈសំខាន់ប្រវត្តិសាស្ត្រ។
+- សីលធម៌–ពលរដ្ឋវិជ្ជា (Moral-Civics): បង្កើតសំណួរ Scenario-based, ការទទួលខុសត្រូវ, វិន័យ, សីលធម៌រស់នៅ, ច្បាប់ចរាចរណ៍, សិទ្ធិ និងករណីយកិច្ច។
+- ភាសាខ្មែរ (Khmer): អក្ខរាវិរុទ្ធ, វេយ្យាករណ៍, អក្សរសិល្ប៍, ការអានស្វែងយល់, សិក្សាអត្ថបទ, តែងសេចក្ដី។
+- ភាសាអង់គ្លេស (English): Grammar tenses, prepositions, reading comprehension, vocabulary in context.
+- STEM & ICT & បច្ចេកវិទ្យា: Problem-solving scenarios, engineering design, coding logic, practical application.
+
+# 4. ច្បាប់សម្រាប់ជម្រើស A B C D (DISTRACTOR RULES):
+- មានចម្លើយត្រឹមត្រូវតែ 1 គត់។
+- Distractors (ជម្រើសខុស) ត្រូវមានភាពសមហេតុផល និងឆ្លុះបញ្ចាំងពីកំហុសដែលសិស្សងាយនឹងច្រឡំ (Misconceptions).
+- ហាមប្រើ "All of the above" ឬ "None of the above" ប្រសិនបើមិនចាំបាច់។
+- Randomize ទីតាំងចម្លើយត្រឹមត្រូវ (correctIndex ត្រូវផ្លាស់ប្តូរឆ្លាស់គ្នា 0, 1, 2, 3)។
+
+# 5. រចនាប័ទ្មសរសេររូបមន្ត (FORMULA NOTATION):
+- ស្វ័យគុណ (Exponents): សរសេរប្រើ "^" (ឧ. "x^2", "10^{-5}")។
+- សន្ទស្សន៍ (Subscripts): សរសេរប្រើ "_" (ឧ. "H_2O", "CO_2")។
+- ប្រភាគ (Fractions): សរសេរតាមរបៀប LaTeX "\\frac{a}{b}" (ឧ. "\\frac{s}{t}")។
+- ឫស (Square roots): សរសេរប្រើ "\\sqrt{x}"។
+- សញ្ញាព្រួញប្រតិកម្ម: សរសេរប្រើ "->" ឬ "\\rightarrow"។
+- និមិត្តសញ្ញា: "\\pm", "\\times", "\\div", "\\pi", "\\Delta", "\\alpha", "\\theta"។
+
+${languagePrompt}
+${categoryRatiosPrompt}
+
+Generate exactly ${totalRequestedCount} structured questions in JSON format matching the schema.`;
+
+      const parts: any[] = [{ text: prompt }];
+
+      if (lessonText?.trim() || extractedClientText.trim()) {
+        let combined = "";
+        if (lessonText?.trim()) combined += `Lesson Text Notes:\n${lessonText}\n\n`;
+        if (extractedClientText.trim()) combined += `Extracted Content from Documents:\n${extractedClientText}\n`;
+        parts.push({ text: combined });
+      }
+
+      reqImages.forEach((img) => {
+        let base64Data = img.data;
+        if (base64Data.includes(";base64,")) {
+          base64Data = base64Data.split(";base64,").pop() || "";
+        }
+        parts.push({
+          inlineData: {
+            mimeType: img.mimeType || "image/jpeg",
+            data: base64Data
+          }
+        });
+      });
+
+      reqPdfs.forEach((pdf) => {
+        let base64Data = pdf.data;
+        if (base64Data.includes(";base64,")) {
+          base64Data = base64Data.split(";base64,").pop() || "";
+        }
+        parts.push({
+          inlineData: {
+            mimeType: "application/pdf",
+            data: base64Data
+          }
+        });
+      });
+
+      const fetchWithRetry = async (retriesLeft = 4, delayMs = 1500): Promise<Response> => {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.8-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+              contents: [
+                {
+                  parts: parts
+                }
+              ],
+              generationConfig: {
+                responseMimeType: "application/json",
+                responseSchema: {
+                  type: "ARRAY",
+                  items: {
+                    type: "OBJECT",
+                    properties: {
+                      text: { 
+                        type: "STRING", 
+                        description: "Question text in accordance with MoEYS curriculum" 
+                      },
+                      options: { 
+                        type: "ARRAY", 
+                        items: { type: "STRING" },
+                        description: "Array of 4 options (or 2 for True/False) with plausible distractors"
+                      },
+                      correctIndex: { type: "INTEGER", description: "The 0-based index of the correct option" },
+                      category: { type: "STRING", description: "The category: choice, matching, fill_blank, theory, or exercise" },
+                      explanation: { type: "STRING", description: "Clear and comprehensive explanation for why the answer is correct" },
+                      bloomLevel: { type: "STRING", description: "Bloom's taxonomy: remember, understand, apply, analyze, evaluate, or create" },
+                      difficulty: { type: "STRING", description: "Difficulty: easy, medium, or hard" },
+                      learningObjective: { type: "STRING", description: "Expected learning outcome / objective aligned with MoEYS" },
+                      solutionStepByStep: { type: "STRING", description: "Step by step calculation or proof (Given, Formula, Calculation, Answer)" },
+                      points: { type: "INTEGER", description: "Points allocated for this question" }
+                    },
+                    required: ["text", "options", "correctIndex", "category"]
+                  }
+                }
+              }
+            })
+          }
+        );
+
+        if (!res.ok) {
+          const errText = await res.clone().text().catch(() => "");
+          let isRetryable = false;
+          try {
+            const errJson = JSON.parse(errText);
+            const msg = errJson.error?.message || "";
+            if (
+              res.status === 503 ||
+              res.status === 429 ||
+              res.status === 500 ||
+              msg.includes("503") ||
+              msg.includes("UNAVAILABLE") ||
+              msg.toLowerCase().includes("overloaded") ||
+              msg.toLowerCase().includes("demand") ||
+              msg.toLowerCase().includes("temporary")
+            ) {
+              isRetryable = true;
+            }
+          } catch (_) {
+            if (res.status === 503 || res.status === 429 || res.status === 500) {
+              isRetryable = true;
+            }
+          }
+
+          if (isRetryable && retriesLeft > 0) {
+            console.warn(`Direct client Gemini API returned retryable status (${res.status}). Retrying in ${delayMs}ms... (${retriesLeft} retries left)`);
+            await new Promise((resolve) => setTimeout(resolve, delayMs));
+            return fetchWithRetry(retriesLeft - 1, delayMs * 2);
+          }
+        }
+        return res;
+      };
+
+      const directRes = await fetchWithRetry();
+
+      if (!directRes.ok) {
+        const errText = await directRes.text().catch(() => "");
+        let errMsg = `កំហុសក្នុងការបង្កើតសំណួរ (HTTP ${directRes.status})`;
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
         try {
           const directRes = await fetch(
             `https://generativelanguage.googleapis.com/v1beta/models/${m}:generateContent?key=${savedKey}`,
@@ -390,8 +678,51 @@ ${extractedClientText ? `\nឯកសារភ្ជាប់៖\n${extractedClie
           console.warn(`Direct model ${m} error:`, mErr);
         }
       }
+<<<<<<< HEAD
     } catch (directError) {
       console.warn("Direct client Gemini call error:", directError);
+=======
+
+      const jsonResult = await directRes.json();
+      const textContent = jsonResult.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (!textContent) {
+        throw new Error("គ្មានទិន្នន័យត្រឡប់មកវិញពី Gemini API ទេ។");
+      }
+
+      const cleanJsonStr = textContent
+        .replace(/^```json\s*/i, "")
+        .replace(/^```\s*/i, "")
+        .replace(/\s*```$/i, "")
+        .trim();
+      let rawQuestions: any[] = [];
+      try {
+        rawQuestions = JSON.parse(cleanJsonStr);
+      } catch {
+        const match = cleanJsonStr.match(/\[[\s\S]*\]/);
+        if (match) {
+          rawQuestions = JSON.parse(match[0]);
+        }
+      }
+      return rawQuestions.map((q: any, i: number) => ({
+        text: q.text,
+        options: q.options,
+        correctIndex: q.correctIndex,
+        id: `q-${i}-${Date.now()}`,
+        questionType: (reqQuestionType as any) || 'general',
+        category: q.category || 'choice',
+        explanation: q.explanation || "",
+        grade: q.grade || grade,
+        subject: q.subject || subject,
+        chapter: q.chapter || chapter,
+        lesson: q.lesson || lesson,
+        topic: q.topic || topic,
+        bloomLevel: q.bloomLevel || bloomLevel,
+        difficulty: q.difficulty || difficulty,
+        learningObjective: q.learningObjective || '',
+        solutionStepByStep: q.solutionStepByStep || '',
+        points: q.points || points
+      }));
+>>>>>>> e7771433e888f909338169cfce9d59fbb2fb2f6e
     }
   }
 
