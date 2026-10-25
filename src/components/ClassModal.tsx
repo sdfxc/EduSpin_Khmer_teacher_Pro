@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { X, GraduationCap, Check, Loader2 } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 interface ClassModalProps {
   isOpen: boolean;
@@ -16,6 +17,7 @@ export const ClassModal: React.FC<ClassModalProps> = ({
   onClose,
   onSave,
 }) => {
+  const { language, t } = useLanguage();
   const [className, setClassName] = useState('');
   const [error, setError] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -43,7 +45,7 @@ export const ClassModal: React.FC<ClassModalProps> = ({
 
     const trimmed = className.trim();
     if (!trimmed) {
-      setError('សូមបញ្ចូលឈ្មោះថ្នាក់រៀន!');
+      setError(language === 'km' ? 'សូមបញ្ចូលឈ្មោះថ្នាក់រៀន!' : 'Please enter a class name!');
       return;
     }
     if (mode === 'rename' && trimmed === currentName.trim()) {
@@ -57,7 +59,7 @@ export const ClassModal: React.FC<ClassModalProps> = ({
       onClose();
     } catch (err) {
       console.error('Failed to save class:', err);
-      setError('មានបញ្ហាក្នុងការរក្សាទុក។ សូមព្យាយាមម្ដងទៀត!');
+      setError(language === 'km' ? 'មានបញ្ហាក្នុងការរក្សាទុក។ សូមព្យាយាមម្ដងទៀត!' : 'Failed to save. Please try again!');
     } finally {
       setIsSubmitting(false);
     }
@@ -77,10 +79,14 @@ export const ClassModal: React.FC<ClassModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-800 dark:text-slate-100">
-                {mode === 'rename' ? 'កែប្រែឈ្មោះថ្នាក់រៀន' : 'បង្កើតថ្នាក់រៀនថ្មី'}
+                {mode === 'rename' 
+                  ? (language === 'km' ? 'កែប្រែឈ្មោះថ្នាក់រៀន' : 'Edit Class Name')
+                  : (language === 'km' ? 'បង្កើតថ្នាក់រៀនថ្មី' : 'Create New Class')}
               </h3>
               <p className="text-xs text-slate-500 dark:text-slate-400">
-                {mode === 'rename' ? 'ផ្លាស់ប្ដូរឈ្មោះថ្នាក់ទៅកាន់ឈ្មោះថ្មី' : 'បញ្ចូលឈ្មោះថ្នាក់រៀនដើម្បីចាប់ផ្ដើម'}
+                {mode === 'rename' 
+                  ? (language === 'km' ? 'ផ្លាស់ប្ដូរឈ្មោះថ្នាក់ទៅកាន់ឈ្មោះថ្មី' : 'Rename this classroom')
+                  : (language === 'km' ? 'បញ្ចូលឈ្មោះថ្នាក់រៀនដើម្បីចាប់ផ្ដើម' : 'Enter class name to get started')}
               </p>
             </div>
           </div>
@@ -98,7 +104,7 @@ export const ClassModal: React.FC<ClassModalProps> = ({
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
             <label className="block text-xs font-bold text-slate-700 dark:text-slate-300 mb-1.5">
-              ឈ្មោះថ្នាក់រៀន <span className="text-red-500">*</span>
+              {language === 'km' ? 'ឈ្មោះថ្នាក់រៀន' : 'Class Name'} <span className="text-red-500">*</span>
             </label>
             <input
               ref={inputRef}
@@ -109,7 +115,7 @@ export const ClassModal: React.FC<ClassModalProps> = ({
                 setClassName(e.target.value);
                 if (error) setError('');
               }}
-              placeholder="ឧទាហរណ៍៖ ថ្នាក់ទី៨ក១, ថ្នាក់ទី៧ក..."
+              placeholder={language === 'km' ? 'ឧទាហរណ៍៖ ថ្នាក់ទី៨ក១, ថ្នាក់ទី៧ក...' : 'e.g., Grade 8A, Grade 7B...'}
               className={`w-full px-4 py-2.5 rounded-xl border text-sm font-medium bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-100 transition-all focus:outline-none focus:ring-2 disabled:opacity-60 ${
                 error
                   ? 'border-red-400 focus:ring-red-400/20 focus:border-red-500'
@@ -126,7 +132,7 @@ export const ClassModal: React.FC<ClassModalProps> = ({
               disabled={isSubmitting}
               className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors disabled:opacity-50"
             >
-              បោះបង់
+              {t('cancel')}
             </button>
             <button
               type="submit"
@@ -136,12 +142,12 @@ export const ClassModal: React.FC<ClassModalProps> = ({
               {isSubmitting ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
-                  <span>កំពុងរក្សាទុក...</span>
+                  <span>{language === 'km' ? 'កំពុងរក្សាទុក...' : 'Saving...'}</span>
                 </>
               ) : (
                 <>
                   <Check className="w-4 h-4" />
-                  <span>{mode === 'rename' ? 'រក្សាទុក' : 'បង្កើតថ្នាក់'}</span>
+                  <span>{mode === 'rename' ? t('save') : (language === 'km' ? 'បង្កើតថ្នាក់' : 'Create Class')}</span>
                 </>
               )}
             </button>

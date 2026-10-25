@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import { Student } from '../types';
 import { getCurrentDateScoreSlot, getStudentCurrentWeekActivityScore } from '../lib/scoreUtils';
+import { useLanguage } from '../context/LanguageContext';
 
 interface StudentListCallingModalProps {
   isOpen: boolean;
@@ -47,6 +48,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
   className = 'ថ្នាក់រៀន',
   isDarkMode = false
 }) => {
+  const { language, t } = useLanguage();
   const [searchQuery, setSearchQuery] = useState('');
   const [filterTab, setFilterTab] = useState<'all' | 'uncalled' | 'called' | 'teacher_called'>('all');
   const [editingScoreStudentId, setEditingScoreStudentId] = useState<string | null>(null);
@@ -124,7 +126,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
               </div>
               <div>
                 <h3 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-2">
-                  <span>បញ្ជីឈ្មោះសិស្សទាំងអស់ ({totalStudents})</span>
+                  <span>{language === 'km' ? `បញ្ជីឈ្មោះសិស្សទាំងអស់ (${totalStudents})` : `All Students (${totalStudents})`}</span>
                   {className && (
                     <span className="text-[11px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 dark:bg-indigo-950/60 text-indigo-600 dark:text-indigo-400 border border-indigo-200 dark:border-indigo-800">
                       {className}
@@ -132,7 +134,9 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                   )}
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                  ពិនិត្យមើលស្ថានភាពហៅឈ្មោះ និងជ្រើសរើស «គ្រូហៅផ្ទាល់» ដើម្បីលើកលែងពីការបង្វិល
+                  {language === 'km' 
+                    ? 'ពិនិត្យមើលស្ថានភាពហៅឈ្មោះ និងជ្រើសរើស «គ្រូហៅផ្ទាល់» ដើម្បីលើកលែងពីការបង្វិល' 
+                    : 'Check calling status and mark "Teacher Called" to exempt from wheel rotation'}
                 </p>
               </div>
             </div>
@@ -141,7 +145,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
               id="close-student-list-calling-modal"
               onClick={onClose}
               className="p-2 rounded-2xl text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
-              title="បិទផ្ទាំង"
+              title={language === 'km' ? 'បិទផ្ទាំង' : 'Close'}
             >
               <X className="w-5 h-5" />
             </button>
@@ -160,7 +164,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                   : 'bg-white dark:bg-slate-800 text-slate-600 dark:text-slate-300 border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-750'
               }`}
             >
-              <span>ទាំងអស់</span>
+              <span>{language === 'km' ? 'ទាំងអស់' : 'All'}</span>
               <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-black/10 dark:bg-white/20">
                 {totalStudents}
               </span>
@@ -176,7 +180,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
               }`}
             >
               <Circle className="w-3.5 h-3.5" />
-              <span>មិនទាន់ហៅ</span>
+              <span>{language === 'km' ? 'មិនទាន់ហៅ' : 'Uncalled'}</span>
               <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-blue-500/20 text-blue-700 dark:text-blue-300">
                 {uncalledCount}
               </span>
@@ -192,7 +196,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
               }`}
             >
               <CheckCircle2 className="w-3.5 h-3.5" />
-              <span>ហៅរួច</span>
+              <span>{language === 'km' ? 'ហៅរួច' : 'Called'}</span>
               <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300">
                 {allCalledCount}
               </span>
@@ -208,7 +212,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
               }`}
             >
               <UserCheck className="w-3.5 h-3.5" />
-              <span>គ្រូហៅផ្ទាល់</span>
+              <span>{language === 'km' ? 'គ្រូហៅផ្ទាល់' : 'Teacher Called'}</span>
               <span className="px-1.5 py-0.2 text-[10px] rounded-full bg-purple-500/20 text-purple-700 dark:text-purple-300">
                 {teacherCalledCount}
               </span>
@@ -219,10 +223,10 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                 type="button"
                 onClick={onResetCalls}
                 className="ml-auto px-2.5 py-1.5 text-[11px] font-bold text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/40 rounded-xl transition-colors flex items-center gap-1 shrink-0 cursor-pointer"
-                title="កំណត់ការហៅឈ្មោះទាំងអស់ឡើងវិញ"
+                title={language === 'km' ? 'កំណត់ការហៅឈ្មោះទាំងអស់ឡើងវិញ' : 'Reset all called students'}
               >
                 <RotateCcw className="w-3 h-3" />
-                <span>កំណត់ឡើងវិញ</span>
+                <span>{language === 'km' ? 'កំណត់ឡើងវិញ' : 'Reset'}</span>
               </button>
             )}
           </div>
@@ -235,7 +239,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="ស្វែងរកឈ្មោះ ឬអត្តលេខសិស្ស..."
+                placeholder={language === 'km' ? 'ស្វែងរកឈ្មោះ ឬអត្តលេខសិស្ស...' : 'Search student by name or ID...'}
                 className={`w-full pl-10 pr-4 py-2.5 rounded-2xl text-xs sm:text-sm font-medium border focus:outline-none focus:ring-2 focus:ring-indigo-500/20 transition-all ${
                   isDarkMode 
                     ? 'bg-slate-950 border-slate-800 text-white placeholder:text-slate-500' 
@@ -248,7 +252,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                   onClick={() => setSearchQuery('')}
                   className="absolute right-3 top-1/2 -translate-y-1/2 text-xs text-slate-400 hover:text-slate-600 dark:hover:text-slate-200"
                 >
-                  សម្អាត
+                  {language === 'km' ? 'សម្អាត' : 'Clear'}
                 </button>
               )}
             </div>
@@ -472,13 +476,15 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                         }`}>
                           <CheckCircle2 className="w-3.5 h-3.5" />
                           <span className="whitespace-nowrap">
-                            {isManual ? 'ហៅរួច (គ្រូ)' : 'ហៅរួច (កង)'}
+                            {isManual 
+                              ? (language === 'km' ? 'ហៅរួច (គ្រូ)' : 'Called (Teacher)') 
+                              : (language === 'km' ? 'ហៅរួច (កង)' : 'Called (Wheel)')}
                           </span>
                         </div>
                       ) : (
                         <div className="px-2.5 py-1 rounded-xl text-[11px] font-bold bg-slate-100 dark:bg-slate-800 text-slate-500 dark:text-slate-400 border border-slate-200 dark:border-slate-700 flex items-center gap-1.5">
                           <Circle className="w-3 h-3 text-slate-400" />
-                          <span className="whitespace-nowrap">មិនទាន់ហៅ</span>
+                          <span className="whitespace-nowrap">{language === 'km' ? 'មិនទាន់ហៅ' : 'Uncalled'}</span>
                         </div>
                       )}
 
@@ -492,10 +498,16 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
                             ? 'bg-purple-600 hover:bg-purple-700 text-white shadow-purple-500/20'
                             : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-200 border border-slate-300 dark:border-slate-700 hover:border-purple-400 hover:text-purple-600 dark:hover:text-purple-300'
                         }`}
-                        title={isManual ? 'ចុចដើម្បីដកការហៅផ្ទាល់ចេញ' : 'ចុចដើម្បីកំណត់ថាគ្រូបានហៅផ្ទាល់ (បន្ថែម ៥ ពិន្ទុសកម្មភាពស្វ័យប្រវត្តិ)'}
+                        title={isManual 
+                          ? (language === 'km' ? 'ចុចដើម្បីដកការហៅផ្ទាល់ចេញ' : 'Click to unmark teacher call') 
+                          : (language === 'km' ? 'ចុចដើម្បីកំណត់ថាគ្រូបានហៅផ្ទាល់ (បន្ថែម ៥ ពិន្ទុសកម្មភាពស្វ័យប្រវត្តិ)' : 'Click to mark teacher call (+5 activity points auto)')}
                       >
                         <UserCheck className={`w-3.5 h-3.5 ${isManual ? 'text-white' : 'text-purple-500'}`} />
-                        <span>{isManual ? 'គ្រូបានហៅ (+៥)' : 'គ្រូហៅផ្ទាល់ (+៥)'}</span>
+                        <span>
+                          {isManual 
+                            ? (language === 'km' ? 'គ្រូបានហៅ (+៥)' : 'Called (+5)') 
+                            : (language === 'km' ? 'គ្រូហៅផ្ទាល់ (+៥)' : 'Teacher Call (+5)')}
+                        </span>
                       </button>
                     </div>
                   </div>
@@ -510,7 +522,13 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
           }`}>
             <div className="flex items-center gap-1.5 text-slate-500 dark:text-slate-400 text-[11px]">
               <Sparkles className="w-3.5 h-3.5 text-amber-500 shrink-0" />
-              <span>សិស្សដែល <strong>ហៅរួច</strong> ឬ <strong>គ្រូហៅផ្ទាល់</strong> នឹងត្រូវលើកលែងដោយស្វ័យប្រវត្តពីកងបង្វិល</span>
+              <span>
+                {language === 'km' ? (
+                  <>សិស្សដែល <strong>ហៅរួច</strong> ឬ <strong>គ្រូហៅផ្ទាល់</strong> នឹងត្រូវលើកលែងដោយស្វ័យប្រវត្តពីកងបង្វិល</>
+                ) : (
+                  <>Students marked <strong>Called</strong> or <strong>Teacher Called</strong> are exempt from wheel spin</>
+                )}
+              </span>
             </div>
 
             <button
@@ -518,7 +536,7 @@ export const StudentListCallingModal: React.FC<StudentListCallingModalProps> = (
               onClick={onClose}
               className="w-full sm:w-auto px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white font-bold rounded-xl transition-all shadow-md shadow-indigo-500/20 active:scale-95 cursor-pointer text-center"
             >
-              យល់ព្រម
+              {language === 'km' ? 'យល់ព្រម' : 'OK'}
             </button>
           </div>
         </motion.div>

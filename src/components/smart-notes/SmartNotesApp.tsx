@@ -406,7 +406,7 @@ export default function SmartNotesApp({ isDarkMode }: SmartNotesAppProps) {
     <div 
       ref={containerRef}
       className={`w-full h-full flex flex-col overflow-hidden select-none font-sans ${
-        isDarkMode ? 'bg-[#0b0f19] text-white' : 'bg-slate-100 text-slate-900'
+        isDarkMode ? 'bg-[#272525] text-white' : 'bg-slate-100 text-slate-900'
       }`}
     >
       {/* 1. Header Notebook Tabs & Global Utilities */}

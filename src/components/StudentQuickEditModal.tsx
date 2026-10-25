@@ -15,6 +15,7 @@ import {
   AlertCircle
 } from 'lucide-react';
 import { Student } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 
 interface StudentQuickEditModalProps {
   isOpen: boolean;
@@ -62,6 +63,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
   onSave,
   isDarkMode = false
 }) => {
+  const { language } = useLanguage();
   const [text, setText] = useState('');
   const [copied, setCopied] = useState(false);
   const [cleanedNotice, setCleanedNotice] = useState(false);
@@ -194,24 +196,24 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
               </div>
               <div>
                 <h3 className="text-lg sm:text-xl font-bold flex items-center gap-2">
-                  <span>បញ្ជី & កែឈ្មោះសិស្សទាំងអស់</span>
+                  <span>{language === 'km' ? 'បញ្ជី & កែឈ្មោះសិស្សទាំងអស់' : 'View & Edit All Student Names'}</span>
                 </h3>
                 <div className="flex items-center gap-2 mt-1 text-xs font-semibold flex-wrap">
                   <span className={`px-2 py-0.5 rounded-full ${
                     isDarkMode ? 'bg-indigo-950/60 text-indigo-300' : 'bg-indigo-50 text-indigo-700'
                   }`}>
-                    ថ្នាក់៖ {className}
+                    {language === 'km' ? `ថ្នាក់៖ ${className}` : `Class: ${className}`}
                   </span>
                   <span className="text-slate-400 dark:text-slate-500">•</span>
                   <span className={`px-2 py-0.5 rounded-full font-mono ${
                     isDarkMode ? 'bg-slate-800 text-slate-300' : 'bg-slate-100 text-slate-700'
                   }`}>
-                    សរុប {parsedNames.length} នាក់
+                    {language === 'km' ? `សរុប ${parsedNames.length} នាក់` : `Total ${parsedNames.length} students`}
                   </span>
                   {duplicateCount > 0 && (
                     <span className="px-2 py-0.5 rounded-full bg-amber-50 dark:bg-amber-950/40 text-amber-600 dark:text-amber-400 text-[11px] flex items-center gap-1">
                       <AlertCircle className="w-3 h-3" />
-                      ឈ្មោះស្ទួន {duplicateCount}
+                      {language === 'km' ? `ឈ្មោះស្ទួន ${duplicateCount}` : `${duplicateCount} duplicates`}
                     </span>
                   )}
                 </div>
@@ -222,7 +224,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
             <button
               onClick={onClose}
               className="p-2 rounded-xl text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer shrink-0"
-              title="បិទផ្ទាំង"
+              title={language === 'km' ? 'បិទផ្ទាំង' : 'Close'}
             >
               <X className="w-5 h-5" />
             </button>
@@ -243,10 +245,14 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                       ? 'bg-indigo-950/40 border border-indigo-800/40 text-indigo-300 hover:bg-indigo-900/50'
                       : 'bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100'
                 }`}
-                title="ចម្លងឈ្មោះទាំងអស់ទៅកាន់ Clipboard (Copy)"
+                title={language === 'km' ? 'ចម្លងឈ្មោះទាំងអស់ទៅកាន់ Clipboard (Copy)' : 'Copy all names to clipboard'}
               >
                 {copied ? <Check className="w-3.5 h-3.5" /> : <Copy className="w-3.5 h-3.5" />}
-                <span>{copied ? 'បានចម្លងរួចរាល់!' : 'ចម្លងទាំងអស់ (Copy)'}</span>
+                <span>
+                  {copied 
+                    ? (language === 'km' ? 'បានចម្លងរួចរាល់!' : 'Copied!') 
+                    : (language === 'km' ? 'ចម្លងទាំងអស់ (Copy)' : 'Copy All')}
+                </span>
               </button>
 
               {/* Paste from Clipboard */}
@@ -258,10 +264,10 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                     ? 'bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-750'
                     : 'bg-slate-100 border border-slate-200 text-slate-700 hover:bg-slate-200'
                 }`}
-                title="បិទភ្ជាប់អត្ថបទពី Clipboard (Paste)"
+                title={language === 'km' ? 'បិទភ្ជាប់អត្ថបទពី Clipboard (Paste)' : 'Paste from clipboard'}
               >
                 <ClipboardPaste className="w-3.5 h-3.5" />
-                <span>បិទភ្ជាប់ (Paste)</span>
+                <span>{language === 'km' ? 'បិទភ្ជាប់ (Paste)' : 'Paste'}</span>
               </button>
 
               {/* Clean Numbers & Bullets */}
@@ -276,10 +282,14 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                       ? 'bg-slate-800/80 border border-slate-700/60 text-purple-300 hover:bg-slate-800'
                       : 'bg-purple-50 border border-purple-100 text-purple-700 hover:bg-purple-100'
                 }`}
-                title="លុបលេខរៀងនាំមុខ (1. , 2. , • ) ពីមុខឈ្មោះ"
+                title={language === 'km' ? 'លុបលេខរៀងនាំមុខ (1. , 2. , • ) ពីមុខឈ្មោះ' : 'Remove leading numbers (1. , 2. , • )'}
               >
                 <Sparkles className="w-3.5 h-3.5" />
-                <span>{cleanedNotice ? 'បានសម្អាតលេខរៀង!' : 'សម្អាតលេខរៀង (1. , 2.)'}</span>
+                <span>
+                  {cleanedNotice 
+                    ? (language === 'km' ? 'បានសម្អាតលេខរៀង!' : 'Cleaned Numbers!') 
+                    : (language === 'km' ? 'សម្អាតលេខរៀង (1. , 2.)' : 'Clean Numbers (1., 2.)')}
+                </span>
               </button>
             </div>
 
@@ -289,10 +299,10 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 type="button"
                 onClick={handleClear}
                 className="px-2.5 py-1.5 rounded-xl text-xs font-semibold text-red-500 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30 transition-colors flex items-center gap-1 cursor-pointer"
-                title="សម្អាតអក្សរទាំងអស់ក្នុងប្រអប់"
+                title={language === 'km' ? 'សម្អាតអក្សរទាំងអស់ក្នុងប្រអប់' : 'Clear all text'}
               >
                 <Trash2 className="w-3.5 h-3.5" />
-                <span>សម្អាត</span>
+                <span>{language === 'km' ? 'សម្អាត' : 'Clear'}</span>
               </button>
             )}
           </div>
@@ -315,7 +325,9 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
               ref={textareaRef}
               value={text}
               onChange={(e) => setText(e.target.value)}
-              placeholder={`វាយ ឬ បិទភ្ជាប់ឈ្មោះសិស្សនៅទីនេះ (មួយជួរ ឈ្មោះមួយ)៖\nសុខ ចាន់ដារ៉ា\nម៉ៅ ស្រីនិច\nកែវ សុវណ្ណ\nជា ឧត្តម...`}
+              placeholder={language === 'km' 
+                ? `វាយ ឬ បិទភ្ជាប់ឈ្មោះសិស្សនៅទីនេះ (មួយជួរ ឈ្មោះមួយ)៖\nសុខ ចាន់ដារ៉ា\nម៉ៅ ស្រីនិច\nកែវ សុវណ្ណ\nជា ឧត្តម...` 
+                : `Type or paste student names here (one name per line):\nJohn Smith\nEmily Davis\nMichael Brown\nSarah Wilson...`}
               className={`w-full flex-1 p-4 rounded-2xl text-sm leading-relaxed font-sans resize-none border focus:outline-none focus:ring-4 focus:ring-indigo-500/15 focus:border-indigo-500 transition-all font-medium ${
                 isDarkMode 
                   ? 'bg-slate-950 border-slate-800 text-slate-100 placeholder:text-slate-600' 
@@ -326,9 +338,13 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
             
             {/* Quick helper tip */}
             <div className="flex items-center justify-between text-[11px] text-slate-400 dark:text-slate-500 pt-2 px-1">
-              <span>ជំនួយ៖ វាយឈ្មោះសិស្ស <b>មួយជួរ ឈ្មោះមួយ</b>។ អ្នកអាច Copy ពី Excel, Word ឬ Telegram មក Paste បានភ្លាមៗ!</span>
+              <span>
+                {language === 'km' 
+                  ? <>ជំនួយ៖ វាយឈ្មោះសិស្ស <b>មួយជួរ ឈ្មោះមួយ</b>។ អ្នកអាច Copy ពី Excel, Word ឬ Telegram មក Paste បានភ្លាមៗ!</> 
+                  : <>Tip: Enter student names <b>one per line</b>. You can copy & paste directly from Excel or Word!</>}
+              </span>
               <span className="font-mono font-bold text-indigo-600 dark:text-indigo-400 shrink-0 ml-2">
-                {parsedNames.length} នាក់
+                {language === 'km' ? `${parsedNames.length} នាក់` : `${parsedNames.length} students`}
               </span>
             </div>
           </div>
@@ -344,7 +360,7 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
               }`}
             >
-              បោះបង់
+              {language === 'km' ? 'បោះបង់' : 'Cancel'}
             </button>
 
             <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
@@ -359,10 +375,10 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                       ? 'bg-indigo-950/60 border border-indigo-800/40 text-indigo-300 hover:bg-indigo-900/60' 
                       : 'bg-indigo-50 border border-indigo-200 text-indigo-700 hover:bg-indigo-100'
                   }`}
-                  title="បន្ថែមឈ្មោះដែលបានបញ្ចូលទៅលើបញ្ជីសិស្សដែលមានស្រាប់"
+                  title={language === 'km' ? 'បន្ថែមឈ្មោះដែលបានបញ្ចូលទៅលើបញ្ជីសិស្សដែលមានស្រាប់' : 'Append names to existing roster'}
                 >
                   <UserPlus className="w-4 h-4" />
-                  <span>+ បន្ថែមលើបញ្ជីចាស់</span>
+                  <span>{language === 'km' ? '+ បន្ថែមលើបញ្ជីចាស់' : '+ Append to List'}</span>
                 </button>
               )}
 
@@ -372,10 +388,14 @@ export const StudentQuickEditModal: React.FC<StudentQuickEditModalProps> = ({
                 disabled={isSaving}
                 onClick={() => handleSave('replace')}
                 className="w-full sm:w-auto px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl text-xs font-bold flex items-center justify-center gap-2 shadow-md shadow-indigo-600/20 transition-all cursor-pointer active:scale-95"
-                title="រក្សាទុក និងជំនួសបញ្ជីសិស្សនៃថ្នាក់នេះទាំងស្រុង"
+                title={language === 'km' ? 'រក្សាទុក និងជំនួសបញ្ជីសិស្សនៃថ្នាក់នេះទាំងស្រុង' : 'Save and replace full student roster'}
               >
                 <Save className="w-4 h-4" />
-                <span>{isSaving ? 'កំពុងរក្សាទុក...' : 'រក្សាទុក និងជំនួសទាំងអស់ (Save All)'}</span>
+                <span>
+                  {isSaving 
+                    ? (language === 'km' ? 'កំពុងរក្សាទុក...' : 'Saving...') 
+                    : (language === 'km' ? 'រក្សាទុក និងជំនួសទាំងអស់ (Save All)' : 'Save & Replace All')}
+                </span>
               </button>
             </div>
           </div>

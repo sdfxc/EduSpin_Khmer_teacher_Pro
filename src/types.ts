@@ -21,6 +21,7 @@ export interface MonthlyDetailedScore {
 export interface SubjectScoreData {
   score?: number;
   monthlyScores?: Record<string, MonthlyDetailedScore>;
+  status?: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ';
 }
 
 export interface Student {
@@ -50,10 +51,19 @@ export interface Question {
   text: string;
   options: string[];
   correctIndex: number;
-  questionType?: 'general' | 'pisa';
+  questionType?: 'general' | 'pisa' | 'qcm' | 'true_false' | 'short_answer' | 'problem_solving' | 'application' | 'hots' | 'stem';
   category?: 'choice' | 'matching' | 'fill_blank' | 'theory' | 'exercise';
   explanation?: string;
   points?: number;
+  grade?: string;
+  subject?: string;
+  chapter?: string;
+  lesson?: string;
+  topic?: string;
+  bloomLevel?: 'remember' | 'understand' | 'apply' | 'analyze' | 'evaluate' | 'create' | string;
+  difficulty?: 'easy' | 'medium' | 'hard' | string;
+  learningObjective?: string;
+  solutionStepByStep?: string;
 }
 
 export interface QuizCard {
@@ -107,11 +117,13 @@ export interface TeacherAccount {
   authProvider?: 'username' | 'email' | 'google' | 'facebook' | 'telegram';
   telegramId?: string;
   telegramUsername?: string;
+  gender?: 'ប្រុស' | 'ស្រី';
+  title?: 'លោកគ្រូ' | 'អ្នកគ្រូ';
 }
 
 export const DEFAULT_CLOUD_TEACHER: TeacherAccount = {
   id: 'email_khengkhey835_gmail_com',
-  name: 'បង្កើតគណនីគ្រូ',
+  name: 'លោកគ្រូ/អ្នកគ្រូ',
   schoolName: 'សាលារៀនសុវណ្ណភូមិ',
   username: 'khengkhey835',
   email: 'khengkhey835@gmail.com',

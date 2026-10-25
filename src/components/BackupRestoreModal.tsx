@@ -1,7 +1,16 @@
 import React, { useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { X, Download, Upload, CheckCircle2, AlertCircle, Database, FileJson, RefreshCw, ShieldCheck, Settings } from 'lucide-react';
+import { X, Download, Upload, CheckCircle2, AlertCircle, Database, FileJson, RefreshCw, ShieldCheck, Settings, Sparkles, BookOpen } from 'lucide-react';
 import { ClassInfo, Student, QuizSubject, QuizCard, QuizChapter, TeacherAccount } from '../types';
+import { 
+  GRADE_8K1_CLASS_ID, 
+  GRADE_8K1_CLASS_NAME, 
+  GRADE_8K1_STUDENTS, 
+  GRADE_8K1_SUBJECTS, 
+  seedGrade8DataToLocalStorage 
+} from '../lib/grade8SeedData';
+import { useLanguage } from '../context/LanguageContext';
+import { calculateSystemStats } from '../lib/systemStats';
 
 interface BackupRestoreModalProps {
   isOpen: boolean;
@@ -32,11 +41,24 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
   onShowToast,
   isDarkMode = false
 }) => {
+  const { language } = useLanguage();
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [importPreview, setImportPreview] = useState<any | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isSuccess, setIsSuccess] = useState(false);
   const [isRestoring, setIsRestoring] = useState(false);
+
+  const systemStats = React.useMemo(() => {
+    return calculateSystemStats({
+      classes,
+      activeClassId,
+      activeStudents: students,
+      activeSubjects: subjects,
+      activeCards: cards,
+      activeChapters: chapters,
+      teacher
+    });
+  }, [classes, activeClassId, students, subjects, cards, chapters, teacher]);
 
   if (!isOpen) return null;
 
@@ -58,7 +80,10 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
           key.startsWith('active_room_id_') ||
           key.startsWith('khmer_teacher_classes') ||
           key.startsWith('smart_notes_') ||
-          key.startsWith('groupsData_')
+          key.startsWith('groupsData_') ||
+          key.startsWith('edu_spin_attendance_') ||
+          key.startsWith('khmer_exams_') ||
+          key.startsWith('edu_spin_')
         )) {
           try {
             const val = localStorage.getItem(key);
@@ -84,18 +109,20 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
           email: teacher.email
         } : null,
         activeClassId,
-        classes: classes,
+        classes: systemStats.realClasses,
         students: students,
-        subjects: subjects,
-        cards: cards,
-        chapters: chapters,
+        allStudents: systemStats.allStudents,
+        subjects: systemStats.allSubjects,
+        cards: systemStats.allCards,
+        chapters: systemStats.allChapters,
         storageDump: localStorageDump,
         metadata: {
-          totalClasses: classes.length,
-          totalStudents: students.length,
-          totalSubjects: subjects.length,
-          totalCards: cards.length,
-          totalChapters: chapters.length
+          totalClasses: systemStats.totalClassesCount,
+          totalStudents: systemStats.totalStudentsCount,
+          totalSubjects: systemStats.totalSubjectsCount,
+          totalCards: systemStats.totalQuestionsCount,
+          totalChapters: systemStats.totalChaptersCount,
+          classBreakdowns: systemStats.classBreakdowns
         }
       };
 
@@ -114,10 +141,12 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      onShowToast('✅ បានទាញយកទិន្នន័យបម្រុងទុក (Full Backup 100%) ដោយជោគជ័យ!');
+      onShowToast(language === 'km' 
+        ? '✅ បានទាញយកទិន្នន័យបម្រុងទុក (Full Backup 100%) ដោយជោគជ័យ!' 
+        : '✅ Full backup exported successfully (100% state)!');
     } catch (err) {
       console.error(err);
-      setErrorMessage('មានបញ្ហាក្នុងការទាញយកទិន្នន័យ!');
+      setErrorMessage(language === 'km' ? 'មានបញ្ហាក្នុងការទាញយកទិន្នន័យ!' : 'Failed to export backup file!');
     }
   };
 
@@ -133,11 +162,13 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
       try {
         const parsed = JSON.parse(event.target?.result as string);
         if (!parsed || typeof parsed !== 'object') {
-          throw new Error('ឯកសារមិនត្រឹមត្រូវ');
+          throw new Error('Invalid file format');
         }
         setImportPreview(parsed);
       } catch (err: any) {
-        setErrorMessage('ឯកសារ JSON មិនត្រឹមត្រូវ ឬខូច! សូមជ្រើសរើសឯកសារត្រឹមត្រូវ។');
+        setErrorMessage(language === 'km' 
+          ? 'ឯកសារ JSON មិនត្រឹមត្រូវ ឬខូច! សូមជ្រើសរើសឯកសារត្រឹមត្រូវ។' 
+          : 'Invalid or corrupt JSON backup file. Please select a valid file.');
         setImportPreview(null);
       }
     };
@@ -151,7 +182,9 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
     try {
       await onRestoreData(importPreview);
       setIsSuccess(true);
-      onShowToast('🎉 បានស្ដារទិន្នន័យទាំងអស់ត្រឡប់មកវិញ ១០០% ជោគជ័យ!');
+      onShowToast(language === 'km' 
+        ? '🎉 បានស្ដារទិន្នន័យទាំងអស់ត្រឡប់មកវិញ ១០០% ជោគជ័យ!' 
+        : '🎉 Restored 100% of data successfully!');
       setTimeout(() => {
         setIsSuccess(false);
         setImportPreview(null);
@@ -160,7 +193,61 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
       }, 1200);
     } catch (err) {
       console.error(err);
-      setErrorMessage('បរាជ័យក្នុងការស្ដារទិន្នន័យ!');
+      setErrorMessage(language === 'km' ? 'បរាជ័យក្នុងការស្ដារទិន្នន័យ!' : 'Failed to restore backup data!');
+      setIsRestoring(false);
+    }
+  };
+
+  // Direct Seed / Backup All for ថ្នាក់ទី៨ក១
+  const handleSeedGrade8All = async () => {
+    setIsRestoring(true);
+    try {
+      const seeded = seedGrade8DataToLocalStorage();
+      if (seeded) {
+        const g8Class: ClassInfo = {
+          id: GRADE_8K1_CLASS_ID,
+          name: GRADE_8K1_CLASS_NAME,
+          order: 1,
+          isPinned: true
+        };
+        
+        const allClasses = classes.some(c => c.id === GRADE_8K1_CLASS_ID)
+          ? classes
+          : [g8Class, ...classes];
+
+        const backupObj = {
+          classes: allClasses,
+          students: seeded.students,
+          subjects: seeded.subjects,
+          chapters: seeded.chapters,
+          cards: seeded.cards,
+          activeClassId: GRADE_8K1_CLASS_ID,
+          storageDump: {
+            [`students_class_${GRADE_8K1_CLASS_ID}`]: seeded.students,
+            [`subjects_class_${GRADE_8K1_CLASS_ID}`]: seeded.subjects,
+            [`chapters_class_${GRADE_8K1_CLASS_ID}`]: seeded.chapters,
+            [`quiz_cards_class_${GRADE_8K1_CLASS_ID}`]: seeded.cards,
+            [`active_subject_id_${GRADE_8K1_CLASS_ID}`]: seeded.activeSubjectId,
+            [`active_room_id_${GRADE_8K1_CLASS_ID}`]: seeded.activeRoomId,
+            'edu_spin_attendance_records': seeded.attendance,
+            'edu_spin_attendance_reasons': seeded.reasons
+          }
+        };
+
+        await onRestoreData(backupObj);
+        setIsSuccess(true);
+        onShowToast(language === 'km' 
+          ? '🎉 បានបញ្ចូល និងស្ដារទិន្នន័យថ្នាក់ទី៨ក១ (សិស្ស, វត្តមាន, ពិន្ទុ, វិញ្ញាសា) ១០០% ជោគជ័យ!' 
+          : '🎉 Grade 8K1 data fully imported (Students, Attendance, Scores, Quizzes)!');
+        setTimeout(() => {
+          setIsSuccess(false);
+          setIsRestoring(false);
+          onClose();
+        }, 1200);
+      }
+    } catch (err) {
+      console.error(err);
+      setErrorMessage(language === 'km' ? 'បរាជ័យក្នុងការបញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១!' : 'Failed to import Grade 8K1 data!');
       setIsRestoring(false);
     }
   };
@@ -185,12 +272,14 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
             </div>
             <div>
               <h2 className="text-base font-black flex items-center gap-2">
-                <span>បម្រុងទុក និងស្ដារទិន្នន័យ ១០០%</span>
+                <span>{language === 'km' ? 'បម្រុងទុក និងស្ដារទិន្នន័យ ១០០%' : 'Backup & Restore Vault'}</span>
                 <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-blue-500/20 text-blue-400 border border-blue-500/30">
                   Full Vault
                 </span>
               </h2>
-              <p className="text-xs text-slate-500 dark:text-blue-200/70 font-medium">100% Comprehensive Backup & Restore Engine</p>
+              <p className="text-xs text-slate-500 dark:text-blue-200/70 font-medium">
+                {language === 'km' ? 'ប្រព័ន្ធបម្រុងទុក & ស្ដារទិន្នន័យគ្រប់គម្លៀត ១០០%' : '100% Comprehensive Backup & Restore Engine'}
+              </p>
             </div>
           </div>
           <button
@@ -210,40 +299,72 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
             <div className="flex items-center justify-between mb-2">
               <div className="flex items-center gap-2 text-xs font-bold text-slate-500 dark:text-blue-300">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                <span>ស្ថានភាពទិន្នន័យបច្ចុប្បន្ន (១០០%):</span>
+                <span>{language === 'km' ? 'ស្ថានភាពទិន្នន័យបច្ចុប្បន្ន (១០០%):' : 'Current System State (100%):'}</span>
               </div>
               <span className="text-[10px] font-black text-emerald-500">Live Ready</span>
             </div>
             <div className="grid grid-cols-3 gap-2 text-center">
               <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-base font-black text-blue-500 dark:text-blue-400">{classes.length}</div>
-                <div className="text-[11px] font-bold text-slate-500">ថ្នាក់រៀន</div>
+                <div className="text-base font-black text-blue-500 dark:text-blue-400">
+                  {systemStats.totalClassesCount}
+                </div>
+                <div className="text-[11px] font-bold text-slate-500">
+                  {language === 'km' ? 'ថ្នាក់រៀនជាក់ស្ដែង' : 'Real Classes'}
+                </div>
               </div>
-              <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-base font-black text-emerald-500 dark:text-emerald-400">{students.length}</div>
-                <div className="text-[11px] font-bold text-slate-500">សិស្សសរុប</div>
+              <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`} title={language === 'km' ? 'ចំនួនសិស្សសរុបបូកបញ្ចូលគ្រប់ថ្នាក់ទាំងអស់' : 'Total students summed across all classes'}>
+                <div className="text-base font-black text-emerald-500 dark:text-emerald-400">
+                  {systemStats.totalStudentsCount}
+                </div>
+                <div className="text-[11px] font-bold text-slate-500">
+                  {language === 'km' ? 'សិស្សសរុប (គ្រប់ថ្នាក់)' : 'Total Students (All Classes)'}
+                </div>
               </div>
-              <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`}>
-                <div className="text-base font-black text-amber-500 dark:text-amber-400">{cards.length || subjects.length}</div>
-                <div className="text-[11px] font-bold text-slate-500">សំណួរ/មុខវិជ្ជា</div>
+              <div className={`p-2.5 rounded-xl border ${isDarkMode ? 'bg-slate-900/80 border-slate-800' : 'bg-white border-slate-200'}`} title={language === 'km' ? 'ចំនួនសំណួរបូកបញ្ចូលគ្រប់ថ្នាក់ និងគ្រប់មុខវិជ្ជាទាំងអស់' : 'Total questions across all classes and subjects'}>
+                <div className="text-base font-black text-amber-500 dark:text-amber-400">
+                  {systemStats.totalQuestionsCount}
+                </div>
+                <div className="text-[11px] font-bold text-slate-500">
+                  {language === 'km' ? `សំណួរ (${systemStats.totalSubjectsCount} មុខវិជ្ជា)` : `Questions (${systemStats.totalSubjectsCount} Subj)`}
+                </div>
               </div>
             </div>
+
+            {/* Breakdown per real class */}
+            {systemStats.classBreakdowns.length > 0 && (
+              <div className={`mt-2.5 pt-2 border-t ${isDarkMode ? 'border-slate-800' : 'border-slate-200'} text-[10.5px] text-left space-y-1`}>
+                <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
+                  <span>{language === 'km' ? '📊 បញ្ជីថ្នាក់ និងទិន្នន័យជាក់ស្ដែង' : '📊 Real Class Breakdown'}</span>
+                  <span className="text-emerald-500 font-black">100% Verified</span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-24 overflow-y-auto scrollbar-thin">
+                  {systemStats.classBreakdowns.map(cb => (
+                    <div key={cb.classId} className={`px-2 py-1 rounded-lg border text-[10px] flex items-center justify-between ${isDarkMode ? 'bg-slate-900/60 border-slate-800 text-slate-300' : 'bg-white border-slate-200 text-slate-700'}`}>
+                      <span className="font-bold truncate max-w-[90px]">{cb.className}</span>
+                      <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{cb.studentsCount} សិស្ស • {cb.questionsCount} សំណួរ</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
 
           {/* Export Section */}
           <div className="space-y-2">
             <h3 className="text-xs font-black text-slate-500 dark:text-blue-300 uppercase tracking-wider">
-              ១. ទាញយកទិន្នន័យបម្រុងទុក (Backup)
+              {language === 'km' ? '១. ទាញយកទិន្នន័យបម្រុងទុក (Backup)' : '1. Download Backup (.json)'}
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-              ទាញយកទិន្នន័យគ្រប់គម្លៀតទាំងអស់ (ថ្នាក់, បញ្ជីសិស្សគ្រប់ថ្នាក់, ពិន្ទុ, កាតសំណួរ, ក្រុម, មេរៀន, និងការកំណត់) ទៅជាឯកសារ <code className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 font-bold">.json</code> លើកុំព្យូទ័រ ដើម្បីការពារការបាត់បង់។
+              {language === 'km' 
+                ? <>ទាញយកទិន្នន័យគ្រប់គម្លៀតទាំងអស់ (ថ្នាក់, បញ្ជីសិស្សគ្រប់ថ្នាក់, ពិន្ទុ, កាតសំណួរ, ក្រុម, មេរៀន, និងការកំណត់) ទៅជាឯកសារ <code className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 font-bold">.json</code> លើកុំព្យូទ័រ ដើម្បីការពារការបាត់បង់។</>
+                : <>Export all data (classes, student rosters, scores, quiz cards, groups, smart notes, and settings) to a <code className="px-1.5 py-0.5 rounded bg-blue-50 dark:bg-blue-950 text-blue-600 dark:text-blue-300 font-bold">.json</code> backup file.</>}
             </p>
             <button
               onClick={handleExport}
               className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white text-xs font-black flex items-center justify-center gap-2 shadow-lg shadow-blue-500/20 transition-all cursor-pointer border border-blue-400/20 active:scale-98"
             >
               <Download className="w-4 h-4" />
-              <span>ទាញយកឯកសារបម្រុងទុក (Backup)</span>
+              <span>{language === 'km' ? 'ទាញយកឯកសារបម្រុងទុក (Backup)' : 'Download Full Backup (.json)'}</span>
             </button>
           </div>
 
@@ -252,10 +373,12 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
           {/* Import Section */}
           <div className="space-y-3">
             <h3 className="text-xs font-black text-slate-500 dark:text-blue-300 uppercase tracking-wider">
-              ២. ស្ដារទិន្នន័យពីឯកសារ (Restore)
+              {language === 'km' ? '២. ស្ដារទិន្នន័យពីឯកសារ (Restore)' : '2. Restore from Backup File'}
             </h3>
             <p className="text-xs text-slate-600 dark:text-slate-300">
-              ជ្រើសរើសឯកសារបម្រុងទុក <code className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 font-bold">.json</code> ដែលបានទាញយកពីមុន ដើម្បីស្ដារឡើងវិញ ១០០%។
+              {language === 'km' 
+                ? <>ជ្រើសរើសឯកសារបម្រុងទុក <code className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 font-bold">.json</code> ដែលបានទាញយកពីមុន ដើម្បីស្ដារឡើងវិញ ១០០%។</>
+                : <>Select an exported <code className="px-1.5 py-0.5 rounded bg-emerald-50 dark:bg-emerald-950 text-emerald-600 dark:text-emerald-300 font-bold">.json</code> backup file to restore all data with 100% fidelity.</>}
             </p>
 
             <input
@@ -278,7 +401,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
               >
                 <Upload className="w-6 h-6 text-blue-400" />
                 <span className="text-xs font-bold text-slate-600 dark:text-blue-200">
-                  ចុចទីនេះដើម្បីជ្រើសរើសឯកសារ Backup .json
+                  {language === 'km' ? 'ចុចទីនេះដើម្បីជ្រើសរើសឯកសារ Backup .json' : 'Click here to choose Backup .json file'}
                 </span>
               </button>
             ) : (
@@ -289,9 +412,9 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
                   <div className="flex items-center gap-2">
                     <FileJson className="w-5 h-5 text-blue-400" />
                     <div>
-                      <div className="text-xs font-bold">ឯកសារត្រៀមស្ដារ៖</div>
+                      <div className="text-xs font-bold">{language === 'km' ? 'ឯកសារត្រៀមស្ដារ៖' : 'File ready to restore:'}</div>
                       <div className="text-[11px] text-slate-500 dark:text-blue-300">
-                        {importPreview.app || 'EduSpin'} — {importPreview.exportedAt ? new Date(importPreview.exportedAt).toLocaleDateString() : 'កាលបរិច្ឆេទមិនស្គាល់'}
+                        {importPreview.app || 'EduSpin'} — {importPreview.exportedAt ? new Date(importPreview.exportedAt).toLocaleDateString() : (language === 'km' ? 'កាលបរិច្ឆេទមិនស្គាល់' : 'Unknown date')}
                       </div>
                     </div>
                   </div>
@@ -308,19 +431,19 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
                     <div className="font-black text-blue-600 dark:text-blue-400">
                       {Array.isArray(importPreview.classes) ? importPreview.classes.length : 0}
                     </div>
-                    <div className="text-[10px] text-slate-500">ថ្នាក់រៀន</div>
+                    <div className="text-[10px] text-slate-500">{language === 'km' ? 'ថ្នាក់រៀន' : 'Classes'}</div>
                   </div>
                   <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                     <div className="font-black text-emerald-600 dark:text-emerald-400">
                       {Array.isArray(importPreview.students) ? importPreview.students.length : 0}
                     </div>
-                    <div className="text-[10px] text-slate-500">សិស្ស</div>
+                    <div className="text-[10px] text-slate-500">{language === 'km' ? 'សិស្ស' : 'Students'}</div>
                   </div>
                   <div className="p-2 rounded-xl bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                     <div className="font-black text-amber-600 dark:text-amber-400">
                       {Array.isArray(importPreview.cards) ? importPreview.cards.length : (Array.isArray(importPreview.subjects) ? importPreview.subjects.length : 0)}
                     </div>
-                    <div className="text-[10px] text-slate-500">សំណួរ</div>
+                    <div className="text-[10px] text-slate-500">{language === 'km' ? 'សំណួរ' : 'Questions'}</div>
                   </div>
                 </div>
 
@@ -335,7 +458,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
                   ) : (
                     <RefreshCw className="w-4 h-4" />
                   )}
-                  <span>{isRestoring ? 'កំពុងស្ដារទិន្នន័យ...' : 'យល់ព្រមស្ដារទិន្នន័យ (Restore Now 100%)'}</span>
+                  <span>{isRestoring ? (language === 'km' ? 'កំពុងស្ដារទិន្នន័យ...' : 'Restoring data...') : (language === 'km' ? 'យល់ព្រមស្ដារទិន្នន័យ (Restore Now 100%)' : 'Restore All Data Now (100%)')}</span>
                 </button>
               </div>
             )}
@@ -350,9 +473,42 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
             {isSuccess && (
               <div className="p-3 rounded-xl bg-emerald-50 dark:bg-emerald-950/60 border border-emerald-200 dark:border-emerald-800 text-emerald-600 dark:text-emerald-300 text-xs flex items-center gap-2">
                 <CheckCircle2 className="w-4 h-4 shrink-0" />
-                <span>បានស្ដារទិន្នន័យជោគជ័យ ១០០%!</span>
+                <span>{language === 'km' ? 'បានស្ដារទិន្នន័យជោគជ័យ ១០០%!' : 'Data successfully restored (100%)!'}</span>
               </div>
             )}
+          </div>
+
+          <div className={`h-px ${isDarkMode ? 'bg-blue-500/20' : 'bg-slate-200'}`} />
+
+          {/* Special Grade 8k1 Full Seed & Backup Section */}
+          <div className="space-y-3">
+            <div className="flex items-center justify-between">
+              <h3 className="text-xs font-black text-slate-500 dark:text-blue-300 uppercase tracking-wider flex items-center gap-1.5">
+                <Sparkles className="w-3.5 h-3.5 text-amber-500" />
+                <span>{language === 'km' ? '៣. ស្ដារ និងបញ្ចូលទិន្នន័យ «ថ្នាក់ទី៨ក១» ពេញលេញ' : '3. Load Sample / Seed Grade 8K1'}</span>
+              </h3>
+              <span className="text-[10px] font-black px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                Grade 8ក១ All-In-One
+              </span>
+            </div>
+            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+              {language === 'km' 
+                ? <>បញ្ចូលទិន្នន័យសិស្សទាំងអស់ (៣០+ នាក់) ព្រមទាំង <strong>បញ្ជីវត្តមាន, ពិន្ទុគ្រប់ខែ/សប្ដាហ៍, មុខវិជ្ជា & សំណួរវិញ្ញាសា</strong> សម្រាប់ថ្នាក់ទី៨ក១ ដោយស្វ័យប្រវត្តក្នុង ១ ចុច។</>
+                : <>Load complete roster (30+ students) with attendance, scores, subjects & quiz cards for Grade 8K1 automatically.</>}
+            </p>
+            <button
+              type="button"
+              disabled={isRestoring}
+              onClick={handleSeedGrade8All}
+              className="w-full py-3.5 px-4 rounded-2xl bg-gradient-to-r from-amber-500 via-orange-500 to-amber-600 hover:from-amber-400 hover:to-orange-400 text-slate-950 font-black text-xs flex items-center justify-center gap-2 shadow-lg shadow-orange-500/20 transition-all cursor-pointer border border-amber-300 active:scale-98 disabled:opacity-50"
+            >
+              {isRestoring ? (
+                <RefreshCw className="w-4 h-4 animate-spin text-slate-950" />
+              ) : (
+                <BookOpen className="w-4 h-4 text-slate-950" />
+              )}
+              <span>{isRestoring ? (language === 'km' ? 'កំពុងបញ្ចូលទិន្នន័យ...' : 'Loading Grade 8K1...') : (language === 'km' ? 'បញ្ចូលទិន្នន័យថ្នាក់ទី៨ក១ ពេញលេញ (Backup All for ថ្នាក់ទី៨ក១)' : 'Load Full Grade 8K1 Dataset')}</span>
+            </button>
           </div>
         </div>
 
@@ -364,7 +520,7 @@ export const BackupRestoreModal: React.FC<BackupRestoreModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-xl text-xs font-bold border border-slate-300 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
           >
-            បិទ
+            {language === 'km' ? 'បិទ' : 'Close'}
           </button>
         </div>
       </motion.div>

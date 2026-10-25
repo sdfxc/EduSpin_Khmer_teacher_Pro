@@ -22,6 +22,7 @@ import {
 import { WordDocItem } from '../../types/lessonMaterials';
 import { exportWordDocContentToDocx } from '../../lib/lessonWordExporter';
 import { useConfirm } from '../../context/ConfirmContext';
+import AiLessonWriterModal from './AiLessonWriterModal';
 
 interface WordDocsManagerProps {
   docs: WordDocItem[];
@@ -52,6 +53,7 @@ export default function WordDocsManager({
   const [selectedCategory, setSelectedCategory] = useState<string>('all');
 
   // Modal states
+  const [isAiLessonModalOpen, setIsAiLessonModalOpen] = useState(false);
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [isViewModalOpen, setIsViewModalOpen] = useState(false);
   const [activeViewingDoc, setActiveViewingDoc] = useState<WordDocItem | null>(null);
@@ -225,10 +227,17 @@ export default function WordDocsManager({
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
+          <button
+            onClick={() => setIsAiLessonModalOpen(true)}
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-95 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-indigo-600/20 transition-all cursor-pointer active:scale-95 border-none"
+          >
+            <Sparkles className="w-4 h-4" />
+            <span>AI សរសេរអត្ថបទមេរៀន (MoEYS)</span>
+          </button>
           <button
             onClick={handleOpenCreate}
-            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-2xl text-xs sm:text-sm font-bold shadow-md shadow-blue-600/20 transition-all cursor-pointer active:scale-95 border-none"
+            className="flex items-center justify-center gap-2 px-4 py-2.5 bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl text-xs sm:text-sm font-bold transition-all cursor-pointer active:scale-95 border-none"
           >
             <Plus className="w-4 h-4" />
             <span>បង្កើតឯកសារ Word ថ្មី</span>
@@ -687,6 +696,19 @@ export default function WordDocsManager({
           </div>
         )}
       </AnimatePresence>
+
+      {/* AI Lesson Writer Modal */}
+      <AiLessonWriterModal
+        isOpen={isAiLessonModalOpen}
+        onClose={() => setIsAiLessonModalOpen(false)}
+        onSaveToWordDocs={(newDoc) => {
+          onSaveDocs([newDoc, ...docs]);
+        }}
+        activeClassName={activeClassName}
+        schoolName={schoolName}
+        teacherName={teacherName}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }

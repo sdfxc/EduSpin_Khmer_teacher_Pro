@@ -25,6 +25,7 @@ import {
 import { LessonPlanItem } from '../../types/lessonMaterials';
 import { exportLessonPlanToDocx } from '../../lib/lessonWordExporter';
 import { useConfirm } from '../../context/ConfirmContext';
+import { getSavedApiKey, generateLessonPlan } from '../../lib/gemini';
 
 interface LessonPlansManagerProps {
   plans: LessonPlanItem[];
@@ -135,31 +136,20 @@ export default function LessonPlansManager({
     setAiError(null);
 
     try {
-      const apiKey = localStorage.getItem('khmer_ai_gemini_api_key') || '';
-      const res = await fetch('/api/generate-lesson-plan', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-api-key': apiKey
-        },
-        body: JSON.stringify({
-          subject: aiSubject,
-          grade: aiGrade,
-          chapter: aiChapter,
-          lessonTitle: aiLessonTitle,
-          duration: aiDuration,
-          schoolName: schoolName,
-          teacherName: teacherName,
-          extraInstructions: aiExtraInstructions
-        })
+      const generatedPlan = await generateLessonPlan({
+        subject: aiSubject,
+        grade: aiGrade,
+        chapter: aiChapter,
+        lessonTitle: aiLessonTitle,
+        duration: aiDuration,
+        schoolName: schoolName,
+        teacherName: teacherName,
+        extraInstructions: aiExtraInstructions
       });
 
-      if (!res.ok) {
-        const data = await res.json().catch(() => ({}));
-        throw new Error(data.error || 'បរាជ័យក្នុងការបង្កើតកិច្ចតែងការដោយ AI');
+      if (!generatedPlan || !generatedPlan.steps) {
+        throw new Error('បរាជ័យក្នុងការបង្កើតកិច្ចតែងការដោយ AI');
       }
-
-      const generatedPlan = await res.json();
 
       const newPlan: LessonPlanItem = {
         id: `plan-${Date.now()}`,

@@ -39,8 +39,15 @@ export function getStudentMonthlyScoresForSubject(
   student: Student,
   subjectId?: string
 ): Record<string, MonthlyDetailedScore> {
-  if (subjectId && student.subjectScores?.[subjectId]?.monthlyScores) {
-    return student.subjectScores[subjectId].monthlyScores || {};
+  if (subjectId) {
+    if (student.subjectScores?.[subjectId]?.monthlyScores) {
+      return student.subjectScores[subjectId].monthlyScores || {};
+    }
+    // Only fallback for legacy default physics subject if subjectScores has not been initialized yet
+    if ((subjectId === 'subj-physics' || subjectId === 'default') && !student.subjectScores?.[subjectId]) {
+      return student.monthlyScores || {};
+    }
+    return {};
   }
   return student.monthlyScores || {};
 }
@@ -49,8 +56,15 @@ export function getStudentTotalScoreForSubject(
   student: Student,
   subjectId?: string
 ): number {
-  if (subjectId && student.subjectScores?.[subjectId]?.score !== undefined) {
-    return Number(student.subjectScores[subjectId].score) || 0;
+  if (subjectId) {
+    if (student.subjectScores?.[subjectId]?.score !== undefined) {
+      return Number(student.subjectScores[subjectId].score) || 0;
+    }
+    // Only fallback for legacy default physics subject if subjectScores has not been initialized yet
+    if ((subjectId === 'subj-physics' || subjectId === 'default') && !student.subjectScores?.[subjectId]) {
+      return Number(student.score) || 0;
+    }
+    return 0;
   }
   return Number(student.score) || 0;
 }

@@ -294,7 +294,7 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
 
     if (status === 'absent') {
       const reasonSuffix = reason ? ` (${reason})` : '';
-      return `${numPrefix}${student.name} - អវត្តមាន${reasonSuffix}`;
+      return `${numPrefix}${student.name} - អ.ច្បាប់${reasonSuffix}`;
     }
 
     if (status === 'late') {
@@ -319,7 +319,7 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
     if (category === 'absent') {
       list = absentStudents;
       title = 'បញ្ជីសិស្សអវត្តមាន';
-      statusLabel = 'អវត្តមាន';
+      statusLabel = 'អ.ច្បាប់';
     } else if (category === 'late') {
       list = lateStudents;
       title = 'បញ្ជីសិស្សមកយឺត';
@@ -415,7 +415,7 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
       sections.push(`${prefix}សិស្សមករៀន ៖ ${fmt(effectivePresentCount)} នាក់`);
       sections.push('---------------------------------');
       sections.push(
-        `${prefix}អវត្តមានសរុប៖ ${fmt(totalCount)} នាក់ (ច្បាប់: ${fmt(permissionStudents.length)} | អវត្តមាន: ${fmt(absentStudents.length)})`
+        `${prefix}អវត្តមានសរុប៖ ${fmt(totalCount)} នាក់ (ច្បាប់: ${fmt(permissionStudents.length)} | អត់ច្បាប់: ${fmt(absentStudents.length)})`
       );
       sections.push(''); // blank line before lists
     }
@@ -434,12 +434,12 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
 
     // 2. អវត្តមានក្រោម (Absent below)
     if (absentStudents.length > 0) {
-      sections.push(`${prefix}សិស្សអវត្តមាន (${fmt(absentStudents.length)} នាក់)៖`);
+      sections.push(`${prefix}សិស្សអត់ច្បាប់ (${fmt(absentStudents.length)} នាក់)៖`);
       absentStudents.forEach((s, idx) => {
         sections.push(formatStudentLine(s, 'absent', idx));
       });
     } else {
-      sections.push(`${prefix}សិស្សអវត្តមាន៖ គ្មាន`);
+      sections.push(`${prefix}សិស្សអត់ច្បាប់៖ គ្មាន`);
     }
 
     return sections.join('\n');
@@ -483,9 +483,8 @@ export const AttendanceCategoryViews: React.FC<AttendanceCategoryViewsProps> = (
       `${prefix}សិស្សស្រី ៖ ${fmt(femaleStudentsCount)} នាក់`,
       `${prefix}សិស្សមករៀន ៖ ${fmt(effectivePresentCount)} នាក់`,
       '---------------------------------',
-      `${prefix}អវត្តមានសរុប៖ ${fmt(totalAbsentee)} នាក់ (ច្បាប់: ${fmt(permissionStudents.length)} | អវត្តមាន: ${fmt(absentStudents.length)} | យឺត: ${fmt(lateStudents.length)})`,
+      `${prefix}អវត្តមានសរុប៖ ${fmt(totalAbsentee)} នាក់ (ច្បាប់: ${fmt(permissionStudents.length)} | អត់ច្បាប់: ${fmt(absentStudents.length)} | យឺត: ${fmt(lateStudents.length)})`,
       '',
-      `${prefix}បញ្ជីសិស្សអវត្តមាន និងច្បាប់៖`,
       ...lines,
     ];
 

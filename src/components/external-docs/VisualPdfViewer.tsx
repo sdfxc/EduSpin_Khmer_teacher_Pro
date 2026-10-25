@@ -186,7 +186,7 @@ const PdfThumbnailItem = React.memo(({
 });
 
 // -------------------------------------------------------------
-// Subcomponent: Individual PDF Page Item for continuous vertical scroll (រូប១)
+// Subcomponent: Individual PDF Page Item for continuous vertical scroll
 // Pre-calculates exact height to eliminate scroll jumping and flickering
 // -------------------------------------------------------------
 interface PdfPageItemProps {
@@ -395,7 +395,7 @@ export default function VisualPdfViewer({
   // 100% zoom = 1.35x base point size (approx 803px width, standard optimal reading width)
   const scale = (zoomPercent / 100) * 1.35;
 
-  // Zoom handlers (រូបទី៣: អាចវាយបញ្ចូលលេខដើម្បីប្តូរកម្រិតបង្ហាញជា %)
+  // Zoom handlers
   const handleZoomIn = () => {
     const next = Math.min(300, Math.round((zoomPercent + 15) / 5) * 5);
     setZoomPercent(next);
@@ -905,7 +905,7 @@ export default function VisualPdfViewer({
             </button>
           )}
 
-          {/* Zoom controls with percentage input (រូបទី៣: អាចវាយបញ្ចូលលេខដើម្បីប្ដូរកម្រិតបង្ហាញជា %) */}
+          {/* Zoom controls with percentage input */}
           {!isGoogleDrive && (
             <div className="flex items-center gap-0.5 bg-slate-100 dark:bg-slate-800/90 px-1.5 py-1 rounded-xl border border-slate-200 dark:border-slate-700 text-xs">
               <button

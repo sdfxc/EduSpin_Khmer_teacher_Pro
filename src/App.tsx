@@ -5,7 +5,7 @@
 
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, GripVertical, Camera, Pin, PinOff, Maximize, Minimize, Volume2, VolumeX, Database, Keyboard, HelpCircle, Settings } from 'lucide-react';
+import { Sparkles, LayoutGrid, RotateCcw, User, LogIn, LogOut, Plus, Moon, Sun, Trash2, GraduationCap, Compass, Users as UsersIcon, UserCog, Check, Cloud, Loader2, Pencil, ChevronLeft, ChevronRight, ChevronDown, GripVertical, Camera, Pin, PinOff, Maximize, Minimize, Volume2, VolumeX, Database, Keyboard, HelpCircle, Settings, Dices, Flag } from 'lucide-react';
 import StudentPanel from './components/StudentPanel';
 import QuizPanel from './components/QuizPanel';
 import LessonModal from './components/LessonModal';
@@ -15,6 +15,7 @@ import { BackupRestoreModal } from './components/BackupRestoreModal';
 import { SettingsMenuDrawer } from './components/SettingsMenuDrawer';
 import { GlassLiquidOverlay } from './components/GlassLiquidCapsule';
 import { ShortcutsHelpModal } from './components/ShortcutsHelpModal';
+import { AppLanguage, getSavedLanguage, saveLanguage, t } from './lib/translations';
 import { isSoundEnabled, setSoundEnabled, playChimeSound } from './lib/soundUtils';
 import SpinningWheel from './components/SpinningWheel';
 import GroupDivider from './components/GroupDivider';
@@ -22,23 +23,44 @@ import StopwatchPanel from './components/StopwatchPanel';
 import StudentManager from './components/StudentManager';
 import { Student, Question, QuizCard, ClassInfo, TeacherAccount, QuizRoom, QuizChapter, QuizSubject, isStudentInClass, DEFAULT_CLOUD_TEACHER } from './types';
 import { collection, doc, getDoc, getDocs, arrayUnion } from 'firebase/firestore';
-import { db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs, isQuotaExceeded } from './lib/firebase';
+import { onAuthStateChanged } from 'firebase/auth';
+import { auth, db, handleFirestoreError, OperationType, safeSetDoc, safeDeleteDoc, safeOnSnapshot, safeGetDoc, safeGetDocs, isQuotaExceeded } from './lib/firebase';
 import StudentPlayView from './components/StudentPlayView';
 import StudentLobby from './components/StudentLobby';
+import DuckRaceGame from './components/DuckRaceGame';
+import RandomNamePickers from './components/RandomNamePickers';
+import RaceTimersGame from './components/RaceTimersGame';
 import ExamsPanel from './components/ExamsPanel';
 import SovannaphumiLogo from './components/SovannaphumiLogo';
 import { useConfirm } from './context/ConfirmContext.tsx';
 import { ClassModal } from './components/ClassModal';
 import SmartNotesApp from './components/smart-notes/SmartNotesApp';
-import { BookOpen } from 'lucide-react';
+import LessonsPanel from './components/lessons/LessonsPanel';
+import GoogleSheetsSyncModal from './components/GoogleSheetsSyncModal';
+import { BookOpen, FileSpreadsheet } from 'lucide-react';
 import { addActivityPointsToStudent, setActivityScoreForStudent, addGroupWorkPointsToStudent, getCurrentDateScoreSlot } from './lib/scoreUtils';
+import { 
+  GRADE_8K1_CLASS_ID, 
+  GRADE_8K1_CLASS_NAME, 
+  GRADE_8K1_STUDENTS, 
+  GRADE_8K1_SUBJECTS, 
+  seedGrade8DataToLocalStorage, 
+  getGrade8AttendanceSeed 
+} from './lib/grade8SeedData';
 
 // Globally patch localStorage.setItem to gracefully handle QuotaExceededError and auto-sanitize
 function cleanupLocalStorageQuota() {
   try {
+    const keysToRemove: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const key = localStorage.key(i);
       if (!key) continue;
+
+      // Purge old flawed blacklists that previously caused accidental deletion of classes
+      if (key.startsWith('khmer_teacher_deleted_classes')) {
+        keysToRemove.push(key);
+        continue;
+      }
 
       if (key === 'khmer_teacher_classes' || key.startsWith('khmer_teacher_classes_')) {
         const value = localStorage.getItem(key);
@@ -60,11 +82,12 @@ function cleanupLocalStorageQuota() {
         }
       }
     }
+    keysToRemove.forEach(k => localStorage.removeItem(k));
   } catch (e) {
     console.error('Error during localStorage quota cleanup:', e);
   }
 }
-
+cleanupLocalStorageQuota();
 
 const EMOJIS = ["🥰", "😂", "😩", "🥳", "🥺", "😇", "😎", "🤩", "🤔", "🤗", "🤭", "🫠", "😤", "😮💨", "🫡", "😬", "🙄", "🤒", "😵💫", "😳", "🤪", "😜", "🤫", "🫣", "☹️", "😕"];
 
@@ -101,46 +124,9 @@ const SAMPLE_STUDENTS: Record<string, Student[]> = {};
 
 const DEFAULT_CLASSES: ClassInfo[] = [];
 
-function getDeletedClassIds(teacherId?: string): Set<string> {
-  const deletedSet = new Set<string>();
-  try {
-    for (let i = 0; i < localStorage.length; i++) {
-      const k = localStorage.key(i);
-      if (k && k.startsWith('khmer_teacher_deleted_classes')) {
-        const raw = localStorage.getItem(k);
-        if (raw) {
-          const arr = JSON.parse(raw);
-          if (Array.isArray(arr)) {
-            arr.forEach(id => {
-              if (id) deletedSet.add(String(id));
-            });
-          }
-        }
-      }
-    }
-  } catch {}
-  return deletedSet;
-}
-
-function markClassAsDeleted(classId: string, teacherId?: string) {
-  if (!classId) return;
-  const strId = String(classId);
-  const deletedSet = getDeletedClassIds(teacherId);
-  deletedSet.add(strId);
-  const arr = Array.from(deletedSet);
-  const json = JSON.stringify(arr);
-  try {
-    localStorage.setItem('khmer_teacher_deleted_classes_local', json);
-    if (teacherId && teacherId !== 'local') {
-      localStorage.setItem(`khmer_teacher_deleted_classes_${teacherId}`, json);
-    }
-  } catch {}
-}
-
-const sortClasses = (classList: ClassInfo[], teacherId?: string): ClassInfo[] => {
-  const deletedSet = getDeletedClassIds(teacherId);
+const sortClasses = (classList: ClassInfo[]): ClassInfo[] => {
   const clean = (classList || [])
-    .filter(c => c && c.id && c.name && c.name.trim() !== '' && !(c as any).isDeleted && !deletedSet.has(String(c.id)))
+    .filter(c => c && c.id && c.name && String(c.name).trim() !== '' && !(c as any).isDeleted)
     .map(c => ({
       id: String(c.id),
       name: String(c.name).trim(),
@@ -149,12 +135,9 @@ const sortClasses = (classList: ClassInfo[], teacherId?: string): ClassInfo[] =>
     }));
 
   const uniqueIds = new Set<string>();
-  const uniqueNames = new Set<string>();
   const filtered = clean.filter(c => {
-    const trimmedName = c.name.trim();
-    if (uniqueIds.has(c.id) || uniqueNames.has(trimmedName)) return false;
+    if (uniqueIds.has(c.id)) return false;
     uniqueIds.add(c.id);
-    uniqueNames.add(trimmedName);
     return true;
   });
 
@@ -185,7 +168,25 @@ function getInitialActiveTeacherAndClass() {
       teacherId = teacherObj?.id || '';
     } catch {}
   }
-  const deletedSet = getDeletedClassIds(teacherId);
+
+  // If not logged in, but user connected Google Account (e.g. for Sheets), auto-restore teacher
+  if (!teacherObj) {
+    const connectedEmail = localStorage.getItem('google_sheets_connected_email');
+    if (connectedEmail && connectedEmail.includes('@')) {
+      const cleanId = `email_${connectedEmail.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+      teacherObj = {
+        id: cleanId,
+        name: `លោកគ្រូ (${connectedEmail.split('@')[0]})`,
+        schoolName: 'សាលារៀនសុវណ្ណភូមិ',
+        username: connectedEmail.split('@')[0],
+        email: connectedEmail,
+        authProvider: 'google'
+      };
+      teacherId = cleanId;
+      localStorage.setItem('logged_in_teacher', JSON.stringify(teacherObj));
+    }
+  }
+
   const savedActiveId = (teacherId ? localStorage.getItem(`khmer_teacher_active_class_id_${teacherId}`) : null)
     || localStorage.getItem('khmer_teacher_active_class_id')
     || '';
@@ -197,25 +198,49 @@ function getInitialActiveTeacherAndClass() {
     try {
       const raw = JSON.parse(savedClassesRaw) as ClassInfo[];
       parsedClasses = (raw || [])
-        .filter(c => c && c.id && c.name && c.name.trim() !== '' && !deletedSet.has(String(c.id)))
+        .filter(c => c && c.id && c.name && String(c.name).trim() !== '' && !(c as any).isDeleted)
         .map(c => ({
           id: String(c.id),
           name: String(c.name).trim(),
           order: typeof c.order === 'number' ? c.order : 0,
           isPinned: !!c.isPinned
         }));
-      if (savedActiveId && !deletedSet.has(savedActiveId) && parsedClasses.some(c => c.id === savedActiveId)) {
-        effectiveClassId = savedActiveId;
-      } else if (parsedClasses.length > 0) {
-        effectiveClassId = parsedClasses[0].id;
-      } else {
-        effectiveClassId = '';
-      }
     } catch {}
   }
-  if (!effectiveClassId && parsedClasses.length > 0) {
-    effectiveClassId = parsedClasses[0].id;
+
+  // Always ensure ថ្នាក់ទី៨ក១ is present in classes list
+  const hasGrade8k1 = parsedClasses.some(c => 
+    c.name.includes('៨ក១') || c.name.includes('8ក១') || c.name.includes('8K1') || c.name.includes('៨')
+  );
+  if (!hasGrade8k1) {
+    const grade8ClassId = GRADE_8K1_CLASS_ID;
+    parsedClasses.push({
+      id: grade8ClassId,
+      name: GRADE_8K1_CLASS_NAME,
+      order: 1,
+      isPinned: true
+    });
   }
+
+  // Ensure Grade 8 student data exists in localStorage
+  const grade8TargetId = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'))?.id || GRADE_8K1_CLASS_ID;
+  const existingGrade8Students = localStorage.getItem(`students_class_${grade8TargetId}`);
+  if (!existingGrade8Students || existingGrade8Students === '[]') {
+    seedGrade8DataToLocalStorage();
+  }
+
+  parsedClasses = sortClasses(parsedClasses);
+
+  if (savedActiveId && parsedClasses.some(c => c.id === savedActiveId)) {
+    effectiveClassId = savedActiveId;
+  } else if (parsedClasses.length > 0) {
+    // If Grade 8k1 was requested, prioritize it if effectiveClassId is empty
+    const g8 = parsedClasses.find(c => c.name.includes('៨ក១') || c.name.includes('8ក១'));
+    effectiveClassId = g8?.id || parsedClasses[0].id;
+  } else {
+    effectiveClassId = GRADE_8K1_CLASS_ID;
+  }
+
   return {
     teacher: teacherObj,
     activeClassId: effectiveClassId,
@@ -329,7 +354,18 @@ export default function App() {
 
   const { confirmAction } = useConfirm();
 
-  const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'stopwatch' | 'students' | 'student-lobby' | 'exams-room' | 'smart-notes'>('wheel');
+  const [activeTab, setActiveTab] = useState<'wheel' | 'quiz' | 'groups' | 'stopwatch' | 'students' | 'student-lobby' | 'exams-room' | 'lessons' | 'smart-notes'>('wheel');
+  const [wheelSubTab, setWheelSubTab] = useState<'wheel' | 'games' | 'pickers' | 'races'>('wheel');
+  const [funGameView, setFunGameView] = useState<'duck-race' | 'study-game'>('duck-race');
+
+  // Automatically route any student-lobby navigation into wheel tab's 2nd sub-tab
+  useEffect(() => {
+    if (activeTab === 'student-lobby') {
+      setActiveTab('wheel');
+      setWheelSubTab('games');
+      setFunGameView('study-game');
+    }
+  }, [activeTab]);
   const [showWheelBulk, setShowWheelBulk] = useState(false);
   const [quizLeftView, setQuizLeftView] = useState<'wheel' | 'list'>('wheel');
   const [loadingCloudData, setLoadingCloudData] = useState(false);
@@ -350,6 +386,20 @@ export default function App() {
     const saved = localStorage.getItem('khmer_teacher_dark_mode');
     return saved === 'true';
   });
+
+  const [language, setLanguage] = useState<AppLanguage>(() => getSavedLanguage());
+
+  useEffect(() => {
+    const handleLangChange = (e: any) => {
+      if (e?.detail && (e.detail === 'km' || e.detail === 'en')) {
+        setLanguage(e.detail);
+      }
+    };
+    window.addEventListener('app-language-changed', handleLangChange);
+    return () => {
+      window.removeEventListener('app-language-changed', handleLangChange);
+    };
+  }, []);
 
   const initialClassState = getInitialActiveTeacherAndClass();
   const lastLoadedClassId = useRef<string>(initialClassState.activeClassId);
@@ -527,9 +577,41 @@ export default function App() {
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [soundOn, setSoundOn] = useState(() => isSoundEnabled());
   const [isBackupModalOpen, setIsBackupModalOpen] = useState(false);
+  const [isGoogleSheetsModalOpen, setIsGoogleSheetsModalOpen] = useState(false);
   const [isSettingsDrawerOpen, setIsSettingsDrawerOpen] = useState(false);
   const [isShortcutsModalOpen, setIsShortcutsModalOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const [isMobileAuthDropdownOpen, setIsMobileAuthDropdownOpen] = useState(false);
+  const [isMobileNavOpen, setIsMobileNavOpen] = useState(false);
+
+  const [googleSheetsCustomPayload, setGoogleSheetsCustomPayload] = useState<{
+    classId?: string;
+    className?: string;
+    subjectId?: string;
+    subjectName?: string;
+    selectedMonth?: string;
+    attendanceDate?: string;
+    attendanceMap?: Record<string, 'present' | 'absent' | 'permission' | 'late'>;
+    attendanceReasons?: Record<string, string>;
+    students?: Student[];
+    syncScores?: boolean;
+    syncAttendance?: boolean;
+    syncStatus?: boolean;
+  } | null>(null);
+
+  useEffect(() => {
+    const handleOpenGoogleSheets = (e: Event) => {
+      const customEvt = e as CustomEvent;
+      if (customEvt.detail) {
+        setGoogleSheetsCustomPayload(customEvt.detail);
+      } else {
+        setGoogleSheetsCustomPayload(null);
+      }
+      setIsGoogleSheetsModalOpen(true);
+    };
+    window.addEventListener('open-google-sheets-sync', handleOpenGoogleSheets);
+    return () => window.removeEventListener('open-google-sheets-sync', handleOpenGoogleSheets);
+  }, []);
 
   const showToast = useCallback((msg: string) => {
     setToastMessage(msg);
@@ -550,6 +632,30 @@ export default function App() {
     }
     return null;
   });
+
+  // Keep teacher session in sync with Firebase Auth
+  useEffect(() => {
+    const unsub = onAuthStateChanged(auth, (user) => {
+      if (user && user.email) {
+        const cleanId = `email_${user.email.toLowerCase().replace(/[^a-z0-9]/g, '_')}`;
+        setTeacher(prev => {
+          if (prev && prev.id === cleanId) return prev;
+          const teacherData: TeacherAccount = {
+            id: cleanId,
+            name: user.displayName || `លោកគ្រូ (${user.email!.split('@')[0]})`,
+            schoolName: prev?.schoolName || 'សាលារៀនសុវណ្ណភូមិ',
+            username: user.email!.split('@')[0],
+            email: user.email!,
+            avatarUrl: user.photoURL || undefined,
+            authProvider: 'google'
+          };
+          localStorage.setItem('logged_in_teacher', JSON.stringify(teacherData));
+          return teacherData;
+        });
+      }
+    });
+    return () => unsub();
+  }, []);
 
   const lastSubjectsStrRef = useRef<string>('');
   const lastChaptersStrRef = useRef<string>('');
@@ -738,24 +844,32 @@ export default function App() {
   // Real-Time Cross-Device Synchronization for Teacher Profile and Classes
   useEffect(() => {
     if (!teacher) {
-      setClasses([]);
-      setActiveClassId('');
-      setStudents([]);
-      setSubjects([]);
-      setChapters([]);
-      setCards([]);
-      setPickedIds([]);
+      // Guest or local mode: Preserve and display local classes instead of clearing them!
+      const localClassesRaw = localStorage.getItem('khmer_teacher_classes');
+      let localParsed: ClassInfo[] = [];
+      if (localClassesRaw) {
+        try {
+          localParsed = JSON.parse(localClassesRaw);
+        } catch {}
+      }
+      if (!Array.isArray(localParsed) || localParsed.length === 0) {
+        localParsed = [{
+          id: GRADE_8K1_CLASS_ID,
+          name: GRADE_8K1_CLASS_NAME,
+          order: 0,
+          isPinned: true
+        }];
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(localParsed));
+      }
+      const sortedLocal = sortClasses(localParsed);
+      setClasses(sortedLocal);
+      setActiveClassId(curr => {
+        if (curr && sortedLocal.some(c => c.id === curr)) return curr;
+        const lastActive = localStorage.getItem('khmer_teacher_active_class_id');
+        if (lastActive && sortedLocal.some(c => c.id === lastActive)) return lastActive;
+        return sortedLocal[0]?.id || GRADE_8K1_CLASS_ID;
+      });
       setLoadingCloudData(false);
-      try {
-        const keysToRemove: string[] = [];
-        for (let i = 0; i < localStorage.length; i++) {
-          const key = localStorage.key(i);
-          if (key && (key.startsWith('quiz_cards_class_') || key.startsWith('picked_students_class_'))) {
-            keysToRemove.push(key);
-          }
-        }
-        keysToRemove.forEach(k => localStorage.removeItem(k));
-      } catch {}
       return;
     }
 
@@ -769,13 +883,8 @@ export default function App() {
       const teacherDocRef = doc(db, 'teachers', teacher.id);
       unsubTeacher = safeOnSnapshot(teacherDocRef, (teacherSnap: any) => {
         if (teacherSnap && teacherSnap.exists && teacherSnap.exists()) {
-          const cloudTeacher = teacherSnap.data() as TeacherAccount & { deletedClassIds?: string[] };
+          const cloudTeacher = teacherSnap.data() as TeacherAccount;
           if (cloudTeacher) {
-            if (Array.isArray(cloudTeacher.deletedClassIds)) {
-              cloudTeacher.deletedClassIds.forEach((dId: string) => {
-                if (dId) markClassAsDeleted(String(dId), teacher.id);
-              });
-            }
             setTeacher(prev => {
               if (!prev) return cloudTeacher;
               if (
@@ -803,16 +912,13 @@ export default function App() {
 
         let fetchedClasses: ClassInfo[] = [];
         const seenIds = new Set<string>();
-        const deletedSet = getDeletedClassIds(teacher.id);
 
         classesSnap.forEach((docSnap: any) => {
           const clsData = docSnap.data();
           if (!clsData) return;
           const id = clsData.id || docSnap.id;
 
-          if (clsData.isDeleted === true || deletedSet.has(id)) {
-            // Document was marked deleted or in local deleted set! Safely clean up in cloud
-            safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', id)).catch(() => {});
+          if (clsData.isDeleted === true) {
             return;
           }
 
@@ -829,7 +935,36 @@ export default function App() {
           }
         });
 
-        const sortedCloudClasses = sortClasses(fetchedClasses, teacher.id);
+        // If cloud collection is currently empty for this teacher, restore from local cache or seed Grade 8k1
+        if (fetchedClasses.length === 0) {
+          const savedLocalRaw = localStorage.getItem(`khmer_teacher_classes_${teacher.id}`) || localStorage.getItem('khmer_teacher_classes');
+          let localClassesList: ClassInfo[] = [];
+          if (savedLocalRaw) {
+            try {
+              localClassesList = JSON.parse(savedLocalRaw);
+            } catch {}
+          }
+          if (!Array.isArray(localClassesList) || localClassesList.length === 0) {
+            localClassesList = [{
+              id: GRADE_8K1_CLASS_ID,
+              name: GRADE_8K1_CLASS_NAME,
+              order: 0,
+              isPinned: true
+            }];
+          }
+          fetchedClasses = localClassesList;
+          // Synchronize to Firestore so cloud database stores these classes for this teacher
+          for (const cls of localClassesList) {
+            safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', cls.id), {
+              id: cls.id,
+              name: cls.name,
+              order: cls.order ?? 0,
+              isPinned: !!cls.isPinned
+            }, { merge: true }).catch(() => {});
+          }
+        }
+
+        const sortedCloudClasses = sortClasses(fetchedClasses);
         setClasses(prev => {
           const isSame = prev.length === sortedCloudClasses.length &&
             prev.every((c, i) => c.id === sortedCloudClasses[i].id && c.name === sortedCloudClasses[i].name && c.order === sortedCloudClasses[i].order && c.isPinned === sortedCloudClasses[i].isPinned);
@@ -838,22 +973,15 @@ export default function App() {
         });
 
         localStorage.setItem(`khmer_teacher_classes_${teacher.id}`, JSON.stringify(sortedCloudClasses));
+        localStorage.setItem('khmer_teacher_classes', JSON.stringify(sortedCloudClasses));
 
         if (sortedCloudClasses.length > 0) {
           setActiveClassId(curr => {
             if (curr && sortedCloudClasses.some(c => c.id === curr)) return curr;
-            const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || sortedCloudClasses[0].id;
+            const lastActiveId = localStorage.getItem(`khmer_teacher_active_class_id_${teacher.id}`) || localStorage.getItem('khmer_teacher_active_class_id') || sortedCloudClasses[0].id;
             const exists = sortedCloudClasses.some(c => c.id === lastActiveId);
             return exists && lastActiveId ? lastActiveId : sortedCloudClasses[0].id;
           });
-        } else {
-          setActiveClassId('');
-          setStudents([]);
-          setCards([]);
-          setSubjects([]);
-          setChapters([]);
-          setPickedIds([]);
-          setManualCalledIds([]);
         }
         setLoadingCloudData(false);
       }, (err: any) => {
@@ -923,7 +1051,18 @@ export default function App() {
         } catch {}
 
         if (localStudentsStr) {
-          try { setStudents(JSON.parse(localStudentsStr)); } catch {}
+          try { 
+            const parsed = JSON.parse(localStudentsStr);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setStudents(parsed);
+            } else if (activeClassId === GRADE_8K1_CLASS_ID) {
+              setStudents(GRADE_8K1_STUDENTS);
+            }
+          } catch {
+            if (activeClassId === GRADE_8K1_CLASS_ID) setStudents(GRADE_8K1_STUDENTS);
+          }
+        } else if (activeClassId === GRADE_8K1_CLASS_ID) {
+          setStudents(GRADE_8K1_STUDENTS);
         }
         if (localPickedStr) {
           try { setPickedIds(JSON.parse(localPickedStr)); } catch {}
@@ -935,22 +1074,11 @@ export default function App() {
 
     const loadClassDetails = async () => {
       try {
-        const deletedSet = getDeletedClassIds(teacher.id);
-        if (deletedSet.has(activeClassId)) {
-          setLoadingCloudData(false);
-          return;
-        }
-
         setLoadingCloudData(true);
         
         // 1. Fetch class doc
         const classDocRef = doc(db, 'teachers', teacher.id, 'classes', activeClassId);
         const classSnap = await safeGetDoc(classDocRef);
-        
-        if (getDeletedClassIds(teacher.id).has(activeClassId)) {
-          setLoadingCloudData(false);
-          return;
-        }
         
         let loadedSubjects: QuizSubject[] = [];
         let loadedActiveSubjectId: string | null = null;
@@ -1005,7 +1133,7 @@ export default function App() {
           loadedActiveRoomId = classData.activeRoomId || null;
         } else {
           // Empty or new class in cloud – check if this activeClassId is actually a valid non-deleted class in state
-          const isClassInList = classes.some(c => c.id === activeClassId) && !getDeletedClassIds(teacher.id).has(activeClassId);
+          const isClassInList = classes.some(c => c.id === activeClassId);
           if (!isClassInList) {
             setLoadingCloudData(false);
             return;
@@ -1150,6 +1278,33 @@ export default function App() {
             }
           } catch (e) {}
         }
+
+        // Special Grade 8k1 complete data assurance
+        if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១') || activeClassName?.includes('8K1')) {
+          if (loadedStudents.length === 0) {
+            loadedStudents = GRADE_8K1_STUDENTS;
+            if (teacher?.id) {
+              for (const s of GRADE_8K1_STUDENTS) {
+                safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId, 'students', s.id), s, { merge: true }).catch(() => {});
+              }
+            }
+          }
+          if (loadedSubjects.length === 0 || (loadedSubjects.length === 1 && loadedSubjects[0].chapters[0]?.rooms[0]?.cards?.length === 0)) {
+            loadedSubjects = GRADE_8K1_SUBJECTS;
+            loadedActiveSubjectId = loadedSubjects[0]?.id || null;
+            loadedChapters = loadedSubjects[0]?.chapters || [];
+            loadedActiveRoomId = loadedChapters[0]?.rooms[0]?.id || null;
+            resolvedCards = loadedChapters[0]?.rooms[0]?.cards || [];
+            setCards(resolvedCards);
+            if (teacher?.id) {
+              safeSetDoc(classDocRef, {
+                subjects: loadedSubjects,
+                activeSubjectId: loadedActiveSubjectId,
+                activeRoomId: loadedActiveRoomId
+              }, { merge: true }).catch(() => {});
+            }
+          }
+        }
         
         setStudents(loadedStudents);
         if (activeClassId) {
@@ -1185,6 +1340,24 @@ export default function App() {
       const activeClassName = activeCls?.name;
 
       if (snapshot.empty) {
+        // If empty in cloud, check local storage before clearing to prevent data loss!
+        const localRaw = localStorage.getItem(`students_class_${activeClassId}`);
+        if (localRaw) {
+          try {
+            const parsed = JSON.parse(localRaw);
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              setStudents(parsed);
+              for (const s of parsed) {
+                safeSetDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', s.id), s, { merge: true }).catch(() => {});
+              }
+              return;
+            }
+          } catch {}
+        }
+        if (activeClassId === GRADE_8K1_CLASS_ID || activeClassName?.includes('៨ក១') || activeClassName?.includes('8ក១')) {
+          setStudents(GRADE_8K1_STUDENTS);
+          return;
+        }
         setStudents([]);
         return;
       }
@@ -1193,11 +1366,7 @@ export default function App() {
       snapshot.forEach(docSnap => {
         const data = docSnap.data() as Student;
         if (data && data.id && !data.id.startsWith('sim-')) {
-          if (isStudentInClass(data, activeClassId, activeClassName)) {
-            loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
-          } else {
-            safeDeleteDoc(doc(db, 'teachers', effectiveTeacherId, 'classes', activeClassId, 'students', data.id)).catch(() => {});
-          }
+          loadedStudents.push(data.classId ? data : { ...data, classId: activeClassId });
         }
       });
       setStudents(loadedStudents);
@@ -1549,7 +1718,16 @@ export default function App() {
     localStorage.setItem(`active_subject_id_${activeClassId}`, currentSubId);
     localStorage.setItem(`active_room_id_${activeClassId}`, currentRoomId);
 
-    // Redundant cloud write removed - syncClassInfo effect handles this throttled.
+    // Save updated questions & rooms to Firestore for this specific class only
+    if (teacher?.id && activeClassId) {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        subjects: updatedSubjects,
+        activeSubjectId: currentSubId,
+        activeRoomId: currentRoomId,
+        cards: updatedCards,
+        pickedIds: updatedPickedIds
+      }, { merge: true }).catch(err => console.error('Failed to sync updated questions to Firestore:', err));
+    }
   }, [teacher, activeClassId, activeRoomId, chapters, subjects, activeSubjectId]);
 
   // Helper to save student score updates to Firestore
@@ -2588,11 +2766,6 @@ export default function App() {
   };
 
   const handleOpenAddClass = () => {
-    if (!teacher) {
-      setAuthModalMode('login');
-      setIsAuthModalOpen(true);
-      return;
-    }
     setClassModalState({
       isOpen: true,
       mode: 'add',
@@ -2697,25 +2870,18 @@ export default function App() {
       confirmText: 'បាទ/ចាស លុបថ្នាក់',
       variant: 'danger',
       onConfirm: async () => {
-        const currentTeacherId = teacher?.id || 'local';
-        markClassAsDeleted(classId, currentTeacherId);
-
-        const updatedClasses = classes.filter(c => c.id !== classId);
-        const sortedClasses = sortClasses(updatedClasses, currentTeacherId);
-        setClasses(sortedClasses);
-
-        // 1. Mark as deleted and delete from Firestore if teacher is logged in
+        // 1. Delete ONLY this specific class from Firestore if teacher is logged in
         if (teacher?.id) {
           try {
-            await safeSetDoc(doc(db, 'teachers', teacher.id), {
-              deletedClassIds: arrayUnion(classId)
-            }, { merge: true });
-            await safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', classId), { isDeleted: true }, { merge: true });
             await safeDeleteDoc(doc(db, 'teachers', teacher.id, 'classes', classId));
           } catch (err) {
             console.error('Failed to delete class from Firestore:', err);
           }
         }
+
+        const updatedClasses = classes.filter(c => c.id !== classId);
+        const sortedClasses = sortClasses(updatedClasses);
+        setClasses(sortedClasses);
 
         // 2. Update localStorage strictly for this teacher
         if (teacher) {
@@ -2730,7 +2896,7 @@ export default function App() {
           }
         }
 
-        // 3. Clear all cached class data from localStorage
+        // 3. Clear all cached class data for ONLY this deleted class
         localStorage.removeItem(`students_class_${classId}`);
         localStorage.removeItem(`quiz_cards_class_${classId}`);
         localStorage.removeItem(`picked_students_class_${classId}`);
@@ -2739,11 +2905,30 @@ export default function App() {
         localStorage.removeItem(`chapters_class_${classId}`);
         localStorage.removeItem(`active_subject_id_${classId}`);
         localStorage.removeItem(`active_room_id_${classId}`);
+        localStorage.removeItem(`khmer_exams_${classId}`);
         
         // 4. Handle active class switch
         if (activeClassId === classId) {
           if (sortedClasses.length > 0) {
-            handleSwitchClass(sortedClasses[0].id);
+            const nextClass = sortedClasses[0];
+            lastLoadedClassId.current = nextClass.id;
+            setActiveClassId(nextClass.id);
+            if (teacher) {
+              localStorage.setItem(`khmer_teacher_active_class_id_${teacher.id}`, nextClass.id);
+            }
+            localStorage.setItem('khmer_teacher_active_class_id', nextClass.id);
+
+            // Load next class cached data
+            try {
+              const cachedStudents = localStorage.getItem(`students_class_${nextClass.id}`);
+              setStudents(cachedStudents ? JSON.parse(cachedStudents) : []);
+              const cachedCards = localStorage.getItem(`quiz_cards_class_${nextClass.id}`);
+              setCards(cachedCards ? JSON.parse(cachedCards) : []);
+              const cachedPicked = localStorage.getItem(`picked_students_class_${nextClass.id}`);
+              setPickedIds(cachedPicked ? JSON.parse(cachedPicked) : []);
+              const cachedManual = localStorage.getItem(`manual_called_students_class_${nextClass.id}`);
+              setManualCalledIds(cachedManual ? JSON.parse(cachedManual) : []);
+            } catch {}
           } else {
             setActiveClassId('');
             setStudents([]);
@@ -3098,6 +3283,13 @@ export default function App() {
 
   const handleAnswer = useCallback((correct: boolean) => {
     if (!activeCardId) return;
+    const currentActiveCardId = activeCardId;
+
+    // Immediately clear active card references and states to prevent re-opening or echo
+    activeCardIdRef.current = null;
+    setActiveCardId(null);
+    lastSyncedQuizRef.current.activeCardId = null;
+    lastSyncedQuizRef.current.activeCardIdOfCard = null;
 
     // Update student score if student is selected
     if (selectedStudentId) {
@@ -3116,16 +3308,24 @@ export default function App() {
 
     // Update card status
     const updatedCards = cards.map(c => {
-      if (c.id === activeCardId) {
-        return { ...c, isRevealed: true, status: correct ? 'correct' : 'wrong' as any };
+      if (c.id === currentActiveCardId) {
+        return { ...c, isRevealed: true, status: (correct ? 'correct' : 'wrong') as any };
       }
       return c;
     });
     setCards(updatedCards);
 
     saveClassMetadata(updatedCards, pickedIds);
-    setActiveCardId(null);
-  }, [activeCardId, selectedStudentId, cards, pickedIds, saveClassMetadata, saveStudentScore]);
+
+    // Immediately clear active presentation card state on Firestore
+    if (teacher?.id && activeClassId) {
+      safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+        activeCardId: null,
+        activeCard: null,
+        activeCardState: 'answering'
+      }, { merge: true }).catch(() => {});
+    }
+  }, [activeCardId, selectedStudentId, cards, pickedIds, saveClassMetadata, teacher?.id, activeClassId]);
 
   const resetMatch = useCallback(async () => {
     confirmAction({
@@ -3278,59 +3478,97 @@ export default function App() {
   };
 
   return (
-    <div className={`flex flex-col h-screen ${isDarkMode ? 'bg-[#222222] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
+    <div className={`flex flex-col h-screen w-full max-w-full overflow-x-hidden ${isDarkMode ? 'bg-[#272525] text-slate-100 dark' : 'bg-[#f8fafc] text-slate-900'}`}>
       {/* Header */}
-      <header className={`h-20 flex items-center justify-between px-6 lg:px-8 shrink-0 z-20 border-b transition-colors ${
-        isDarkMode ? 'bg-[#222222] border-[#333333]' : 'bg-gradient-to-r from-sky-50/70 via-white to-purple-50/70 border-slate-200/80 shadow-xs'
+      <header className={`h-18 sm:h-20 flex items-center justify-between px-3 sm:px-6 lg:px-8 shrink-0 z-20 border-b transition-colors w-full max-w-full ${
+        isDarkMode ? 'bg-[#272525] border-[#333333]' : 'bg-gradient-to-r from-sky-50/70 via-white to-purple-50/70 border-slate-200/80 shadow-xs'
       }`}>
+        {/* Brand & School Logo */}
         <div 
           onClick={() => setActiveTab('wheel')}
-          className="flex items-center gap-3.5 cursor-pointer hover:opacity-90 active:scale-98 transition-all select-none shrink-0"
+          className="flex items-center gap-2 sm:gap-3.5 cursor-pointer hover:opacity-90 active:scale-98 transition-all select-none shrink-0"
           title="ត្រឡប់ទៅទំព័រដើម (Home)"
         >
-          <div className="w-11 h-11 flex items-center justify-center relative drop-shadow-xs">
+          <div className="w-9 h-9 sm:w-11 sm:h-11 flex items-center justify-center relative drop-shadow-xs shrink-0">
             {teacher?.schoolLogoUrl ? (
               <img 
                 src={teacher.schoolLogoUrl} 
                 alt="School Logo" 
-                className="w-11 h-11 object-contain rounded-xl select-none" 
+                className="w-9 h-9 sm:w-11 sm:h-11 object-contain rounded-xl select-none" 
               />
             ) : (
-              <SovannaphumiLogo className="w-11 h-11" />
+              <SovannaphumiLogo className="w-9 h-9 sm:w-11 sm:h-11" />
             )}
           </div>
           <div>
-            <div className="flex items-center gap-2">
-              <h1 className="text-lg font-black tracking-tight flex items-center gap-1.5">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <h1 className="text-base sm:text-lg font-black tracking-tight flex items-center gap-1">
                 <span className="text-indigo-600 dark:text-indigo-400">EduSpin</span>
                 <span className="text-slate-800 dark:text-slate-200">Pro</span>
               </h1>
             </div>
-            <div className="text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-none flex items-center gap-1.5 mt-1">
-              <span className="truncate max-w-[160px] sm:max-w-[220px]" title={teacher?.schoolName || 'សាលារៀន'}>
+            <div className="text-[10px] sm:text-[11px] font-bold text-slate-500 dark:text-slate-400 leading-none flex items-center gap-1.5 mt-0.5 sm:mt-1">
+              <span className="truncate max-w-[110px] sm:max-w-[220px]" title={teacher?.schoolName || 'សាលារៀន'}>
                 {teacher ? (teacher.schoolName || 'មិនទាន់បញ្ចូលឈ្មោះសាលា') : 'សាលារៀនសុវណ្ណភូមិ'}
               </span>
             </div>
           </div>
         </div>
 
-        {/* Dynamic Soft Light Pastel iOS Glass Navigation Tabs */}
-        <nav className={`flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
+        {/* Mobile Phone Edition: Tap to Drop Down Menu Button ("នៅលើទូរស័ព្ទសូម tap ទម្លាក់ចុះក្រោមដើម្បីអាចអោយ មើលឃើញលើអេក្រង់") */}
+        <div className="md:hidden flex items-center gap-1.5">
+          <button
+            type="button"
+            onClick={() => setIsMobileNavOpen(prev => !prev)}
+            className={`px-2.5 py-1.5 rounded-xl border flex items-center gap-1.5 text-xs font-black shadow-xs active:scale-95 transition-all cursor-pointer select-none ${
+              isMobileNavOpen
+                ? 'bg-blue-600 text-white border-blue-500 shadow-blue-500/20 ring-2 ring-blue-500/20'
+                : isDarkMode
+                  ? 'bg-slate-800/90 text-slate-100 border-slate-700 hover:bg-slate-700'
+                  : 'bg-white text-slate-800 border-slate-200 hover:bg-slate-50'
+            }`}
+            title="ចុចទម្លាក់ចុះក្រោមដើម្បីជ្រើសរើសផ្ទាំងមុខងារ (Tabs)"
+          >
+            {(() => {
+              const currentTabObj = [
+                { id: 'wheel', label: language === 'km' ? 'បង្វិលឈ្មោះ' : 'Wheel Spin', icon: Compass },
+                { id: 'groups', label: language === 'km' ? 'បែងចែកក្រុម' : 'Groups', icon: UsersIcon },
+                { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog },
+                { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid },
+                { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap },
+              ].find(t => t.id === activeTab) || { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass };
+              const CurrentIcon = currentTabObj.icon;
+              return (
+                <>
+                  <CurrentIcon className="w-3.5 h-3.5 text-blue-500 shrink-0" />
+                  <span className="max-w-[85px] truncate font-black">{currentTabObj.label}</span>
+                  {activeTab === 'wheel' && pendingStudentsCount > 0 && (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce">
+                      +{pendingStudentsCount}
+                    </span>
+                  )}
+                  <ChevronDown className={`w-3.5 h-3.5 transition-transform duration-200 ${isMobileNavOpen ? 'rotate-180 text-blue-400' : 'text-slate-400'}`} />
+                </>
+              );
+            })()}
+          </button>
+        </div>
+
+        {/* Dynamic Soft Light Pastel iOS Glass Navigation Tabs (Laptop, PC, iPad: រក្សាទម្រង់នៅដដែល ១០០%) */}
+        <nav className={`hidden md:flex items-center gap-1.5 p-1.5 rounded-2xl border backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10 shrink-0 ${
           isDarkMode 
             ? 'bg-[#18181c]/90 border-white/10 shadow-[inset_0_1px_2px_rgba(255,255,255,0.05),0_8px_30px_rgba(0,0,0,0.6)]' 
-            : 'bg-gradient-to-r from-sky-50/90 via-indigo-50/80 to-purple-50/90 border-white/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.8)]'
+            : 'bg-white/80 border-slate-200/90 shadow-[0_8px_25px_rgba(100,116,139,0.08),inset_0_1px_2px_rgba(255,255,255,0.9)]'
         }`}>
           {[
-            { id: 'wheel', label: 'បង្វិលឈ្មោះ', icon: Compass, activeBgLight: 'from-sky-100/95 via-blue-50/95 to-sky-100/95', textLight: 'text-sky-700', activeTextLight: 'text-sky-800' },
-            { id: 'groups', label: 'បែងចែកក្រុម', icon: UsersIcon, activeBgLight: 'from-emerald-100/95 via-teal-50/95 to-emerald-100/95', textLight: 'text-emerald-700', activeTextLight: 'text-emerald-800' },
-            { id: 'students', label: 'គ្រប់គ្រងសិស្ស', icon: UserCog, activeBgLight: 'from-violet-100/95 via-purple-50/95 to-violet-100/95', textLight: 'text-purple-700', activeTextLight: 'text-purple-800' },
-            { id: 'quiz', label: 'ក្ដារសំណួរ', icon: LayoutGrid, activeBgLight: 'from-amber-100/95 via-orange-50/95 to-amber-100/95', textLight: 'text-amber-700', activeTextLight: 'text-amber-800' },
-            { id: 'exams-room', label: 'បន្ទប់វិញ្ញាសា', icon: GraduationCap, activeBgLight: 'from-indigo-100/95 via-blue-50/95 to-indigo-100/95', textLight: 'text-indigo-700', activeTextLight: 'text-indigo-800' },
-            { id: 'student-lobby', label: 'Study game', icon: Sparkles, badge: true, activeBgLight: 'from-rose-100/95 via-pink-50/95 to-rose-100/95', textLight: 'text-rose-700', activeTextLight: 'text-rose-800' },
+            { id: 'wheel', label: language === 'km' ? 'បង្វិលឈ្មោះ' : 'Wheel Spin', icon: Compass, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'groups', label: language === 'km' ? 'បែងចែកក្រុម' : 'Groups', icon: UsersIcon, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
+            { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap, activeBgLight: 'from-slate-100/95 via-white to-slate-100/95' },
           ].map((tab) => {
             const Icon = tab.icon;
             const isActive = activeTab === tab.id;
-            const isStudyGame = tab.id === 'student-lobby';
 
             return (
               <motion.button
@@ -3341,8 +3579,8 @@ export default function App() {
                 transition={{ type: "spring", stiffness: 500, damping: 20 }}
                 className={`relative px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-2 cursor-pointer select-none whitespace-nowrap transition-colors duration-200 focus:outline-none ${
                   isActive
-                    ? isDarkMode ? 'text-blue-400 font-extrabold' : `${tab.activeTextLight} font-black`
-                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : `${tab.textLight} hover:bg-white/70`
+                    ? isDarkMode ? 'text-blue-400 font-extrabold' : 'text-blue-600 font-black'
+                    : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-white/10' : 'text-slate-700 hover:text-blue-600 hover:bg-slate-100/70'
                 }`}
               >
                 {isActive && (
@@ -3357,7 +3595,7 @@ export default function App() {
                     className={`absolute inset-0 rounded-xl border backdrop-blur-2xl overflow-hidden pointer-events-none ${
                       isDarkMode
                         ? 'bg-white/[0.08] border-white/35 shadow-[0_4px_24px_rgba(0,0,0,0.5),inset_0_2px_4px_rgba(255,255,255,0.4),inset_0_-2px_4px_rgba(255,255,255,0.1)]'
-                        : `bg-gradient-to-r ${tab.activeBgLight} border-white/95 shadow-[0_6px_20px_rgba(0,0,0,0.06),inset_0_2.5px_4px_rgba(255,255,255,1),inset_0_-2px_4px_rgba(255,255,255,0.5)]`
+                        : `bg-gradient-to-r ${tab.activeBgLight} border-slate-200/90 shadow-[0_4px_16px_rgba(15,23,42,0.08),inset_0_2px_4px_rgba(255,255,255,1),inset_0_-1px_2px_rgba(0,0,0,0.03)]`
                     }`}
                   >
                     {/* Top Specular Glare Dome Reflection */}
@@ -3387,26 +3625,40 @@ export default function App() {
                     y: isActive ? -0.5 : 0
                   }}
                   transition={{ type: "spring", stiffness: 450, damping: 22 }}
-                  className="relative z-10 flex items-center gap-2"
+                  className="relative z-10 flex items-center gap-2.5"
                 >
-                  <Icon className={`w-4 h-4 transition-all duration-300 ${
+                  {/* Circular shape around tab icon */}
+                  <div className={`w-7 h-7 rounded-full border flex items-center justify-center transition-all duration-200 shrink-0 ${
                     isActive
-                      ? isDarkMode ? 'text-blue-400 scale-110 drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' : `${tab.activeTextLight} scale-110 drop-shadow-xs`
-                      : isDarkMode ? 'text-slate-400' : 'text-slate-500'
-                  } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
+                      ? isDarkMode 
+                        ? 'border-blue-400 bg-blue-500/10 shadow-[0_0_10px_rgba(96,165,250,0.2)]' 
+                        : 'border-blue-600 bg-blue-500/5 shadow-[0_0_8px_rgba(37,99,235,0.15)]'
+                      : isDarkMode 
+                        ? 'border-neutral-700 bg-transparent' 
+                        : 'border-slate-300 bg-transparent group-hover:border-slate-400'
+                  }`}>
+                    <Icon className={`w-3.5 h-3.5 transition-all duration-300 ${
+                      isActive
+                        ? isDarkMode ? 'text-blue-400 scale-110' : 'text-blue-600 scale-110'
+                        : isDarkMode ? 'text-slate-400' : 'text-slate-600'
+                    } ${isActive && tab.id === 'wheel' ? 'animate-spin-slow' : ''}`} />
+                  </div>
+
                   <span className={
                     isActive 
                       ? isDarkMode 
                         ? 'text-blue-400 font-extrabold tracking-wide drop-shadow-[0_1px_2px_rgba(0,0,0,0.8)]' 
-                        : `${tab.activeTextLight} font-black tracking-wide` 
-                      : 'font-bold'
+                        : 'text-blue-600 font-black tracking-wide' 
+                      : isDarkMode
+                        ? 'text-slate-300 font-bold'
+                        : 'text-slate-700 hover:text-blue-600 font-bold'
                   }>{tab.label}</span>
                   
-                  {isStudyGame && pendingStudentsCount > 0 ? (
+                  {tab.id === 'wheel' && pendingStudentsCount > 0 ? (
                     <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce shadow-xs">
                       +{pendingStudentsCount}
                     </span>
-                  ) : tab.badge ? (
+                  ) : (tab as any).badge ? (
                     <span className="flex h-2 w-2 relative ml-0.5">
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
@@ -3419,10 +3671,10 @@ export default function App() {
         </nav>
 
         {/* Action and Profile Controls */}
-        <div className="flex items-center gap-2 shrink-0">
-          {/* Active Teacher Profile Area */}
+        <div className="flex items-center gap-1.5 sm:gap-2 shrink-0">
+          {/* Active Teacher Profile Area (Desktop & iPad) */}
           {teacher ? (
-            <div className={`flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
+            <div className={`hidden md:flex items-center gap-2 px-2.5 py-1.5 rounded-2xl border transition-colors group/prof ${
               isDarkMode ? 'bg-slate-800/90 border-slate-700 hover:border-slate-600 shadow-sm' : 'bg-slate-50 border-slate-200 hover:border-slate-300'
             }`}>
               {/* Avatar with Camera badge for instant change from phone/PC */}
@@ -3481,7 +3733,7 @@ export default function App() {
               </button>
             </div>
           ) : (
-            <div className="flex items-center gap-1.5">
+            <div className="hidden md:flex items-center gap-1.5">
               <button
                 onClick={() => {
                   setAuthModalMode('login');
@@ -3490,7 +3742,7 @@ export default function App() {
                 className="px-3 py-1.5 bg-indigo-50 dark:bg-indigo-950/40 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-bold flex items-center gap-1.5 hover:bg-indigo-100 dark:hover:bg-indigo-900/40 transition-all border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
               >
                 <LogIn className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">ចូលគណនី</span>
+                <span>{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
               </button>
               <button
                 onClick={() => {
@@ -3500,12 +3752,12 @@ export default function App() {
                 className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer"
               >
                 <User className="w-3.5 h-3.5" />
-                <span>ចុះឈ្មោះគ្រូ</span>
+                <span>{language === 'km' ? 'ចុះឈ្មោះគ្រូ' : 'Register'}</span>
               </button>
             </div>
           )}
 
-          <div className={`h-6 w-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-0.5`} />
+          <div className={`hidden md:block h-6 w-px ${isDarkMode ? 'bg-slate-800' : 'bg-slate-200'} mx-0.5`} />
 
           {/* Sound Toggle */}
           <button
@@ -3515,20 +3767,20 @@ export default function App() {
                 ? 'text-red-500 bg-red-50 dark:bg-red-950/40 hover:bg-red-100 dark:hover:bg-red-900/50'
                 : (isDarkMode ? 'text-emerald-400 hover:bg-slate-800' : 'text-emerald-600 hover:bg-slate-100')
             }`}
-            title={soundOn ? 'បិទសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'បើកសំឡេងហ្គេម (គ្រាប់ចុច M)'}
+            title={soundOn ? (language === 'km' ? 'បិទសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'Mute Game Sound (Key M)') : (language === 'km' ? 'បើកសំឡេងហ្គេម (គ្រាប់ចុច M)' : 'Turn On Sound (Key M)')}
           >
-            {soundOn ? <Volume2 className="w-4.5 h-4.5" /> : <VolumeX className="w-4.5 h-4.5" />}
+            {soundOn ? <Volume2 className="w-4 h-4 sm:w-4.5 sm:h-4.5" /> : <VolumeX className="w-4 h-4 sm:w-4.5 sm:h-4.5" />}
           </button>
 
-          {/* Fullscreen Mode */}
+          {/* Fullscreen Mode (hidden on small mobile screens to keep header sleek) */}
           <button
             onClick={toggleFullscreen}
-            className={`p-2 rounded-xl transition-all cursor-pointer ${
+            className={`hidden sm:flex p-2 rounded-xl transition-all cursor-pointer ${
               isFullscreen
                 ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-400'
                 : (isDarkMode ? 'text-slate-300 hover:bg-slate-800' : 'text-slate-600 hover:bg-slate-100')
             }`}
-            title={isFullscreen ? 'ចាកចេញពីអេក្រង់ពេញ (គ្រាប់ចុច F)' : 'ពង្រីកពេញអេក្រង់សម្រាប់ Projector/TV (គ្រាប់ចុច F)'}
+            title={isFullscreen ? (language === 'km' ? 'ចាកចេញពីអេក្រង់ពេញ (គ្រាប់ចុច F)' : 'Exit Fullscreen (Key F)') : (language === 'km' ? 'ពង្រីកពេញអេក្រង់សម្រាប់ Projector/TV (គ្រាប់ចុច F)' : 'Enter Fullscreen (Key F)')}
           >
             {isFullscreen ? <Minimize className="w-4.5 h-4.5" /> : <Maximize className="w-4.5 h-4.5" />}
           </button>
@@ -3541,16 +3793,16 @@ export default function App() {
                 ? 'bg-gradient-to-tr from-blue-900/50 via-indigo-900/50 to-blue-950/50 hover:from-blue-800/80 hover:to-indigo-800/80 text-blue-300 border-blue-400/30 hover:border-blue-400/60 shadow-blue-500/10' 
                 : 'bg-gradient-to-tr from-blue-50 to-indigo-50 hover:from-blue-100 hover:to-indigo-100 text-blue-600 border-blue-200 hover:border-blue-300 shadow-blue-500/10'
             }`}
-            title="ការកំណត់ & បម្រុងទុកទិន្នន័យ ១០០% (Settings & 100% Full Backup Menu)"
+            title={language === 'km' ? 'ការកំណត់ & បម្រុងទុកទិន្នន័យ (Settings & Backup)' : 'Settings & Backup (ការកំណត់)'}
             aria-label="Settings & Backup"
           >
-            <Settings className="w-4.5 h-4.5 text-blue-500 group-hover:rotate-90 transition-transform duration-300" />
+            <Settings className="w-4 h-4 sm:w-4.5 sm:h-4.5 text-blue-500 group-hover:rotate-90 transition-transform duration-300" />
           </button>
 
           {/* Cloud Sync Status Indicator */}
           <div 
             title={quotaExceeded ? 'កូតា Cloud ដល់កម្រិតកំណត់ - កំពុងដំណើរការក្នុង Offline Local Mode ដោយសុវត្ថិភាព' : (teacher ? `បានភ្ជាប់គណនី ${teacher.username} ទៅកាន់ Cloud Firestore` : 'ទិន្នន័យរក្សាទុកក្នុង Local និងត្រៀម Sync ទៅកាន់ Cloud')}
-            className={`inline-flex items-center gap-1 font-bold text-[9.5px] px-2 py-1 rounded-xl border select-none shadow-2xs leading-none ${
+            className={`inline-flex items-center gap-1 font-bold text-[9.5px] px-2 py-1 rounded-xl border select-none shadow-2xs leading-none shrink-0 ${
               quotaExceeded 
                 ? 'text-amber-600 dark:text-amber-400 bg-amber-50/90 dark:bg-amber-950/50 border-amber-200/60 dark:border-amber-800/40' 
                 : 'text-emerald-600 dark:text-emerald-400 bg-emerald-50/90 dark:bg-emerald-950/50 border-emerald-200/60 dark:border-emerald-800/40'
@@ -3562,14 +3814,171 @@ export default function App() {
         </div>
       </header>
 
+      {/* Mobile Phone Edition: Dropped-down Tabs Navigation Menu ("នៅលើទូរស័ព្ទសូម tap ទម្លាក់ចុះក្រោមដើម្បីអាចអោយ មើលឃើញលើអេក្រង់") */}
+      <AnimatePresence>
+        {isMobileNavOpen && (
+          <motion.div
+            initial={{ opacity: 0, height: 0 }}
+            animate={{ opacity: 1, height: 'auto' }}
+            exit={{ opacity: 0, height: 0 }}
+            transition={{ duration: 0.2 }}
+            className="md:hidden border-b bg-white/95 dark:bg-[#1a1921]/95 backdrop-blur-2xl border-slate-200 dark:border-slate-800 px-3 py-3 shadow-xl z-30 shrink-0 overflow-hidden"
+          >
+            <div className="flex items-center justify-between px-1.5 pb-2 text-[11px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-wider">
+              <span>{language === 'km' ? 'ផ្ទាំងមុខងារទាំងអស់ (Tabs)' : 'Navigation Tabs'}</span>
+              <span className="text-[10px] text-blue-500 font-bold lowercase">ចុចជ្រើសរើស</span>
+            </div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {[
+                { id: 'wheel', label: language === 'km' ? 'បង្វិលឈ្មោះ' : 'Wheel Spin', icon: Compass, desc: language === 'km' ? 'កងបង្វិល, ហ្គេម & Races' : 'Spinning Wheel & Games' },
+                { id: 'groups', label: language === 'km' ? 'បែងចែកក្រុម' : 'Groups', icon: UsersIcon, desc: language === 'km' ? 'បែងចែកសិស្សជាក្រុមដោយស្វ័យប្រវត្តិ' : 'Auto divide students into groups' },
+                { id: 'students', label: language === 'km' ? 'គ្រប់គ្រងសិស្ស' : 'Students', icon: UserCog, desc: language === 'km' ? 'តារាងពិន្ទុ, វត្តមាន & បញ្ជីឈ្មោះ' : 'Scores, Attendance & Students list' },
+                { id: 'quiz', label: language === 'km' ? 'ក្ដារសំណួរ' : 'Quiz Board', icon: LayoutGrid, desc: language === 'km' ? 'សំណួរឆ្លើយយករង្វាន់ & កាត' : 'Interactive flashcards & points' },
+                { id: 'exams-room', label: language === 'km' ? 'បន្ទប់វិញ្ញាសា' : 'Exams Room', icon: GraduationCap, desc: language === 'km' ? 'វិញ្ញាសាប្រឡង & បន្ទប់ឆ្លើយ' : 'Exams & Live Classroom Rooms' },
+              ].map((tab) => {
+                const Icon = tab.icon;
+                const isActive = activeTab === tab.id;
+                return (
+                  <button
+                    key={tab.id}
+                    type="button"
+                    onClick={() => {
+                      setActiveTab(tab.id as any);
+                      setIsMobileNavOpen(false);
+                    }}
+                    className={`w-full px-3.5 py-2.5 rounded-xl text-left flex items-center justify-between cursor-pointer transition-all active:scale-98 ${
+                      isActive
+                        ? isDarkMode
+                          ? 'bg-blue-500/20 text-blue-400 border border-blue-500/40 shadow-xs'
+                          : 'bg-blue-50 text-blue-600 border border-blue-200 shadow-xs'
+                        : isDarkMode
+                          ? 'text-slate-200 hover:bg-white/5 border border-transparent'
+                          : 'text-slate-700 hover:bg-slate-100 border border-transparent'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3 min-w-0">
+                      <div className={`w-8 h-8 rounded-xl flex items-center justify-center shrink-0 ${
+                        isActive
+                          ? isDarkMode ? 'bg-blue-500/30 text-blue-300' : 'bg-blue-600 text-white shadow-xs'
+                          : isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        <Icon className="w-4 h-4" />
+                      </div>
+                      <div className="min-w-0">
+                        <div className="text-xs font-black leading-tight flex items-center gap-1.5 truncate">
+                          <span>{tab.label}</span>
+                          {tab.id === 'wheel' && pendingStudentsCount > 0 && (
+                            <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce">
+                              +{pendingStudentsCount}
+                            </span>
+                          )}
+                        </div>
+                        <div className="text-[10px] font-medium text-slate-400 dark:text-slate-500 mt-0.5 truncate">
+                          {tab.desc}
+                        </div>
+                      </div>
+                    </div>
+                    {isActive ? (
+                      <span className="w-2.5 h-2.5 rounded-full bg-blue-500 shrink-0 ml-2" />
+                    ) : (
+                      <ChevronRight className="w-4 h-4 text-slate-400 dark:text-slate-600 shrink-0 ml-2" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* Mobile Phone Edition: Dropped-down Teacher Account Registration & Sign-in Bar (Immediately Visible ភ្លាមៗ) */}
+      {!teacher ? (
+        <div className="md:hidden px-3.5 py-2.5 bg-gradient-to-r from-indigo-500/10 via-purple-500/10 to-indigo-500/10 dark:from-indigo-950/70 dark:via-purple-950/70 dark:to-indigo-950/70 border-b border-indigo-200/80 dark:border-indigo-800/60 flex items-center justify-between gap-2.5 shrink-0 z-20">
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-7 h-7 rounded-lg bg-indigo-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <User className="w-3.5 h-3.5" />
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-indigo-950 dark:text-indigo-200 leading-tight truncate">
+                {language === 'km' ? 'គណនីគ្រូបង្រៀន' : 'Teacher Account'}
+              </p>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 leading-tight truncate">
+                {language === 'km' ? 'ចុះឈ្មោះ ឬចូលដើម្បីរក្សាទុក' : 'Sign in to save scores & classes'}
+              </p>
+            </div>
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              type="button"
+              onClick={() => {
+                setAuthModalMode('login');
+                setIsAuthModalOpen(true);
+              }}
+              className="px-2.5 py-1.5 bg-white dark:bg-slate-900 text-indigo-600 dark:text-indigo-400 rounded-xl text-xs font-black flex items-center gap-1 border border-indigo-200 dark:border-indigo-800 shadow-2xs active:scale-95 transition-all cursor-pointer"
+            >
+              <LogIn className="w-3 h-3" />
+              <span>{language === 'km' ? 'ចូលគណនី' : 'Sign In'}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setAuthModalMode('register');
+                setIsAuthModalOpen(true);
+              }}
+              className="px-2.5 py-1.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-black flex items-center gap-1 shadow-sm active:scale-95 transition-all cursor-pointer"
+            >
+              <User className="w-3 h-3" />
+              <span>{language === 'km' ? 'ចុះឈ្មោះគ្រូ' : 'Register'}</span>
+            </button>
+          </div>
+        </div>
+      ) : (
+        <div className="md:hidden px-3.5 py-2 bg-slate-100/90 dark:bg-slate-900/90 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 shrink-0 z-20">
+          <div 
+            onClick={() => setIsProfileModalOpen(true)}
+            className="flex items-center gap-2 min-w-0 cursor-pointer"
+          >
+            <div className="relative shrink-0">
+              <div className="w-7 h-7 rounded-full overflow-hidden border border-emerald-500 bg-emerald-500 flex items-center justify-center text-white text-xs font-black">
+                {teacher.avatarUrl ? (
+                  <img src={teacher.avatarUrl} alt={teacher.name} className="w-full h-full object-cover" />
+                ) : (
+                  <User className="w-3.5 h-3.5" />
+                )}
+              </div>
+              <span className="absolute -bottom-0.5 -right-0.5 w-3 h-3 bg-indigo-600 text-white rounded-full flex items-center justify-center border border-white dark:border-slate-900">
+                <Camera className="w-1.5 h-1.5" />
+              </span>
+            </div>
+            <div className="min-w-0">
+              <p className="text-xs font-black text-slate-800 dark:text-slate-100 truncate">
+                {teacher.name}
+              </p>
+              <p className="text-[10px] font-bold text-slate-500 dark:text-slate-400 truncate">
+                {teacher.schoolName || 'សាលារៀនសុវណ្ណភូមិ'}
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={handleLogout}
+            className="px-2.5 py-1 rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 flex items-center gap-1 cursor-pointer transition-colors"
+            title="ចាកចេញពីគណនី"
+          >
+            <LogOut className="w-3 h-3" />
+            <span>ចាកចេញ</span>
+          </button>
+        </div>
+      )}
+
       {/* Firestore Quota Exceeded / Offline Notice Banner */}
       {quotaExceeded && !quotaBannerDismissed && (
         <div className="bg-amber-50 dark:bg-amber-950/40 border-b border-amber-200 dark:border-amber-800/60 px-4 py-2 flex items-center justify-between text-xs text-amber-800 dark:text-amber-200 z-10 shrink-0">
           <div className="flex items-center gap-2 flex-1 min-w-0 pr-3">
             <span className="shrink-0 flex items-center justify-center w-4 h-4 rounded-full bg-amber-500 text-white font-bold text-[10px]">!</span>
             <div className="truncate">
-              <span className="font-semibold">ម៉ូដក្រៅបណ្ដាញ (Offline Mode)៖</span>{' '}
-              <span>កូតាឥតគិតថ្លៃប្រចាំថ្ងៃរបស់ Firestore បានដល់កម្រិតកំណត់។ ទិន្នន័យត្រូវបានរក្សាទុកក្នុងម៉ាស៊ីននេះដោយសុវត្ថិភាព ហើយកូតានឹង reset នៅថ្ងៃស្អែក។</span>
+              <span className="font-semibold">{t('offlineBannerTitle', language)}</span>{' '}
+              <span>{t('offlineBannerDesc', language)}</span>
             </div>
           </div>
           <div className="flex items-center gap-2 shrink-0">
@@ -3579,12 +3988,12 @@ export default function App() {
               rel="noopener noreferrer"
               className="px-2.5 py-1 bg-amber-600 hover:bg-amber-700 text-white font-medium rounded text-[11px] transition-colors whitespace-nowrap"
             >
-              ដំឡើងគម្រោង (Upgrade)
+              {t('upgradePlan', language)}
             </a>
             <button
               onClick={() => setQuotaBannerDismissed(true)}
               className="p-1 text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-200 transition-colors"
-              title="បិទ (Dismiss)"
+              title={t('dismiss', language)}
             >
               ✕
             </button>
@@ -3593,44 +4002,20 @@ export default function App() {
       )}
 
       {/* Class Switcher & Workspace Sub-Bar */}
-      <div className={`py-2.5 px-6 lg:px-8 flex items-center justify-between shrink-0 border-b transition-colors gap-4 overflow-x-auto ${
-        isDarkMode ? 'bg-[#222222]/95 border-[#333333]' : 'bg-slate-50/90 border-slate-200'
+      <div className={`py-2 px-3 sm:px-6 lg:px-8 flex items-center justify-between shrink-0 border-b transition-colors gap-2 sm:gap-4 overflow-x-auto no-scrollbar w-full max-w-full ${
+        isDarkMode ? 'bg-[#272525]/95 border-[#333333]' : 'bg-slate-50/90 border-slate-200'
       }`}>
         <div className="flex items-center gap-2 shrink-0">
           <div className="flex items-center gap-1.5 mr-1 text-slate-500 dark:text-slate-400 font-bold text-xs">
             <GraduationCap className="w-4 h-4 text-indigo-500 shrink-0" />
-            <span>ថ្នាក់រៀន៖</span>
+            <span>{t('classColon', language)}</span>
           </div>
 
           {/* Class Pills Track */}
           <div className="flex items-center gap-1.5 p-1 rounded-2xl bg-slate-200/50 dark:bg-slate-900/60 border border-white/80 dark:border-white/10 shadow-[0_4px_16px_rgba(0,0,0,0.04)] backdrop-blur-2xl overflow-x-auto no-scrollbar max-w-full select-none relative z-10">
-            {!teacher ? (
-              <div className="flex items-center gap-2 px-2 py-1">
-                <span className="text-xs text-slate-500 dark:text-slate-400 italic">
-                  មិនទាន់មានគណនីចូលប្រើ — ទិន្នន័យទទេរ
-                </span>
-                <button
-                  onClick={() => {
-                    setAuthModalMode('login');
-                    setIsAuthModalOpen(true);
-                  }}
-                  className="px-2.5 py-1 text-xs font-bold bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-lg hover:bg-indigo-100 dark:hover:bg-indigo-900/50 border border-indigo-200 dark:border-indigo-800/60 cursor-pointer"
-                >
-                  ចូលគណនី
-                </button>
-                <button
-                  onClick={() => {
-                    setAuthModalMode('register');
-                    setIsAuthModalOpen(true);
-                  }}
-                  className="px-2.5 py-1 text-xs font-bold bg-indigo-600 text-white rounded-lg hover:bg-indigo-500 cursor-pointer"
-                >
-                  ចុះឈ្មោះគ្រូ
-                </button>
-              </div>
-            ) : classes.length === 0 ? (
+            {classes.length === 0 ? (
               <span className="text-xs text-slate-400 dark:text-slate-500 italic px-3 py-1">
-                មិនទាន់មានថ្នាក់នៅឡើយទេ ចុច «បន្ថែមថ្នាក់» ដើម្បីបង្កើត
+                {t('noClassesNotice', language)}
               </span>
             ) : (
               classes.map((cls, idx) => {
@@ -3711,7 +4096,7 @@ export default function App() {
                             ? isDarkMode ? 'hover:bg-blue-500/20 text-blue-400' : 'hover:bg-blue-500/10 text-blue-600' 
                             : isDarkMode ? 'hover:bg-white/10 text-slate-400' : 'hover:bg-black/10 text-slate-500'
                         }`}
-                        title="អូសដើម្បីតម្រៀបលំដាប់ថ្នាក់"
+                        title={t('dragSort', language)}
                       >
                         <GripVertical className="w-3 h-3" />
                       </div>
@@ -3721,7 +4106,7 @@ export default function App() {
                         type="button"
                         onClick={(e) => handleTogglePinClass(e, cls.id)}
                         className="p-0.5 -ml-0.5 rounded-full hover:bg-amber-500/20 text-amber-500 dark:text-amber-400 transition-transform active:scale-90 flex items-center justify-center cursor-pointer"
-                        title="បានខ្ទាស់ម្ជុលជាប់ (ចុចដោះម្ជុលចេញវិញដើម្បីអាចប្ដូរទីតាំងបាន)"
+                        title={language === 'km' ? 'បានខ្ទាស់ម្ជុលជាប់ (ចុចដោះម្ជុលចេញវិញដើម្បីអាចប្ដូរទីតាំងបាន)' : 'Pinned class (Click unpin to reorder)'}
                       >
                         <Pin className="w-3.5 h-3.5 fill-amber-500 text-amber-500 -rotate-45 drop-shadow-xs" />
                       </button>
@@ -3750,7 +4135,7 @@ export default function App() {
                               ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300 hover:text-amber-500' 
                               : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-amber-500'
                         }`}
-                        title={cls.isPinned ? "ដោះម្ជុលចេញវិញ (Unpin ដើម្បីប្ដូរទីតាំងបាន)" : "ខ្ទាស់ម្ជុល (Pin)"}
+                        title={cls.isPinned ? t('unpin', language) : t('pin', language)}
                       >
                         {cls.isPinned ? (
                           <PinOff className="w-2.5 h-2.5 text-amber-500" />
@@ -3768,7 +4153,7 @@ export default function App() {
                               ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
                               : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
                           }`}
-                          title="រំកិលទៅឆ្វេង"
+                          title={t('moveLeft', language)}
                         >
                           <ChevronLeft className="w-3 h-3" />
                         </button>
@@ -3781,7 +4166,7 @@ export default function App() {
                               ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
                               : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
                           }`}
-                          title="រំកិលទៅស្ដាំ"
+                          title={t('moveRight', language)}
                         >
                           <ChevronRight className="w-3 h-3" />
                         </button>
@@ -3793,49 +4178,37 @@ export default function App() {
                             ? 'hover:bg-blue-500/20 text-blue-600 dark:text-blue-300' 
                             : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400'
                         }`}
-                        title="កែឈ្មោះថ្នាក់"
+                        title={t('editClassName', language)}
                       >
                         <Pencil className="w-2.5 h-2.5" />
                       </button>
-                      {classes.length > 1 && (
-                        <button
-                          onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
-                          className={`p-0.5 rounded transition-colors ${
-                            isActive
-                              ? 'hover:bg-red-500 text-red-500 hover:text-white'
-                              : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
-                          }`}
-                          title="លុបថ្នាក់"
-                        >
-                          <Trash2 className="w-2.5 h-2.5" />
-                        </button>
-                      )}
+                      <button
+                        onClick={(e) => handleRemoveClass(e, cls.id, cls.name)}
+                        className={`p-0.5 rounded transition-colors ${
+                          isActive
+                            ? 'hover:bg-red-500 text-red-500 hover:text-white'
+                            : 'hover:bg-red-500/20 hover:text-red-500 text-slate-400'
+                        }`}
+                        title={t('deleteClass', language)}
+                      >
+                        <Trash2 className="w-2.5 h-2.5" />
+                      </button>
                     </div>
                   </motion.span>
                 </motion.div>
               );
             }))}
 
-            {teacher && (
-              <div className="flex items-center gap-1.5 shrink-0">
-                <button
-                  onClick={handleOpenAddClass}
-                  className="px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
-                  title="បន្ថែមថ្នាក់ថ្មី"
-                >
-                  <Plus className="w-3.5 h-3.5" />
-                  <span>បន្ថែមថ្នាក់</span>
-                </button>
-                <button
-                  onClick={() => setIsBackupModalOpen(true)}
-                  className="px-2.5 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
-                  title="បម្រុងទុក និងស្ដារទិន្នន័យ (Backup / Restore)"
-                >
-                  <Database className="w-3.5 h-3.5 text-emerald-500" />
-                  <span className="hidden sm:inline">Backup</span>
-                </button>
-              </div>
-            )}
+            <div className="flex items-center gap-1.5 shrink-0">
+              <button
+                onClick={handleOpenAddClass}
+                className="px-3 py-1.5 bg-transparent border border-dashed rounded-xl text-xs font-bold flex items-center gap-1 transition-all cursor-pointer text-slate-500 dark:text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-white/40 dark:hover:bg-white/10 border-slate-300 dark:border-slate-700 active:scale-95 shrink-0"
+                title={t('addClassTitle', language)}
+              >
+                <Plus className="w-3.5 h-3.5" />
+                <span>{t('addClass', language)}</span>
+              </button>
+            </div>
           </div>
         </div>
 
@@ -3845,17 +4218,17 @@ export default function App() {
             isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
           }`}>
             <UsersIcon className="w-3.5 h-3.5 text-indigo-500" />
-            <span>សិស្សសរុប៖ <strong className="text-indigo-600 dark:text-indigo-400">{currentClassStudents.length}</strong> នាក់</span>
+            <span>{t('totalStudentsColon', language)} <strong className="text-indigo-600 dark:text-indigo-400">{currentClassStudents.length}</strong> {t('personsUnit', language)}</span>
           </div>
 
           <div className={`flex items-center gap-1.5 px-3 py-1 rounded-xl border ${
             isDarkMode ? 'bg-slate-800/60 border-slate-700 text-slate-300' : 'bg-white border-slate-200 text-slate-700 shadow-xs'
           }`}>
             <Compass className="w-3.5 h-3.5 text-amber-500" />
-            <span>បានហៅ៖ <strong className="text-amber-600 dark:text-amber-400">{currentClassPickedIds.length + currentClassManualCalledIds.filter(id => !currentClassPickedIds.includes(id)).length}</strong>/{currentClassStudents.length}</span>
+            <span>{t('called', language)} <strong className="text-amber-600 dark:text-amber-400">{currentClassPickedIds.length + currentClassManualCalledIds.filter(id => !currentClassPickedIds.includes(id)).length}</strong>/{currentClassStudents.length}</span>
             {currentClassManualCalledIds.length > 0 && (
               <span className="text-[10px] px-1.5 py-0.5 bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-300 rounded font-black">
-                គ្រូហៅ {currentClassManualCalledIds.length}
+                {t('teacherCalled', language)} {currentClassManualCalledIds.length}
               </span>
             )}
           </div>
@@ -3870,9 +4243,9 @@ export default function App() {
                 }
               }}
               className="px-2.5 py-1 text-xs font-bold text-slate-500 hover:text-red-500 hover:bg-red-500/10 rounded-lg transition-colors cursor-pointer"
-              title="លាងសម្អាតការហៅឈ្មោះឡើងវិញ"
+              title={t('clearCalledTitle', language)}
             >
-              សម្អាតការហៅ
+              {t('clearCalled', language)}
             </button>
           )}
         </div>
@@ -3881,61 +4254,278 @@ export default function App() {
       {/* Main Layout */}
       <main className="flex-1 flex overflow-hidden">
         {activeTab === 'wheel' && (
-          <>
-            <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#222222]">
-              <SpinningWheel
-                students={currentClassStudents}
-                pickedIds={currentClassPickedIds}
-                manualCalledIds={currentClassManualCalledIds}
-                onSetPickedIds={handleSetPickedIds}
-                onToggleManualCall={handleToggleManualCall}
-                onSelectStudent={(s) => setSelectedStudentId(s.id)}
-                onWheelPickStudent={handleWheelPickStudent}
-                onAwardActivityPoints={awardStudentActivityPoints}
-                onSetExactActivityScore={handleSetExactActivityScore}
-                selectedStudent={selectedStudent}
-                onAddStudent={addStudent}
-                onBulkAddStudents={handleBulkAddStudents}
-                showBulkInput={showWheelBulk}
-                setShowBulkInput={setShowWheelBulk}
-                isDarkMode={isDarkMode}
-                className={activeClass?.name || 'ថ្នាក់រៀន'}
-              />
-            </section>
-            
-            <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-[#333333]">
-              <StudentPanel
-                students={currentClassStudents}
-                pickedIds={currentClassPickedIds}
-                manualCalledIds={currentClassManualCalledIds}
-                onSetPickedIds={handleSetPickedIds}
-                onToggleManualCall={handleToggleManualCall}
-                onAwardActivityPoints={awardStudentActivityPoints}
-                onSetExactActivityScore={handleSetExactActivityScore}
-                onAddStudent={addStudent}
-                onRemoveStudent={removeStudent}
-                onClearStudents={clearStudents}
-                onSelectStudent={(s) => setSelectedStudentId(s.id)}
-                selectedStudent={selectedStudent}
-                isDarkMode={isDarkMode}
-                activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
-                onBatchSyncStudents={handleBatchSyncStudents}
-              />
-            </aside>
-          </>
+          <div className="flex-1 flex flex-col h-full overflow-hidden">
+            {/* Secondary Sub-Tabs (tap រង) Bar for Wheel Tab */}
+            <div className={`px-2 sm:px-4 py-2 border-b flex items-center justify-between gap-2 sm:gap-3 shrink-0 z-20 backdrop-blur-md overflow-x-auto no-scrollbar w-full max-w-full ${
+              isDarkMode 
+                ? 'bg-[#18181c]/80 border-white/10' 
+                : 'bg-white/80 border-slate-200/90 shadow-2xs'
+            }`}>
+              {/* Sub-tab 1 & Sub-tab 2 */}
+              <div className={`flex items-center gap-1.5 p-1 rounded-2xl border overflow-x-auto no-scrollbar max-w-full shrink-0 ${
+                isDarkMode 
+                  ? 'bg-white/[0.04] border-white/10' 
+                  : 'bg-slate-100/90 border-slate-200/80'
+              }`}>
+                <button
+                  type="button"
+                  onClick={() => setWheelSubTab('wheel')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all duration-200 ${
+                    wheelSubTab === 'wheel'
+                      ? isDarkMode 
+                        ? 'bg-white/10 text-blue-400 font-extrabold shadow-xs border border-white/15' 
+                        : 'bg-white text-blue-600 font-black shadow-xs border border-slate-200/80'
+                      : isDarkMode 
+                        ? 'text-slate-400 hover:text-white' 
+                        : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Compass className={`w-3.5 h-3.5 ${wheelSubTab === 'wheel' ? (isDarkMode ? 'text-blue-400' : 'text-blue-600') : 'text-slate-400'}`} />
+                  <span>{language === 'km' ? 'កងបង្វិលឈ្មោះ' : 'Spinning Wheel'}</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWheelSubTab('games')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all duration-200 ${
+                    wheelSubTab === 'games'
+                      ? isDarkMode 
+                        ? 'bg-white/10 text-emerald-400 font-extrabold shadow-xs border border-white/15' 
+                        : 'bg-white text-emerald-600 font-black shadow-xs border border-slate-200/80'
+                      : isDarkMode 
+                        ? 'text-slate-400 hover:text-white' 
+                        : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Sparkles className={`w-3.5 h-3.5 ${wheelSubTab === 'games' ? 'text-emerald-500' : 'text-slate-400'}`} />
+                  <span>{language === 'km' ? 'មុខងារសប្បាយៗ' : 'Fun Games'}</span>
+                  {pendingStudentsCount > 0 ? (
+                    <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-500 text-slate-950 animate-bounce">
+                      +{pendingStudentsCount}
+                    </span>
+                  ) : (
+                    <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-500 to-rose-500 text-white leading-none shadow-2xs">
+                      HOT
+                    </span>
+                  )}
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWheelSubTab('pickers')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all duration-200 ${
+                    wheelSubTab === 'pickers'
+                      ? isDarkMode 
+                        ? 'bg-white/10 text-purple-400 font-extrabold shadow-xs border border-white/15' 
+                        : 'bg-white text-purple-600 font-black shadow-xs border border-slate-200/80'
+                      : isDarkMode 
+                        ? 'text-slate-400 hover:text-white' 
+                        : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Dices className={`w-3.5 h-3.5 ${wheelSubTab === 'pickers' ? 'text-purple-500' : 'text-slate-400'}`} />
+                  <span>Random Name Pickers!</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-purple-500 to-pink-500 text-white leading-none shadow-2xs">
+                    NEW
+                  </span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setWheelSubTab('races')}
+                  className={`px-3.5 py-1.5 rounded-xl text-xs font-black flex items-center gap-2 cursor-pointer transition-all duration-200 ${
+                    wheelSubTab === 'races'
+                      ? isDarkMode 
+                        ? 'bg-white/10 text-amber-400 font-extrabold shadow-xs border border-white/15' 
+                        : 'bg-white text-amber-600 font-black shadow-xs border border-slate-200/80'
+                      : isDarkMode 
+                        ? 'text-slate-400 hover:text-white' 
+                        : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <Flag className={`w-3.5 h-3.5 ${wheelSubTab === 'races' ? 'text-amber-500' : 'text-slate-400'}`} />
+                  <span>{language === 'km' ? 'ប្រណាំងសប្បាយៗ (Races!)' : 'Races!'}</span>
+                  <span className="px-1.5 py-0.5 rounded-full text-[9px] font-black bg-gradient-to-r from-amber-500 to-rose-500 text-white leading-none shadow-2xs">
+                    RACES
+                  </span>
+                </button>
+              </div>
+
+              {/* If in Games Sub-Tab, show the Game Selector pills */}
+              {wheelSubTab === 'games' && (
+                <div className="flex items-center gap-2">
+                  <div className={`flex items-center gap-1 p-1 rounded-2xl border ${
+                    isDarkMode 
+                      ? 'bg-white/[0.04] border-white/10' 
+                      : 'bg-slate-100/90 border-slate-200/80'
+                  }`}>
+                    <button
+                      type="button"
+                      onClick={() => setFunGameView('duck-race')}
+                      className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                        funGameView === 'duck-race'
+                          ? 'bg-emerald-600 text-white shadow-xs'
+                          : isDarkMode 
+                            ? 'text-slate-300 hover:text-emerald-400' 
+                            : 'text-slate-600 hover:text-emerald-600'
+                      }`}
+                    >
+                      <span>🦆</span>
+                      <span>{language === 'km' ? 'ប្រណាំងកូនទា' : 'Duck Race'}</span>
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setFunGameView('study-game')}
+                      className={`px-3 py-1 rounded-xl text-xs font-black flex items-center gap-1.5 cursor-pointer transition-all ${
+                        funGameView === 'study-game'
+                          ? 'bg-indigo-600 text-white shadow-xs'
+                          : isDarkMode 
+                            ? 'text-slate-300 hover:text-indigo-400' 
+                            : 'text-slate-600 hover:text-indigo-600'
+                      }`}
+                    >
+                      <span>🎮</span>
+                      <span>Study Game</span>
+                      {pendingStudentsCount > 0 && (
+                        <span className="px-1.5 py-0.2 rounded-full text-[9px] font-black bg-amber-400 text-slate-950">
+                          +{pendingStudentsCount}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Sub-Tab 1: Wheel Spin & Student Panel */}
+            {wheelSubTab === 'wheel' && (
+              <div className="flex-1 flex overflow-hidden">
+                <section className="flex-1 md:basis-3/5 h-full overflow-y-auto flex flex-col bg-slate-50 dark:bg-[#272525]">
+                  <SpinningWheel
+                    students={currentClassStudents}
+                    pickedIds={currentClassPickedIds}
+                    manualCalledIds={currentClassManualCalledIds}
+                    onSetPickedIds={handleSetPickedIds}
+                    onToggleManualCall={handleToggleManualCall}
+                    onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                    onWheelPickStudent={handleWheelPickStudent}
+                    onAwardActivityPoints={awardStudentActivityPoints}
+                    onSetExactActivityScore={handleSetExactActivityScore}
+                    selectedStudent={selectedStudent}
+                    onAddStudent={addStudent}
+                    onBulkAddStudents={handleBulkAddStudents}
+                    showBulkInput={showWheelBulk}
+                    setShowBulkInput={setShowWheelBulk}
+                    isDarkMode={isDarkMode}
+                    className={activeClass?.name || 'ថ្នាក់រៀន'}
+                  />
+                </section>
+                
+                <aside className="hidden md:block md:basis-2/5 h-full shrink-0 border-l border-slate-200 dark:border-[#333333]">
+                  <StudentPanel
+                    students={currentClassStudents}
+                    pickedIds={currentClassPickedIds}
+                    manualCalledIds={currentClassManualCalledIds}
+                    onSetPickedIds={handleSetPickedIds}
+                    onToggleManualCall={handleToggleManualCall}
+                    onAwardActivityPoints={awardStudentActivityPoints}
+                    onSetExactActivityScore={handleSetExactActivityScore}
+                    onAddStudent={addStudent}
+                    onRemoveStudent={removeStudent}
+                    onClearStudents={clearStudents}
+                    onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                    selectedStudent={selectedStudent}
+                    isDarkMode={isDarkMode}
+                    activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+                    onBatchSyncStudents={handleBatchSyncStudents}
+                  />
+                </aside>
+              </div>
+            )}
+
+            {/* Sub-Tab 2: មុខងារសប្បាយៗ (Fun Games / Activities) */}
+            {wheelSubTab === 'games' && (
+              <div className="flex-1 h-full overflow-hidden flex flex-col">
+                {funGameView === 'duck-race' ? (
+                  <DuckRaceGame
+                    students={currentClassStudents}
+                    pickedIds={currentClassPickedIds}
+                    manualCalledIds={currentClassManualCalledIds}
+                    onSetPickedIds={handleSetPickedIds}
+                    onAwardActivityPoints={awardStudentActivityPoints}
+                    onSetExactActivityScore={handleSetExactActivityScore}
+                    isDarkMode={isDarkMode}
+                    className={activeClass?.name || 'ថ្នាក់រៀន'}
+                    onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                  />
+                ) : (
+                  <StudentLobby
+                    activeClassId={activeClassId}
+                    className={activeClass?.name || 'ថ្នាក់រៀន'}
+                    teacher={teacher}
+                    activeRoomId={activeRoomId}
+                    students={currentClassStudents}
+                    cards={cards}
+                    activeCardId={activeCardId}
+                    isDarkMode={isDarkMode}
+                    setActiveCardId={setActiveCardId}
+                    activeCardState={activeCardState}
+                    setActiveCardState={setActiveCardState}
+                    activeSubjectName={subjects.find(s => s.id === activeSubjectId)?.name}
+                    onNavigateToSmartNotes={() => setActiveTab('smart-notes')}
+                  />
+                )}
+              </div>
+            )}
+
+            {/* Sub-Tab 3: Random Name Pickers! */}
+            {wheelSubTab === 'pickers' && (
+              <div className="flex-1 h-full overflow-hidden flex flex-col">
+                <RandomNamePickers
+                  students={currentClassStudents}
+                  pickedIds={currentClassPickedIds}
+                  manualCalledIds={currentClassManualCalledIds}
+                  onSetPickedIds={handleSetPickedIds}
+                  onToggleManualCall={handleToggleManualCall}
+                  onAwardActivityPoints={awardStudentActivityPoints}
+                  onSetExactActivityScore={handleSetExactActivityScore}
+                  isDarkMode={isDarkMode}
+                  className={activeClass?.name || 'ថ្នាក់រៀន'}
+                  onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                />
+              </div>
+            )}
+
+            {/* Sub-Tab 4: Race Timers! */}
+            {wheelSubTab === 'races' && (
+              <div className="flex-1 h-full overflow-hidden flex flex-col">
+                <RaceTimersGame
+                  students={currentClassStudents}
+                  pickedIds={currentClassPickedIds}
+                  manualCalledIds={currentClassManualCalledIds}
+                  onSetPickedIds={handleSetPickedIds}
+                  onAwardActivityPoints={awardStudentActivityPoints}
+                  onSetExactActivityScore={handleSetExactActivityScore}
+                  isDarkMode={isDarkMode}
+                  className={activeClass?.name || 'ថ្នាក់រៀន'}
+                  onSelectStudent={(s) => setSelectedStudentId(s.id)}
+                />
+              </div>
+            )}
+          </div>
         )}
 
         {activeTab === 'quiz' && (
           <>
-            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#222222]">
+            <aside className="basis-2/5 h-full shrink-0 hidden md:flex flex-col bg-slate-50 dark:bg-[#272525]">
               {/* Quick Switcher between Spinning Wheel (Image 1 - Default) and Student List (Image 3) */}
-              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-[#333333] bg-white dark:bg-[#222222] shrink-0">
+              <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-200 dark:border-[#333333] bg-white dark:bg-[#272525] shrink-0">
                 <div className="flex items-center gap-2">
                   <span className="text-xs font-black text-slate-700 dark:text-slate-200">
-                    {quizLeftView === 'wheel' ? 'កងបង្វិលសិស្ស' : 'បញ្ជីឈ្មោះសិស្ស'}
+                    {quizLeftView === 'wheel' ? (language === 'km' ? 'កងបង្វិលសិស្ស' : 'Spinning Wheel') : (language === 'km' ? 'បញ្ជីឈ្មោះសិស្ស' : 'Student List')}
                   </span>
                   <span className="px-2 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-                    {currentClassStudents.length} នាក់
+                    {currentClassStudents.length} {t('personsUnit', language)}
                   </span>
                 </div>
 
@@ -3948,10 +4538,10 @@ export default function App() {
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
-                    title="បង្ហាញកងបង្វិល"
+                    title={language === 'km' ? 'បង្ហាញកងបង្វិល' : 'Show Spinning Wheel'}
                   >
                     <Compass className="w-3.5 h-3.5" />
-                    <span>កងបង្វិល</span>
+                    <span>{language === 'km' ? 'កងបង្វិល' : 'Wheel'}</span>
                   </button>
                   <button
                     type="button"
@@ -3961,10 +4551,10 @@ export default function App() {
                         ? 'bg-indigo-600 text-white shadow-xs'
                         : 'text-slate-500 hover:text-slate-800 dark:hover:text-slate-200'
                     }`}
-                    title="បង្ហាញបញ្ជីឈ្មោះ"
+                    title={language === 'km' ? 'បង្ហាញបញ្ជីឈ្មោះ' : 'Show Student List'}
                   >
                     <UsersIcon className="w-3.5 h-3.5" />
-                    <span>បញ្ជី</span>
+                    <span>{language === 'km' ? 'បញ្ជី' : 'List'}</span>
                   </button>
                 </div>
               </div>
@@ -4017,15 +4607,33 @@ export default function App() {
             <div className="w-[3px] bg-[#f97316] h-full hidden md:block shrink-0" />
 
             <section className={`flex-1 md:basis-3/5 h-full overflow-hidden flex flex-col ${
-              isDarkMode ? 'bg-[#0f172a]' : 'bg-slate-50'
+              isDarkMode ? 'bg-[#272525]' : 'bg-slate-50'
             }`}>
               <QuizPanel
                 cards={cards}
-                onCardClick={(c) => setActiveCardId(c.id)}
+                onCardClick={(c) => {
+                  if (c.isRevealed) return;
+                  activeCardIdRef.current = c.id;
+                  setActiveCardId(c.id);
+                  lastSyncedQuizRef.current.activeCardId = c.id;
+                  lastSyncedQuizRef.current.activeCardIdOfCard = c.id;
+                }}
                 onAnswer={handleAnswer}
                 onReset={resetMatch}
                 activeCard={activeCard}
-                onCloseActiveCard={() => setActiveCardId(null)}
+                onCloseActiveCard={() => {
+                  activeCardIdRef.current = null;
+                  setActiveCardId(null);
+                  lastSyncedQuizRef.current.activeCardId = null;
+                  lastSyncedQuizRef.current.activeCardIdOfCard = null;
+                  if (teacher?.id && activeClassId) {
+                    safeSetDoc(doc(db, 'teachers', teacher.id, 'classes', activeClassId), {
+                      activeCardId: null,
+                      activeCard: null,
+                      activeCardState: 'answering'
+                    }, { merge: true }).catch(() => {});
+                  }
+                }}
                 selectedStudent={selectedStudent}
                 chapters={chapters}
                 activeRoomId={activeRoomId}
@@ -4051,7 +4659,7 @@ export default function App() {
         )}
 
         {activeTab === 'groups' && (
-          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#272525]' : 'bg-slate-50'}`}>
             <GroupDivider
               students={currentClassStudents}
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
@@ -4068,9 +4676,10 @@ export default function App() {
         )}
 
         {activeTab === 'stopwatch' && (
-          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#272525]' : 'bg-slate-50'}`}>
             <StopwatchPanel
               isDarkMode={isDarkMode}
+              teacher={teacher}
               activeClassId={activeClassId || ''}
               className={activeClass?.name || 'ថ្នាក់រៀន'}
               onNavigateTab={(tab) => setActiveTab(tab as any)}
@@ -4079,7 +4688,7 @@ export default function App() {
         )}
 
         {activeTab === 'students' && (
-          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#272525]' : 'bg-slate-50'}`}>
             <StudentManager
               students={students}
               classes={classes}
@@ -4093,6 +4702,13 @@ export default function App() {
               onBulkAddStudents={handleBulkAddStudents}
               onBatchSyncStudents={handleBatchSyncStudents}
               onSwitchClass={handleSwitchClass}
+              subjects={subjects}
+              activeSubjectId={activeSubjectId}
+              activeSubjectName={subjects.find(s => s.id === activeSubjectId)?.name || 'រូបវិទ្យា'}
+              onSelectSubject={handleSelectSubject}
+              onCreateSubject={handleCreateSubject}
+              onRenameSubject={handleRenameSubject}
+              onDeleteSubject={handleDeleteSubject}
             />
           </div>
         )}
@@ -4115,8 +4731,19 @@ export default function App() {
           />
         )}
 
+        {activeTab === 'lessons' && (
+          <div className="flex-1 h-full overflow-hidden">
+            <LessonsPanel
+              activeClassId={activeClassId || ''}
+              activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
+              isDarkMode={isDarkMode}
+              teacher={teacher}
+            />
+          </div>
+        )}
+
         {activeTab === 'exams-room' && (
-          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#0b0f19]' : 'bg-slate-50'}`}>
+          <div className={`flex-1 h-full overflow-y-auto ${isDarkMode ? 'bg-[#272525]' : 'bg-slate-50'}`}>
             <ExamsPanel
               activeClassId={activeClassId || ''}
               activeClassName={activeClass?.name || 'ថ្នាក់រៀន'}
@@ -4184,12 +4811,12 @@ export default function App() {
                   <LogOut className="w-5 h-5" />
                 </div>
                 <div>
-                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">ចាកចេញពីគណនី</h3>
+                  <h3 className="text-base font-bold text-slate-900 dark:text-slate-100">{t('confirmLogoutTitle', language)}</h3>
                   <p className="text-xs text-slate-500 dark:text-slate-400">Logout Account</p>
                 </div>
               </div>
               <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់ចាកចេញពីគណនីមែនទេ? (រាល់ទិន្នន័យដែលបានរក្សាទុកក្នុង Cloud នឹងមិនបាត់បង់ឡើយ)
+                {t('confirmLogoutDesc', language)}
               </p>
               <div className="flex items-center justify-end gap-2.5 pt-2">
                 <button
@@ -4197,7 +4824,7 @@ export default function App() {
                   onClick={() => setIsLogoutModalOpen(false)}
                   className="px-4 py-2 text-xs font-bold text-slate-600 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-xl transition-colors cursor-pointer"
                 >
-                  បោះបង់
+                  {t('cancel', language)}
                 </button>
                 <button
                   type="button"
@@ -4205,7 +4832,7 @@ export default function App() {
                   className="px-4 py-2 text-xs font-bold bg-red-600 hover:bg-red-700 active:scale-98 text-white rounded-xl transition-all shadow-md shadow-red-600/20 cursor-pointer flex items-center gap-1.5"
                 >
                   <LogOut className="w-3.5 h-3.5" />
-                  <span>ចាកចេញ</span>
+                  <span>{t('logout', language)}</span>
                 </button>
               </div>
             </motion.div>
@@ -4233,6 +4860,8 @@ export default function App() {
         }}
         onLogout={() => setIsLogoutModalOpen(true)}
         onOpenProfile={() => setIsProfileModalOpen(true)}
+        language={language}
+        onLanguageChange={setLanguage}
         classes={classes}
         students={students}
         subjects={subjects}
@@ -4257,6 +4886,29 @@ export default function App() {
         onRestoreData={handleRestoreFullData}
         onShowToast={showToast}
         isDarkMode={isDarkMode}
+      />
+
+      {/* Google Sheets Synchronization & Auto-Backup Modal */}
+      <GoogleSheetsSyncModal
+        isOpen={isGoogleSheetsModalOpen}
+        onClose={() => {
+          setIsGoogleSheetsModalOpen(false);
+          setGoogleSheetsCustomPayload(null);
+        }}
+        className={googleSheetsCustomPayload?.className || classes.find(c => c.id === activeClassId)?.name || 'ថ្នាក់រៀន'}
+        classId={googleSheetsCustomPayload?.classId || activeClassId}
+        students={googleSheetsCustomPayload?.students || currentClassStudents}
+        selectedMonth={googleSheetsCustomPayload?.selectedMonth || 'តុលា'}
+        activeSubjectName={googleSheetsCustomPayload?.subjectName || subjects.find(s => s.id === activeSubjectId)?.name || 'រូបវិទ្យា'}
+        activeSubjectId={googleSheetsCustomPayload?.subjectId || activeSubjectId}
+        attendanceMap={googleSheetsCustomPayload?.attendanceMap}
+        attendanceReasons={googleSheetsCustomPayload?.attendanceReasons}
+        attendanceDate={googleSheetsCustomPayload?.attendanceDate}
+        initialSyncScores={googleSheetsCustomPayload?.syncScores}
+        initialSyncAttendance={googleSheetsCustomPayload?.syncAttendance}
+        initialSyncStatus={googleSheetsCustomPayload?.syncStatus}
+        allClasses={classes}
+        allSubjects={subjects}
       />
 
       {/* Keyboard Shortcuts Guide Modal */}

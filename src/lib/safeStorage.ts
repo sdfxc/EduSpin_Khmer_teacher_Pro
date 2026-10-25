@@ -63,7 +63,9 @@ export function evictExpendableStorage(): number {
       if (
         key === 'logged_in_teacher' ||
         key.startsWith('khmer_teacher_classes') ||
-        key.startsWith('khmer_teacher_active_class_id')
+        key.startsWith('khmer_teacher_active_class_id') ||
+        key.startsWith('khmer_teacher_deleted_') ||
+        key.startsWith('khmer_deleted_')
       ) {
         continue;
       }

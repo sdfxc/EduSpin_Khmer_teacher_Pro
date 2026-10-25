@@ -162,9 +162,50 @@ function extractCleanTextFromBinary(buffer: Buffer): string {
   return words16.length > words8.length ? words16 : words8;
 }
 
+// Robust JSON parsing helper that extracts JSON from markdown fences or surrounding text
+function cleanAndParseJson<T = any>(rawText: string, fallback: T): T {
+  if (!rawText || !rawText.trim()) return fallback;
+  const trimmed = rawText.trim();
+  const cleaned = trimmed
+    .replace(/^```json\s*/i, "")
+    .replace(/^```\s*/i, "")
+    .replace(/\s*```$/i, "")
+    .trim();
+  try {
+    return JSON.parse(cleaned);
+  } catch {
+    const match = cleaned.match(/(\[[\s\S]*\]|\{[\s\S]*\})/);
+    if (match) {
+      try {
+        return JSON.parse(match[0]);
+      } catch {}
+    }
+    return fallback;
+  }
+}
+
 // API route to proxy Gemini API call
 app.post("/api/generate-questions", async (req, res) => {
-  const { lessonText, count, images, pdfs, officeFiles, questionType, pisaLanguage = 'khmer', categoryCounts } = req.body;
+  const { 
+    lessonText, 
+    count = 25, 
+    images, 
+    pdfs, 
+    officeFiles, 
+    questionType = 'general', 
+    pisaLanguage = 'khmer', 
+    categoryCounts,
+    grade = '',
+    subject = '',
+    chapter = '',
+    lesson = '',
+    topic = '',
+    bloomLevel = 'all',
+    difficulty = 'medium',
+    points = 2,
+    includeExplanation = true,
+    customInstructions = ''
+  } = req.body;
   
   // Extract API key dynamically from request headers or use environment variable
   const clientApiKey = (req.headers["x-api-key"] as string || "").trim();
@@ -191,9 +232,9 @@ app.post("/api/generate-questions", async (req, res) => {
   const hasPdfs = pdfs && Array.isArray(pdfs) && pdfs.length > 0;
   const hasOffice = officeFiles && Array.isArray(officeFiles) && officeFiles.length > 0;
 
-  if (!hasText && !hasImages && !hasPdfs && !hasOffice) {
+  if (!hasText && !hasImages && !hasPdfs && !hasOffice && !subject && !topic) {
     return res.status(400).json({ 
-      error: "ខ្លឹមសារមេរៀន រូបភាព ឯកសារ PDF ឬឯកសារការិយាល័យតម្រូវឱ្យបញ្ចូលយ៉ាងហោចណាស់មួយ (Please provide text, images, PDF, or Office files)" 
+      error: "ខ្លឹមសារមេរៀន មុខវិជ្ជា រូបភាព ឯកសារ PDF ឬឯកសារការិយាល័យតម្រូវឱ្យបញ្ចូលយ៉ាងហោចណាស់មួយ (Please provide lesson topic, text, images, PDF, or Office files)" 
     });
   }
 
@@ -247,7 +288,7 @@ app.post("/api/generate-questions", async (req, res) => {
   const isBilingual = pisaLanguage === 'bilingual';
   const isEnglish = pisaLanguage === 'english';
 
-  let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the theme of the material.`;
+  let languagePrompt = `The language of the output questions and options must be in Khmer language, matching the Cambodian curriculum context.`;
   if (isEnglish) {
     languagePrompt = `CRITICAL LANGUAGE REQUIREMENT: Your output questions, options, and explanations MUST be written entirely in English language because this is an international standard evaluation. Do not use Khmer. Everything must be high-quality, clear, correct academic English translation.`;
   } else if (isBilingual) {
@@ -291,86 +332,84 @@ You MUST generate exactly the following quantities of questions for each categor
 
 For each generated question, set its "category" field strictly to the corresponding string key: "choice", "matching", "fill_blank", "theory", or "exercise".
 Total number of questions to generate under these constraints is exactly ${totalRequestedCount}.
-
-If a requested category has a count of 0, DO NOT generate any questions of that category.
-
-CATEGORY FORMATTING SPECIFICATIONS:
-1. For questions in the "matching" category:
-   - The question 'text' should ask to match Column A with Column B.
-   - The 'options' array MUST contain exactly 4 items, representing Column A and Column B terms beautifully:
-     * options[0] is Column A Item 1 (represented by number 1, e.g., "១. <term1>")
-     * options[1] is Column A Item 2 (represented by number 2, e.g., "២. <term2>")
-     * options[2] is Column B Item 1 (represented by letter 'ក', e.g., "ក. <definition1>")
-     * options[3] is Column B Item 2 (represented by letter 'ខ', e.g., "ខ. <definition2>")
-   - The explanation should detail which matches which (e.g., 1 with ខ, 2 with ក).
-
-2. For questions in the "fill_blank" category:
-   - The question 'text' MUST contain blank spaces represented by dots (e.g., ".......") where key terms are omitted, asking the student to complete the blank space.
-   - Set 4 plausible words or choices inside the 'options' array, with the truly correct filled term inside options corresponding to 'correctIndex'.
-
-3. For questions in the "theory" category:
-   - The question 'text' should be a general academic theoretical question, or a question exploring real daily-life scenarios (ការរស់នៅអំពីមេរៀន) and student reflections.
-   - Set 4 plausible solutions/answers inside the 'options' array.
-
-4. For questions in the "exercise" category:
-   - The question 'text' should describe an academic calculation problem or essay problem.
-   - Set 4 numeric or formulaic options in the 'options' array.
-`;
-  } else {
-    categoryRatiosPrompt = `
-All questions must belong to the "choice" category. 
-Ensure that approximately 20% of these questions connect directly to real daily-life situations (ជីវភាពរស់នៅប្រចាំថ្ងៃ) related to the lesson formulas or theories.
 `;
   }
 
-  const promptText = `Based on the provided input materials (which may contain text notes, images, PDF files, or Microsoft Office documents), generate exactly ${totalRequestedCount} high-quality, concise multiple-choice questions for students. 
+  const bloomPrompt = bloomLevel && bloomLevel !== 'all' 
+    ? `BLOOM'S TAXONOMY LEVEL: Strictly generate questions targeting Bloom's Level: ${bloomLevel.toUpperCase()} (Remember, Understand, Apply, Analyze, Evaluate, or Create).` 
+    : `BLOOM'S TAXONOMY LEVEL: Provide a balanced progression across Bloom's Taxonomy Levels:
+- Level 1 — Remember (កំណត់, រំលឹក, រាយ, សម្គាល់)
+- Level 2 — Understand (ពន្យល់, បកស្រាយ, ប្រៀបធៀប, សង្ខេប)
+- Level 3 — Apply (គណនា, អនុវត្ត, ប្រើរូបមន្ត, ដោះស្រាយបញ្ហា)
+- Level 4 — Analyze (វិភាគ, បែងចែក, រកមូលហេតុ, រកទំនាក់ទំនង)
+- Level 5 — Evaluate (វាយតម្លៃ, បង្ហាញហេតុផល, ជ្រើសរើសដោយមានភស្តុតាង)
+- Level 6 — Create (បង្កើត, រចនា, ផ្តល់ដំណោះស្រាយ, គម្រោង STEM)`;
+
+  const questionTypeDescription = (questionType === 'all_mixed' || questionType === 'mixed' || questionType === 'all')
+    ? 'ចម្រុះគ្រប់ប្រភេទទាំងអស់ (Mixed Assessment Types: Balanced combination of QCM/MCQ, True/False, Short Answer, Problem Solving, Application & Scenario, HOTS, PISA-style, and STEM projects)'
+    : questionType;
+
+  const masterPromptText = `
+# SYSTEM IDENTITY & ROLE:
+អ្នកគឺជា "AI Educational Assessment Expert សម្រាប់កម្មវិធីសិក្សាកម្ពុជា" (Cambodian MoEYS Curriculum Assessment Expert).
+ភារកិច្ចរបស់អ្នកគឺបង្កើត សំណួរ ចម្លើយ លំហាត់ QCM/MCQ, True/False, Short Answer, Problem Solving, Application, HOTS, PISA-style និង STEM questions ស្របតាមកម្មវិធីសិក្សា និងឯកសារផ្លូវការរបស់ក្រសួងអប់រំ យុវជន និងកីឡា (MoEYS Cambodia: https://sala.moeys.gov.kh/).
+
+# 1. ព័ត៌មាននៃការបង្កើត (INPUT CONTEXT):
+- ថ្នាក់ទី (Grade): ${grade || 'គ្រប់កម្រិតថ្នាក់ MoEYS'}
+- មុខវិជ្ជា (Subject): ${subject || 'មុខវិជ្ជាទូទៅ'}
+- ជំពូក (Chapter): ${chapter || 'ជំពូកពាក់ព័ន្ធ'}
+- មេរៀន (Lesson): ${lesson || 'មេរៀនពាក់ព័ន្ធ'}
+- ប្រធានបទ (Topic): ${topic || 'ប្រធានបទគោល'}
+- ចំនួនសំណួរដែលត្រូវបង្កើត (Total Count): ${totalRequestedCount} សំណួរ
+- ប្រភេទសំណួរ (Question Type): ${questionTypeDescription}
+- កម្រិតលំបាក (Difficulty): ${difficulty}
+- ពិន្ទុក្នុងមួយសំណួរ (Points): ${points} ពិន្ទុ
+- បង្ហាញដំណោះស្រាយលម្អិត (Include Step-by-Step Solutions): ${includeExplanation ? 'Yes' : 'No'}
+${customInstructions ? `- ការណែនាំបន្ថែមពិសេសពីគ្រូ (Custom Teacher Directive): ${customInstructions}` : ''}
+
+# 2. ប្រភពចំណេះដឹងដែលត្រូវគោរពតាមលំដាប់អាទិភាព៖
+1. កម្មវិធីសិក្សាលម្អិតរបស់ក្រសួងអប់រំ យុវជន និងកីឡា (MoEYS Detailed Curriculum)
+2. សៀវភៅសិក្សាគោលរបស់ក្រសួង (Official MoEYS Textbooks)
+3. សៀវភៅគ្រូ / Teacher Guide
+4. ឯកសារពិសោធន៍ និងឯកសារ STEM របស់ MoEYS
+5. ឯកសារសំណួរ និងការវាយតម្លៃ PISA របស់ MoEYS (https://sala.moeys.gov.kh/)
+
+${bloomPrompt}
+
+# 3. គោលការណ៍តាមមុខវិជ្ជាជាក់លាក់ (SUBJECT-SPECIFIC RULES):
+- គណិតវិទ្យា (Math): បង្ហាញ Given (បម្រាប់), Formula (រូបមន្ត), Calculation (ការគណនា), Answer (ចម្លើយ) និងផ្ទៀងផ្ទាត់លេខនព្វន្តឱ្យបានត្រឹមត្រូវ ១០០%។
+- រូបវិទ្យា (Physics): បង្ហាញ Known (បម្រាប់), Find (ស្វែងរក), Formula (រូបមន្ត), Substitution (ជំនួសលេខ), Calculation, SI Unit (ឯកតា), Final Answer។ ពិនិត្យ dimensional consistency។
+- គីមីវិទ្យា (Chemistry): ពិនិត្យ Chemical formula, Chemical equation, Balance equation, Valency, Mole calculation, Concentration, pH, Reaction type។
+- ជីវវិទ្យា (Biology): ផ្តោតលើ Structure, Function, Biological Process, Human/Plant biology, Ecology, Genetics, Environment។
+- ផែនដីវិទ្យា (Earth Science): Earth structure, Rocks, Minerals, Plate tectonics, Weather, Climate, Natural resources of Cambodia។
+- ភូមិវិទ្យា (Geography): ផែនទីកម្ពុជា, ប្រព័ន្ធទន្លេមេគង្គ-បឹងទន្លេសាប, កសិកម្ម, អាកាសធាតុ, ធនធានធម្មជាតិ, ASEAN និងពិភពលោក។
+- ប្រវត្តិវិទ្យា (History): សម័យបុរេប្រវត្តិ, នគរភ្នំ (Funan), ចេនឡា (Chenla), មហានគរ (Angkor), ក្រោយអង្គរ, កាលបរិច្ឆេទ, តួអង្គប្រវត្តិសាស្ត្រ, សារៈសំខាន់ប្រវត្តិសាស្ត្រ។
+- សីលធម៌–ពលរដ្ឋវិជ្ជា (Moral-Civics): បង្កើតសំណួរ Scenario-based, ការទទួលខុសត្រូវ, វិន័យ, សីលធម៌រស់នៅ, ច្បាប់ចរាចរណ៍, សិទ្ធិ និងករណីយកិច្ច។
+- ភាសាខ្មែរ (Khmer): អក្ខរាវិរុទ្ធ, វេយ្យាករណ៍, អក្សរសិល្ប៍, ការអានស្វែងយល់, សិក្សាអត្ថបទ, តែងសេចក្ដី។
+- ភាសាអង់គ្លេស (English): Grammar tenses, prepositions, reading comprehension, vocabulary in context.
+- STEM & ICT & បច្ចេកវិទ្យា: Problem-solving scenarios, engineering design, coding logic, practical application.
+
+# 4. ច្បាប់សម្រាប់ជម្រើស A B C D (DISTRACTOR RULES):
+- មានចម្លើយត្រឹមត្រូវតែ 1 គត់។
+- Distractors (ជម្រើសខុស) ត្រូវមានភាពសមហេតុផល និងឆ្លុះបញ្ចាំងពីកំហុសដែលសិស្សងាយនឹងច្រឡំ (Misconceptions).
+- ហាមប្រើ "All of the above" ឬ "None of the above" ប្រសិនបើមិនចាំបាច់។
+- Randomize ទីតាំងចម្លើយត្រឹមត្រូវ (correctIndex ត្រូវផ្លាស់ប្តូរឆ្លាស់គ្នា 0, 1, 2, 3)។
+
+# 5. រចនាប័ទ្មសរសេររូបមន្ត (FORMULA NOTATION):
+- ស្វ័យគុណ (Exponents): សរសេរប្រើ "^" (ឧ. "x^2", "10^{-5}")។
+- សន្ទស្សន៍ (Subscripts): សរសេរប្រើ "_" (ឧ. "H_2O", "CO_2")។
+- ប្រភាគ (Fractions): សរសេរតាមរបៀប LaTeX "\\frac{a}{b}" (ឧ. "\\frac{s}{t}")។
+- ឫស (Square roots): សរសេរប្រើ "\\sqrt{x}"។
+- សញ្ញាព្រួញប្រតិកម្ម: សរសេរប្រើ "->" ឬ "\\rightarrow"។
+- និមិត្តសញ្ញា: "\\pm", "\\times", "\\div", "\\pi", "\\Delta", "\\alpha", "\\theta"។
 
 ${languagePrompt}
-
 ${categoryRatiosPrompt}
 
-========================================================================
-CRITICAL MANDATORY REQUIREMENT: SHORT, CONCISE, EASY TO UNDERSTAND & QUICK TO READ
-(លក្ខខណ្ឌដាច់ខាត៖ សំណួរខ្លី ច្បាស់ ងាយយល់ និងជម្រើសចម្លើយខ្លីៗ រហ័សសម្រាប់សិស្ស)
-========================================================================
-The questions will be displayed on a big classroom screen and spinning wheel with a 15-20 second countdown timer.
-Students must be able to read and understand the question and all 4 options IN SECONDS.
-DO NOT generate wordy, convoluted, or lengthy sentences! Keep everything clean, punchy, and accessible.
-
-1. QUESTION TEXT (សំណួរខ្លី ខ្លឹម ចំគោលដៅ ងាយយល់):
-   - MUST be short, direct, and concise: Strictly 1 to 2 lines (ideally 8 to 15 Khmer words, maximum 75-80 characters).
-   - Get straight to the key concept. DO NOT add unnecessary preambles, long winding descriptive clauses, or repetitive phrases.
-   - ❌ FORBIDDEN (Too long, slow to read): "តើមួយណាជាបរិមាណវ៉ិចទ័រដែលបង្ហាញពីការផ្លាស់ប្តូរទីតាំងរបស់វត្ថុពីចំណុចចាប់ផ្តើមទៅចំណុចបញ្ចប់?"
-   - ✅ REQUIRED (Short, crisp, instantly understood): "តើបម្លាស់ទីជាអ្វី?" ឬ "តើបរិមាណណាជាបម្លាស់ទី?" ឬ "តើឯកតា SI នៃកម្លាំងគឺអ្វី?" ឬ "តើរូបមន្តល្បឿនគឺអ្វី?"
-   - ❌ FORBIDDEN: "ប្រសិនបើសិស្សម្នាក់ធ្វើការសង្កេតលើចលនារបស់រថយន្តមួយដែលធ្វើដំណើរលើផ្លូវត្រង់ស្មើ... តើចម្ងាយចរគិតយ៉ាងដូចម្តេច?"
-   - ✅ REQUIRED: "តើចលនាត្រង់ស្មើមានរូបមន្តចម្ងាយអ្វី?" ឬ "តើ $v = \\frac{s}{t}$ ជារូបមន្តអ្វី?"
-
-2. OPTIONS / CHOICES (ចម្លើយ A, B, C, D ខ្លីៗ ច្បាស់ៗ):
-   - Each option MUST be very short and concise: Strictly 1 to 3 words, a single term, a number with unit, or a short formula.
-   - NEVER write full sentences or explanatory paragraphs inside options.
-   - ❌ FORBIDDEN: "ជាបម្លាស់ទីដែលកើតឡើងនៅពេលវត្ថុផ្លាស់ប្តូរទីតាំងពីចំណុចមួយទៅចំណុចមួយទៀត"
-   - ✅ REQUIRED: "បម្លាស់ទី", "ល្បឿន", "សំទុះ", "ចម្ងាយចរ"
-   - ✅ REQUIRED: "10 m/s", "5 N", "v = s/t", "H_2O", "100°C"
-
-3. EXPLANATION (ការពន្យល់):
-   - Keep the explanation also brief, concise, and clear (1 to 2 short sentences).
-
-CRITICAL EXAM SPECIFICATIONS FOR MATHEMATICS, PHYSICS, AND CHEMISTRY FORMULAS:
-If the questions involve math, physics, or chemistry:
-- Use standard notations for formulas so they can be processed and rendered beautifully:
-  - Exponents (powers): write using "^" (e.g., "x^2", "10^{-5}", "y^{2x}").
-  - Subscripts (indices or molecular numbers): write using "_" (e.g., "H_2O", "CO_2", "x_i", "C_nH_{2n+2}"). Note: common formulas like "H2O", "CO2", "H2SO4" can also just be written directly without underscores and will be auto-subscripted.
-  - Fractions: write using LaTeX style "\\frac{numerator}{denominator}" (e.g., "\\frac{s}{t}", "\\frac{1}{2}").
-  - Square roots: write using "\\sqrt{expression}" (e.g., "\\sqrt{16}", "\\sqrt{x}").
-  - Chemical reaction arrows: write using "->" or "-->" or "\\rightarrow" (e.g., "2H_2 + O_2 -> 2H_2O").
-  - Mathematics symbols: use LaTeX style formatting: "\\pm" for ±, "\\times" for ×, "\\div" for ÷, "\\le" for ≤, "\\ge" for ≥, "\\pi" for π, "\\Delta" for Δ, "\\alpha" for α, "\\beta" for β, "\\theta" for θ.
-
-Please thoroughly analyze all provided resource attachments (images, PDF documents, and extracted text from Word, PowerPoint, or Excel files) and formulate short, concise questions testing the main concepts.
-
-Provide the response in JSON format.`;
+Generate exactly ${totalRequestedCount} structured questions in JSON format matching the schema.`;
 
   const parts: any[] = [];
-  parts.push({ text: promptText });
+  parts.push({ text: masterPromptText });
 
   if (hasText || extractedOfficeText.trim()) {
     let textMaterial = "";
@@ -415,10 +454,9 @@ Provide the response in JSON format.`;
 
   try {
     const modelsToTry = [
-      "gemini-2.5-flash",
-      "gemini-3.5-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-flash-latest"
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+      "gemini-3.1-flash-lite"
     ];
 
     const generateWithFallback = async (partsList: any[]): Promise<any> => {
@@ -431,7 +469,7 @@ Provide the response in JSON format.`;
             console.log(`Attempting question generation with model: ${modelName} (attempt ${attempt}/${attempts})`);
             const result = await activeAi.models.generateContent({
               model: modelName,
-              contents: { parts: partsList },
+              contents: partsList,
               config: {
                 responseMimeType: "application/json",
                 responseSchema: {
@@ -441,16 +479,21 @@ Provide the response in JSON format.`;
                     properties: {
                       text: { 
                         type: Type.STRING, 
-                        description: "Short, direct, concise question text (strictly under 15 words). Easy for students to read and understand at a glance in under 3-5 seconds. NEVER write long convoluted sentences or long paragraphs." 
+                        description: "Question text in accordance with MoEYS curriculum" 
                       },
                       options: { 
                         type: Type.ARRAY, 
                         items: { type: Type.STRING },
-                        description: "Exactly 4 very short, concise options (strictly 1 to 3 words, single key term, or short formula/number each). NEVER write full sentences."
+                        description: "Array of 4 options (or 2 for True/False) with plausible distractors"
                       },
                       correctIndex: { type: Type.INTEGER, description: "The 0-based index of the correct option" },
-                      category: { type: Type.STRING, description: "The precise category of the question: choice, matching, fill_blank, theory, or exercise" },
-                      explanation: { type: Type.STRING, description: "Short, concise explanation (1-2 sentences only)" }
+                      category: { type: Type.STRING, description: "The category: choice, matching, fill_blank, theory, or exercise" },
+                      explanation: { type: Type.STRING, description: "Clear and comprehensive explanation for why the answer is correct" },
+                      bloomLevel: { type: Type.STRING, description: "Bloom's taxonomy: remember, understand, apply, analyze, evaluate, or create" },
+                      difficulty: { type: Type.STRING, description: "Difficulty: easy, medium, or hard" },
+                      learningObjective: { type: Type.STRING, description: "Expected learning outcome / objective aligned with MoEYS" },
+                      solutionStepByStep: { type: Type.STRING, description: "Step by step calculation or proof (Given, Formula, Calculation, Answer)" },
+                      points: { type: Type.INTEGER, description: "Points allocated for this question" }
                     },
                     required: ["text", "options", "correctIndex", "category"]
                   }
@@ -479,12 +522,19 @@ Provide the response in JSON format.`;
 
     const response = await generateWithFallback(parts);
 
-    const generatedText = response.text || "[]";
-    const jsonParsed = JSON.parse(generatedText);
+    const jsonParsed = cleanAndParseJson<any[]>(response.text || "[]", []);
     const mappedQuestions = Array.isArray(jsonParsed) ? jsonParsed.map((q: any) => ({
       ...q,
       questionType: questionType || 'general',
-      category: q.category || 'choice'
+      category: q.category || 'choice',
+      grade: grade || q.grade || '',
+      subject: subject || q.subject || '',
+      chapter: chapter || q.chapter || '',
+      lesson: lesson || q.lesson || '',
+      topic: topic || q.topic || '',
+      points: q.points || points || 2,
+      bloomLevel: q.bloomLevel || 'apply',
+      difficulty: q.difficulty || difficulty || 'medium'
     })) : [];
     res.json({ questions: mappedQuestions });
   } catch (error: any) {
@@ -592,13 +642,13 @@ ${extraInstructions ? `- សេចក្តីណែនាំបន្ថែម�
 
   try {
     const modelsToTry = [
-      "gemini-2.5-flash",
-      "gemini-3.5-flash",
-      "gemini-3.1-flash-lite",
-      "gemini-flash-latest"
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+      "gemini-3.1-flash-lite"
     ];
 
     let rawText = "";
+    let lastError = null;
     for (const modelName of modelsToTry) {
       try {
         const result = await activeAi.models.generateContent({
@@ -612,27 +662,262 @@ ${extraInstructions ? `- សេចក្តីណែនាំបន្ថែម�
         rawText = result.text || "";
         if (rawText.trim()) break;
       } catch (err: any) {
+        lastError = err;
         console.warn(`Model ${modelName} failed for lesson plan:`, err?.message);
       }
     }
 
     if (!rawText.trim()) {
-      throw new Error("Unable to generate lesson plan content from Gemini");
+      throw new Error(lastError?.message || "Unable to generate lesson plan content from Gemini");
     }
 
-    // Clean JSON if needed
-    const cleanJson = rawText
-      .replace(/^```json\s*/i, "")
-      .replace(/^```\s*/i, "")
-      .replace(/\s*```$/i, "")
-      .trim();
-
-    const parsed = JSON.parse(cleanJson);
+    const parsed = cleanAndParseJson(rawText, null);
+    if (!parsed) {
+      throw new Error("Unable to parse generated lesson plan JSON");
+    }
     res.json(parsed);
   } catch (error: any) {
     console.error("Error generating lesson plan:", error);
     res.status(500).json({
       error: "មិនអាចបង្កើតកិច្ចតែងការដោយ AI បានទេ សូមព្យាយាមម្តងទៀត ឬបញ្ចូលដោយដៃ។ " + (error?.message || "")
+    });
+  }
+});
+
+// API route to generate Comprehensive MoEYS Teaching Lesson Article & Summary Note
+app.post("/api/generate-lesson-article", async (req, res) => {
+  const {
+    subject = "ភាសាខ្មែរ",
+    grade = "ថ្នាក់ទី ៩",
+    chapter = "",
+    lessonTitle = "",
+    lessonText = "",
+    images = [],
+    pdfs = [],
+    officeFiles = [],
+    customInstructions = "",
+    schoolName = "សាលារៀនសុវណ្ណភូមិ",
+    teacherName = "លោកគ្រូ / អ្នកគ្រូ"
+  } = req.body;
+
+  const clientApiKey = (req.headers["x-api-key"] as string || "").trim();
+  const activeApiKey = clientApiKey || process.env.GEMINI_API_KEY || "";
+
+  if (!activeApiKey) {
+    return res.status(400).json({
+      error: "សូមបញ្ចូលសោរ API Key របស់អ្នកជាមុនសិន! (Please configure Gemini API Key first)"
+    });
+  }
+
+  const activeAi = new GoogleGenAI({
+    apiKey: activeApiKey,
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      }
+    }
+  });
+
+  const hasText = lessonText && lessonText.trim().length > 0;
+  const hasImages = images && Array.isArray(images) && images.length > 0;
+  const hasPdfs = pdfs && Array.isArray(pdfs) && pdfs.length > 0;
+  const hasOffice = officeFiles && Array.isArray(officeFiles) && officeFiles.length > 0;
+
+  if (!hasText && !hasImages && !hasPdfs && !hasOffice && !lessonTitle && !subject) {
+    return res.status(400).json({
+      error: "សូមបញ្ចូលចំណងជើងមេរៀន ខ្លឹមសារ ឬឯកសារ (រូបភាព/PDF/Word) ជាមុនសិន"
+    });
+  }
+
+  // Extract text from Office documents if any
+  let extractedOfficeText = "";
+  if (hasOffice) {
+    for (const file of officeFiles) {
+      const fileName = file.name || "Document";
+      const mimeType = file.mimeType || "";
+      const base64Data = file.data || "";
+
+      try {
+        if (fileName.toLowerCase().endsWith(".docx") || mimeType.includes("wordprocessingml") || mimeType === "application/docx") {
+          const text = await extractTextFromDocx(base64Data);
+          extractedOfficeText += `\n[Extracted from Word: ${fileName}]\n${text}\n`;
+        } else if (fileName.toLowerCase().endsWith(".pptx") || mimeType.includes("presentationml") || mimeType === "application/pptx") {
+          const text = await extractTextFromPptx(base64Data);
+          extractedOfficeText += `\n[Extracted from PowerPoint: ${fileName}]\n${text}\n`;
+        } else if (
+          fileName.toLowerCase().endsWith(".xlsx") || 
+          fileName.toLowerCase().endsWith(".xls") || 
+          fileName.toLowerCase().endsWith(".csv") || 
+          mimeType.includes("spreadsheet") || 
+          mimeType.includes("excel") || 
+          mimeType.includes("csv")
+        ) {
+          const text = extractTextFromExcel(base64Data);
+          extractedOfficeText += `\n[Extracted from Sheet: ${fileName}]\n${text}\n`;
+        } else {
+          const cleanBase64 = base64Data.includes(";base64,") ? base64Data.split(";base64,").pop() || "" : base64Data;
+          const buffer = Buffer.from(cleanBase64, "base64");
+          if (fileName.toLowerCase().endsWith(".txt")) {
+            const text = buffer.toString("utf8");
+            extractedOfficeText += `\n[Extracted from Text: ${fileName}]\n${text}\n`;
+          } else {
+            const text = extractCleanTextFromBinary(buffer);
+            if (text.trim().length > 10) {
+              extractedOfficeText += `\n[Extracted from Doc File: ${fileName}]\n${text}\n`;
+            }
+          }
+        }
+      } catch (err) {
+        console.error(`Failed to extract text from ${fileName}:`, err);
+      }
+    }
+  }
+
+  const masterPromptText = `
+# SYSTEM IDENTITY & ROLE:
+អ្នកគឺជា "AI MoEYS Curriculum Lesson Content & Teaching Expert" (អ្នកឯកទេសសរសេរអត្ថបទមេរៀនបង្រៀន និងសង្ខេបមេរៀន ស្របតាមកម្មវិធីសិក្សាថ្មីរបស់ក្រសួងអប់រំ យុវជន និងកីឡាកម្ពុជា)។
+
+# គោលបំណងចម្បង (MAIN OBJECTIVE):
+សរសេរអត្ថបទមេរៀនបង្រៀនពេញលេញ និងទាក់ទាញបំផុត សម្រាប់គ្រូបង្រៀនយកទៅបង្រៀនសិស្សក្នុងថ្នាក់ ឬចែកជាឯកសារ Word ដោយបែងចែកជា ២ ផ្នែកសំខាន់ច្បាស់លាស់៖
+1. **ផ្នែកទី ១៖ អត្ថបទមេរៀនលម្អិតសម្រាប់បង្រៀន (Detailed Teaching Lesson)** — ពន្យល់ទ្រឹស្តី និយមន័យ រូបមន្ត ឧទាហរណ៍ជាក់ស្តែង ដំណោះស្រាយគំរូមួយជំហានម្តងៗ សំណួរត្រិះរិះ និងសកម្មភាពក្នុងថ្នាក់។
+2. **ផ្នែកទី ២៖ មេរៀនសង្ខេបនៅខាងក្រោយ (Lesson Summary Note at the Back)** — សង្ខេបខ្លឹមសារគន្លឹះខ្លីខ្លឹម បណ្តុំរូបមន្ត/តារាងសង្ខេប ចំណុចសំខាន់ៗដែលត្រូវចងចាំ និងសំណួរស្វ័យវាយតម្លៃ/លំហាត់ពង្រឹងចំណេះដឹង។
+
+# ព័ត៌មានមេរៀន (LESSON CONTEXT):
+- គ្រឹះស្ថានសិក្សា / សាលារៀន៖ ${schoolName}
+- គ្រូបង្រៀន៖ ${teacherName}
+- មុខវិជ្ជា៖ ${subject}
+- ថ្នាក់ទី៖ ${grade}
+- ជំពូក៖ ${chapter || 'ជំពូកពាក់ព័ន្ធ'}
+- ចំណងជើងមេរៀន / ប្រធានបទ៖ ${lessonTitle || 'មេរៀនប្រចាំថ្នាក់'}
+${customInstructions ? `- ការណែនាំបន្ថែមពិសេសពីគ្រូ៖ ${customInstructions}` : ''}
+
+# គោលការណ៍គរុកោសល្យតាមមុខវិជ្ជា (MoEYS Standard Rules):
+- ភាសាខ្មែរ៖ អក្ខរាវិរុទ្ធត្រឹមត្រូវ វេយ្យាករណ៍ ការវិភាគអត្ថបទ អត្ថន័យពាក្យ និងការតែងសេចក្តី។
+- គណិតវិទ្យា៖ និយមន័យ រូបមន្ត បម្រាប់ ដំណោះស្រាយលម្អិត និងលំហាត់អនុវត្ត។
+- រូបវិទ្យា/គីមីវិទ្យា/ជីវវិទ្យា/ផែនដីវិទ្យា៖ ទ្រឹស្តី ពិសោធន៍ ឧទាហរណ៍ក្នុងជីវភាពរស់នៅប្រទេសកម្ពុជា រូបមន្ត សមីការ តុល្យការ និងការអនុវត្តជាក់ស្តែង។
+- ប្រវត្តិវិទ្យា/ភូមិវិទ្យា/សីលធម៌-ពលរដ្ឋ៖ កាលបរិច្ឆេទ ព្រឹត្តិការណ៍ សារៈសំខាន់ប្រវត្តិសាស្ត្រ ផែនទីកម្ពុជា បរិស្ថាន សីលធម៌រស់នៅ និងច្បាប់។
+- ភាសាអង់គ្លេស/STEM៖ វេយ្យាករណ៍ ពាក្យគន្លឹះ និងការអនុវត្តដោះស្រាយបញ្ហា។
+
+# ទម្រង់លទ្ធផល (OUTPUT FORMAT - JSON STRICT):
+សូមបង្កើតជាទម្រង់ JSON ត្រឹមត្រូវ 100% តាម Schema ដូចខាងក្រោម៖
+{
+  "title": "ចំណងជើងមេរៀនផ្លូវការ",
+  "subject": "${subject}",
+  "grade": "${grade}",
+  "chapter": "${chapter || 'ជំពូកពាក់ព័ន្ធ'}",
+  "objectives": {
+    "knowledge": ["ចំណេះដឹងទី១...", "ចំណេះដឹងទី២..."],
+    "skills": ["បំណិនទី១...", "បំណិនទី២..."],
+    "attitude": ["ឥរិយាបថទី១...", "ឥរិយាបថទី២..."]
+  },
+  "introduction": "សេចក្តីផ្តើមទាក់ទាញចំណាប់អារម្មណ៍ និងការផ្សារភ្ជាប់ទៅនឹងជីវភាពរស់នៅជាក់ស្តែង...",
+  "detailedContent": "អត្ថបទមេរៀនលម្អិតជាទម្រង់ Markdown (មានប្រើ #, ##, ###, bullet points, bold, formulas, code blocks ឬ tables) ដែលមានក្បាលមេរៀន និយមន័យ ការពន្យល់ស៊ីជម្រៅ ឧទាហរណ៍ជាក់ស្តែង ដំណោះស្រាយលំហាត់គំរូ និងសកម្មភាពក្នុងថ្នាក់...",
+  "summaryContent": "ខ្លឹមសារមេរៀនសង្ខេបនៅខាងក្រោយជាទម្រង់ Markdown (មានចំណុចគន្លឹះខ្លីខ្លឹម បណ្តុំរូបមន្ត/តារាង និងសំណួរស្វ័យវាយតម្លៃ)...",
+  "keyTakeaways": [
+    "ចំណុចគន្លឹះសំខាន់ទី១ ដែលត្រូវចងចាំ...",
+    "ចំណុចគន្លឹះសំខាន់ទី២...",
+    "ចំណុចគន្លឹះសំខាន់ទី៣..."
+  ],
+  "exercises": [
+    {
+      "question": "សំណួរ ឬលំហាត់ទី១...",
+      "answerOrSolution": "ចម្លើយ ឬដំណោះស្រាយលម្អិត...",
+      "points": 2
+    },
+    {
+      "question": "សំណួរ ឬលំហាត់ទី២...",
+      "answerOrSolution": "ចម្លើយ ឬដំណោះស្រាយលម្អិត...",
+      "points": 2
+    }
+  ]
+}
+`;
+
+  const parts: any[] = [];
+  parts.push({ text: masterPromptText });
+
+  if (hasText || extractedOfficeText.trim()) {
+    let textMaterial = "";
+    if (hasText) {
+      textMaterial += `\n[Input Lesson Text Notes]:\n${lessonText}\n\n`;
+    }
+    if (extractedOfficeText.trim()) {
+      textMaterial += `\n[Extracted Material from Uploaded Word/Office Documents]:\n${extractedOfficeText}\n`;
+    }
+    parts.push({ text: textMaterial });
+  }
+
+  if (hasImages) {
+    images.forEach((img: { mimeType: string, data: string }) => {
+      let base64 = img.data;
+      if (base64.includes(";base64,")) {
+        base64 = base64.split(";base64,").pop() || "";
+      }
+      parts.push({
+        inlineData: {
+          mimeType: img.mimeType || "image/jpeg",
+          data: base64
+        }
+      });
+    });
+  }
+
+  if (hasPdfs) {
+    pdfs.forEach((pdf: { mimeType: string, data: string }) => {
+      let base64 = pdf.data;
+      if (base64.includes(";base64,")) {
+        base64 = base64.split(";base64,").pop() || "";
+      }
+      parts.push({
+        inlineData: {
+          mimeType: "application/pdf",
+          data: base64
+        }
+      });
+    });
+  }
+
+  try {
+    const modelsToTry = [
+      "gemini-3.8-flash",
+      "gemini-flash-latest",
+      "gemini-3.1-flash-lite"
+    ];
+
+    let rawText = "";
+    let lastError = null;
+    for (const modelName of modelsToTry) {
+      try {
+        console.log(`Generating lesson article with model: ${modelName}`);
+        const result = await activeAi.models.generateContent({
+          model: modelName,
+          contents: parts,
+          config: {
+            temperature: 0.7,
+            responseMimeType: "application/json"
+          }
+        });
+        rawText = result.text || "";
+        if (rawText.trim()) break;
+      } catch (err: any) {
+        lastError = err;
+        console.warn(`Model ${modelName} failed for lesson article:`, err?.message);
+      }
+    }
+
+    if (!rawText.trim()) {
+      throw new Error(lastError?.message || "Unable to generate lesson article content from Gemini");
+    }
+
+    const parsed = cleanAndParseJson(rawText, null);
+    if (!parsed) {
+      throw new Error("Unable to parse generated lesson article JSON");
+    }
+    res.json(parsed);
+  } catch (error: any) {
+    console.error("Error generating lesson article:", error);
+    res.status(500).json({
+      error: "មិនអាចបង្កើតអត្ថបទមេរៀនដោយ AI បានទេ៖ " + (error?.message || "សូមពិនិត្យមើល API Key ឬទំហំឯកសារ")
     });
   }
 });

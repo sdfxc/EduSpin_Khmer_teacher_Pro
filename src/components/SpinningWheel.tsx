@@ -6,6 +6,7 @@ import { Student } from '../types';
 import StudentListCallingModal from './StudentListCallingModal';
 import { getCurrentDateScoreSlot, getStudentCurrentWeekActivityScore } from '../lib/scoreUtils';
 import { playTickSound, playWinnerSound } from '../lib/soundUtils';
+import { useLanguage } from '../context/LanguageContext';
 
 interface SpinningWheelProps {
   students: Student[];
@@ -47,6 +48,7 @@ export default function SpinningWheel({
   isDarkMode = false,
   className = 'ថ្នាក់រៀន'
 }: SpinningWheelProps) {
+  const { language, t } = useLanguage();
   const [rotationDegrees, setRotationDegrees] = useState(0);
   const [isSpinning, setIsSpinning] = useState(false);
   const [needleColor, setNeedleColor] = useState('#ff4949');
@@ -359,7 +361,7 @@ export default function SpinningWheel({
         <motion.div
           ref={wheelRef}
           animate={controls}
-          className="w-full h-full rounded-full shadow-2xl bg-white dark:bg-[#222222] border-8 border-white dark:border-[#333333] p-1 relative overflow-hidden"
+          className="w-full h-full rounded-full shadow-2xl bg-white dark:bg-[#0e1524] border-8 border-white dark:border-slate-800 p-1 relative overflow-hidden"
           style={{ originX: '50%', originY: '50%' }}
         >
           <svg viewBox="0 0 400 400" className="w-full h-full overflow-visible">
@@ -371,56 +373,56 @@ export default function SpinningWheel({
         <button
           onClick={handleSpin}
           disabled={isSpinning || students.length === 0}
-          className="absolute w-16 h-16 bg-white dark:bg-[#2a2a2a] rounded-full border-4 border-indigo-600 dark:border-indigo-500 shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-40 transition-all z-10 cursor-pointer"
+          className="absolute w-16 h-16 bg-white dark:bg-slate-800 rounded-full border-4 border-indigo-600 dark:border-indigo-500 shadow-xl flex items-center justify-center text-indigo-600 dark:text-indigo-400 font-extrabold hover:scale-105 active:scale-95 disabled:scale-100 disabled:opacity-40 transition-all z-10 cursor-pointer"
         >
-          <Play className="w-8 h-8 fill-indigo-600 text-indigo-600" />
+          <Play className="w-8 h-8 fill-indigo-600 text-indigo-600 dark:fill-indigo-400 dark:text-indigo-400" />
         </button>
       </div>
 
-      {/* របារបញ្ជា៖ Reset (ខាងឆ្វេង) | Re-pick (កណ្ដាល) | ហៅសិស្សបន្ត (ខាងស្ដាំ) */}
+      {/* Control Buttons */}
       <div className="flex items-center gap-2 sm:gap-3 w-full max-w-sm justify-center mb-3">
-        {/* Reset - Left (ខាងឆ្វេង) */}
+        {/* Reset */}
         <button
           onClick={handleResetPicked}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-[#2a2a2a] border border-slate-200 dark:border-[#383838] text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-[#333333] transition-all cursor-pointer shadow-2xs active:scale-95"
-          title="កំណត់ឡើងវិញ / Reset"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all cursor-pointer shadow-2xs active:scale-95"
+          title="Reset"
         >
           <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
           <span>Reset</span>
         </button>
 
-        {/* Re-pick - Center (កណ្ដាល) */}
+        {/* Re-pick */}
         <button
           onClick={handleRepick}
           disabled={isSpinning || students.length === 0}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-[#2a2a2a] border border-slate-200 dark:border-[#383838] text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-[#333333] transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
-          title="រើសម្តងទៀត / Re-pick"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-xl font-semibold text-xs hover:bg-slate-50 dark:hover:bg-slate-700/80 transition-all cursor-pointer shadow-2xs active:scale-95 disabled:opacity-50"
+          title="Re-pick"
         >
           <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
           <span>Re-pick</span>
         </button>
 
-        {/* ហៅសិស្សបន្ត - Right (ខាងស្ដាំ) */}
+        {/* Call Next */}
         <button
           onClick={handleCallNext}
           disabled={isSpinning || students.length === 0}
-          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-md shadow-indigo-500/25 active:scale-95 disabled:opacity-50 whitespace-nowrap"
-          title="ហៅសិស្សបន្ត"
+          className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 active:scale-95 text-white rounded-xl font-semibold text-xs transition-all cursor-pointer shadow-sm shadow-indigo-500/20 disabled:opacity-50 whitespace-nowrap"
+          title={t('callNext')}
         >
           <Play className="w-3.5 h-3.5 fill-white shrink-0" />
-          <span>ហៅសិស្សបន្ត</span>
+          <span>{t('callNext')}</span>
         </button>
       </div>
 
-      {/* កូន tap តូចមួយសម្រាប់ចុចចូលមើលឈ្មោះសិស្សទាំងអស់ និង Profile/Emoji Switch */}
+      {/* Student List & Manual Call Button */}
       <div className="w-full max-w-sm flex items-center justify-center gap-2 mb-5 flex-wrap">
         <button
           onClick={() => setShowStudentListModal(true)}
           className="inline-flex items-center gap-2 px-3.5 py-1.5 bg-indigo-50 hover:bg-indigo-100/80 dark:bg-indigo-950/40 dark:hover:bg-indigo-900/50 border border-indigo-200/80 dark:border-indigo-800/60 text-indigo-700 dark:text-indigo-300 rounded-full font-bold text-xs shadow-2xs transition-all cursor-pointer active:scale-95 group"
-          title="មើលបញ្ជីឈ្មោះសិស្សទាំងអស់ & កំណត់ស្ថានភាពហៅ"
+          title={t('studentListAndManual')}
         >
           <Users className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
-          <span>បញ្ជីសិស្ស & គ្រូហៅផ្ទាល់</span>
+          <span>{t('studentListAndManual')}</span>
           <span className="px-1.5 py-0.2 bg-indigo-200/70 dark:bg-indigo-800/80 text-indigo-800 dark:text-indigo-200 rounded-full text-[10px] font-black">
             {students.length}
           </span>
@@ -468,15 +470,17 @@ export default function SpinningWheel({
             className="text-xs font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 mx-auto cursor-pointer"
           >
             <Plus className="w-3.5 h-3.5" />
-            <span>បញ្ចូលឈ្មោះសិស្សបន្ថែម (Bulk Add)</span>
+            <span>{t('bulkAddPrompt')}</span>
           </button>
         ) : (
           <form onSubmit={handleBulkSubmit} className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-4 shadow-sm text-left animate-in fade-in slide-in-from-top-2 duration-300">
-            <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase block mb-1">បញ្ចូលឈ្មោះសិស្សច្រើន (មួយជួរ ឈ្មោះមួយ)</label>
+            <label className="text-[10px] font-black text-slate-500 dark:text-slate-400 uppercase block mb-1">
+              {t('bulkAddTitle')}
+            </label>
             <textarea
               value={bulkText}
               onChange={(e) => setBulkText(e.target.value)}
-              placeholder="សុខ រីបុល&#10;ចាន់ថា ស្រីលីន&#10;កែវ មករា"
+              placeholder={language === 'km' ? 'សុខ រីបុល\nចាន់ថា ស្រីលីន\nកែវ មករា' : 'John Smith\nEmily Davis\nMichael Brown'}
               className="w-full text-xs p-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/20 h-24 font-semibold resize-none mb-2"
               autoFocus
             />
@@ -484,15 +488,15 @@ export default function SpinningWheel({
               <button
                 type="button"
                 onClick={() => setShowBulkInput(false)}
-                className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-bold"
+                className="px-3 py-1 bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-300 rounded-lg font-bold cursor-pointer"
               >
-                បោះបង់
+                {t('cancel')}
               </button>
               <button
                 type="submit"
-                className="px-3 py-1 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shrink-0"
+                className="px-3 py-1 bg-indigo-600 text-white rounded-lg font-bold hover:bg-indigo-700 shrink-0 cursor-pointer"
               >
-                យល់ព្រម
+                {t('confirm')}
               </button>
             </div>
           </form>
@@ -526,7 +530,7 @@ export default function SpinningWheel({
               {/* Header Badge */}
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1 rounded-full bg-indigo-500/10 dark:bg-indigo-500/20 text-indigo-600 dark:text-indigo-400 text-xs font-black uppercase tracking-wider mb-4 border border-indigo-500/20">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                <span>សិស្សដែលបានជ្រើសរើស</span>
+                <span>{t('selectedStudent')}</span>
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
               </div>
 
@@ -581,7 +585,7 @@ export default function SpinningWheel({
                 )}
               </div>
 
-              {/* ឈ្មោះសិស្សធំៗ ច្បាស់ៗ */}
+              {/* Student Name */}
               <h2 className="text-2xl sm:text-3xl font-black text-slate-900 dark:text-white mt-4 tracking-tight">
                 {winnerStudent.name}
               </h2>
@@ -594,7 +598,7 @@ export default function SpinningWheel({
                       ? 'bg-pink-500/10 text-pink-600 dark:text-pink-400 border border-pink-500/20'
                       : 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border border-blue-500/20'
                   }`}>
-                    {winnerStudent.gender}
+                    {winnerStudent.gender === 'ស្រី' ? t('female') : t('male')}
                   </span>
                 )}
                 {winnerStudent.studentId && (
@@ -605,12 +609,12 @@ export default function SpinningWheel({
               </div>
 
               <p className="text-sm font-bold text-indigo-600 dark:text-indigo-400 mt-2">
-                🎉 បានជ្រើសរើសជាសិស្សឡើងឆ្លើយសំណួរ 🎉
+                🎉 {language === 'km' ? 'បានជ្រើសរើសជាសិស្សឡើងឆ្លើយសំណួរ' : 'Chosen to answer the question'} 🎉
               </p>
 
               <div className="inline-flex items-center gap-1.5 px-3.5 py-1.5 rounded-full bg-slate-100 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 text-xs font-semibold mt-2.5 shadow-2xs">
                 <Sparkles className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
-                <span>សិស្សនឹងទទួលបាន 5 ពិន្ទុសកម្មភាព នៅពេលឆ្លើយសំណួរត្រូវ</span>
+                <span>{language === 'km' ? 'សិស្សនឹងទទួលបាន 5 ពិន្ទុសកម្មភាព នៅពេលឆ្លើយសំណួរត្រូវ' : 'Student will receive 5 activity points for answering correctly'}</span>
               </div>
 
               {/* Quick Score Adjustment Bar in Winner Card */}
@@ -624,15 +628,15 @@ export default function SpinningWheel({
                     <div className="flex items-center justify-between w-full text-xs font-bold text-slate-700 dark:text-slate-300 px-1">
                       <span className="text-[11px] text-amber-800 dark:text-amber-300 flex items-center gap-1">
                         <Star className="w-3.5 h-3.5 fill-amber-500 text-amber-500" />
-                        <span>សកម្មភាព {dateSlot.weekLabel} (ខែ{dateSlot.month})</span>
+                        <span>{language === 'km' ? `សកម្មភាព ${dateSlot.weekLabel} (ខែ${dateSlot.month})` : `Activity ${dateSlot.weekLabel} (M${dateSlot.month})`}</span>
                       </span>
                       <span className="text-xs font-black text-amber-900 dark:text-amber-200">
-                        {activityScore} ពិន្ទុ
+                        {activityScore} {t('points')}
                       </span>
                     </div>
 
                     <div className="flex items-center gap-1.5 w-full justify-center flex-wrap">
-                      <span className="text-[10px] font-bold text-slate-400">កែពិន្ទុ៖</span>
+                      <span className="text-[10px] font-bold text-slate-400">{language === 'km' ? 'កែពិន្ទុ៖' : 'Score:'}</span>
                       {[1, 2, 3, 5].map((pts) => (
                         <button
                           key={pts}
@@ -643,7 +647,7 @@ export default function SpinningWheel({
                             }
                           }}
                           className="px-2 py-0.5 rounded-lg text-xs font-black bg-white dark:bg-slate-800 text-emerald-600 dark:text-emerald-400 border border-emerald-300 dark:border-emerald-700 hover:bg-emerald-600 hover:text-white dark:hover:bg-emerald-600 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                          title={`បន្ថែម ${pts} ពិន្ទុ`}
+                          title={`+${pts} ${t('points')}`}
                         >
                           +{pts}
                         </button>
@@ -657,7 +661,7 @@ export default function SpinningWheel({
                         }}
                         disabled={activityScore <= 0}
                         className="px-2 py-0.5 rounded-lg text-xs font-black bg-white dark:bg-slate-800 text-rose-600 dark:text-rose-400 border border-rose-200 dark:border-rose-800 hover:bg-rose-600 hover:text-white dark:hover:bg-rose-600 disabled:opacity-40 transition-all cursor-pointer active:scale-95 shadow-2xs"
-                        title="ដក 1 ពិន្ទុ"
+                        title={`-1 ${t('points')}`}
                       >
                         -1
                       </button>
@@ -666,36 +670,36 @@ export default function SpinningWheel({
                 );
               })()}
 
-              {/* របារប៊ូតុងបញ្ជាខាងក្នុង Popup: Reset (ឆ្វេង) | Re-pick (កណ្ដាល) | ហៅសិស្សបន្ត (ស្ដាំ) */}
+              {/* Popup Bottom Control Bar */}
               <div className="flex items-center gap-2 sm:gap-3 w-full mt-4 pt-3 border-t border-slate-100 dark:border-slate-800">
-                {/* Reset (ឆ្វេង) */}
+                {/* Reset */}
                 <button
                   onClick={handleResetPicked}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-200 dark:hover:bg-slate-700 transition-all cursor-pointer active:scale-95"
-                  title="កំណត់ឡើងវិញ / Reset"
+                  title="Reset"
                 >
                   <RotateCcw className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
                   <span>Reset</span>
                 </button>
 
-                {/* Re-pick (កណ្ដាល) */}
+                {/* Re-pick */}
                 <button
                   onClick={handleRepick}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 rounded-2xl font-bold text-xs hover:bg-slate-50 dark:hover:bg-slate-700 transition-all cursor-pointer shadow-2xs active:scale-95"
-                  title="រើសម្តងទៀត / Re-pick"
+                  title="Re-pick"
                 >
                   <Shuffle className="w-3.5 h-3.5 text-emerald-500 shrink-0" />
                   <span>Re-pick</span>
                 </button>
 
-                {/* ហៅសិស្សបន្ត (ស្ដាំ) */}
+                {/* Call Next */}
                 <button
                   onClick={handleCallNext}
                   className="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-2xl font-bold text-xs transition-all cursor-pointer shadow-md shadow-indigo-500/25 active:scale-95 whitespace-nowrap"
-                  title="ហៅសិស្សបន្ត"
+                  title={t('callNext')}
                 >
                   <Play className="w-3.5 h-3.5 fill-white shrink-0" />
-                  <span>ហៅសិស្សបន្ត</span>
+                  <span>{t('callNext')}</span>
                 </button>
               </div>
             </motion.div>

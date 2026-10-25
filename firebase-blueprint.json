@@ -62,13 +62,15 @@
     },
     "ExamsData": {
       "title": "ExamsData",
-      "description": "Represent exam papers data for a class",
+      "description": "Represent exam papers and exam rules configuration data for a class",
       "type": "object",
       "properties": {
         "exams": { "type": "array" },
+        "customRules": { "type": "array" },
+        "regulations": { "type": "array" },
+        "examTitle": { "type": "string" },
         "updatedAt": { "type": "string", "format": "date-time" }
-      },
-      "required": ["exams"]
+      }
     },
     "ExternalDoc": {
       "title": "ExternalDoc",

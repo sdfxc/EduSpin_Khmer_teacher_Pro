@@ -25,18 +25,18 @@ export const ConfirmProvider: React.FC<{ children: ReactNode; isDarkMode?: boole
 }) => {
   const [modalState, setModalState] = useState<{
     isOpen: boolean;
-    title: string;
+    title?: string;
     message: string;
-    confirmText: string;
-    cancelText: string;
+    confirmText?: string;
+    cancelText?: string;
     variant: 'danger' | 'warning' | 'primary';
     onConfirm: () => void | Promise<void>;
   }>({
     isOpen: false,
-    title: 'តើអ្នកពិតជាចង់លុបមែនឬទេ?',
+    title: undefined,
     message: '',
-    confirmText: 'លុប',
-    cancelText: 'ទេ',
+    confirmText: undefined,
+    cancelText: undefined,
     variant: 'danger',
     onConfirm: () => {}
   });
@@ -47,10 +47,10 @@ export const ConfirmProvider: React.FC<{ children: ReactNode; isDarkMode?: boole
     resolverRef.current = null;
     setModalState({
       isOpen: true,
-      title: options.title || 'តើអ្នកពិតជាចង់លុបមែនឬទេ?',
+      title: options.title,
       message: options.message,
-      confirmText: options.confirmText || 'លុប',
-      cancelText: options.cancelText || 'ទេ',
+      confirmText: options.confirmText,
+      cancelText: options.cancelText,
       variant: options.variant || 'danger',
       onConfirm: options.onConfirm || (() => {})
     });
@@ -61,10 +61,10 @@ export const ConfirmProvider: React.FC<{ children: ReactNode; isDarkMode?: boole
       resolverRef.current = resolve;
       setModalState({
         isOpen: true,
-        title: options.title || 'តើអ្នកពិតជាចង់លុបមែនឬទេ?',
+        title: options.title,
         message: options.message,
-        confirmText: options.confirmText || 'លុប',
-        cancelText: options.cancelText || 'ទេ',
+        confirmText: options.confirmText,
+        cancelText: options.cancelText,
         variant: options.variant || 'danger',
         onConfirm: async () => {
           if (options.onConfirm) {

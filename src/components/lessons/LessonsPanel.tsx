@@ -12,6 +12,7 @@ import {
 import WordDocsManager from './WordDocsManager';
 import SlidesManager from './SlidesManager';
 import LessonPlansManager from './LessonPlansManager';
+import AiLessonWriterModal from './AiLessonWriterModal';
 import { WordDocItem, SlideDeckItem, LessonPlanItem } from '../../types/lessonMaterials';
 import { DEFAULT_WORD_DOCS, DEFAULT_SLIDES, DEFAULT_LESSON_PLANS, DEMO_SAMPLE_IDS } from '../../lib/defaultLessonMaterials';
 import { db, doc, safeSetDoc, safeGetDoc, safeOnSnapshot } from '../../lib/firebase';
@@ -34,6 +35,7 @@ export default function LessonsPanel({
   teacher
 }: LessonsPanelProps) {
   const [activeSubTab, setActiveSubTab] = useState<LessonSubTab>('word');
+  const [isAiWriterModalOpen, setIsAiWriterModalOpen] = useState(false);
 
   const teacherId = teacher?.id || 'default_teacher';
   const storageKey = `khmer_lesson_materials_${teacherId}_${activeClassId || 'general'}`;
@@ -232,8 +234,17 @@ export default function LessonsPanel({
           </button>
         </div>
 
-        <div className="hidden md:flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 pr-2">
-          <span>ថ្នាក់៖ {activeClassName}</span>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setIsAiWriterModalOpen(true)}
+            className="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-bold bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 hover:opacity-95 text-white shadow-md shadow-indigo-600/20 transition-all cursor-pointer active:scale-95 border-none shrink-0"
+          >
+            <Sparkles className="w-3.5 h-3.5" />
+            <span>AI សរសេរអត្ថបទមេរៀន</span>
+          </button>
+          <div className="hidden lg:flex items-center gap-2 text-xs text-slate-400 dark:text-slate-500 pr-2">
+            <span>ថ្នាក់៖ {activeClassName}</span>
+          </div>
         </div>
       </div>
 
@@ -294,6 +305,20 @@ export default function LessonsPanel({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* AI Lesson Writer Modal */}
+      <AiLessonWriterModal
+        isOpen={isAiWriterModalOpen}
+        onClose={() => setIsAiWriterModalOpen(false)}
+        onSaveToWordDocs={(newDoc) => {
+          handleSaveWordDocs([newDoc, ...wordDocs]);
+          setActiveSubTab('word');
+        }}
+        activeClassName={activeClassName}
+        schoolName={teacher?.schoolName || 'សាលារៀនសុវណ្ណភូមិ'}
+        teacherName={teacher?.name || 'លោកគ្រូ / អ្នកគ្រូ'}
+        isDarkMode={isDarkMode}
+      />
     </div>
   );
 }
