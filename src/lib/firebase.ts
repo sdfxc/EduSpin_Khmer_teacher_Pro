@@ -61,7 +61,8 @@ export const setQuotaExceeded = (exceeded: boolean = true) => {
         localStorage.setItem(QUOTA_STORAGE_KEY, Date.now().toString());
         window.dispatchEvent(new CustomEvent('firestore-quota-exceeded', {
           detail: {
-            projectId: firebaseConfig.projectId
+            projectId: firebaseConfig.projectId,
+            databaseId: firebaseConfig.firestoreDatabaseId
           }
         }));
       } else {
@@ -89,13 +90,13 @@ export {
 try {
   initializeFirestore(app, {
     experimentalForceLongPolling: true,
-  });
+  }, firebaseConfig.firestoreDatabaseId);
 } catch {
   // Already initialized or fallback
 }
 
-// Initialize Firestore
-export const db = getFirestore(app); /* CRITICAL: The app will break without this line */
+// Initialize Firestore with database ID specified in firebaseConfig as per Firebase skill
+export const db = getFirestore(app, firebaseConfig.firestoreDatabaseId); /* CRITICAL: The app will break without this line */
 
 // Validate connection on boot as recommended in skill guidelines with non-blocking timeout
 export async function testConnection() {

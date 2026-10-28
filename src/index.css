@@ -10,11 +10,6 @@
 }
 
 @layer base {
-  html, body {
-    width: 100%;
-    max-width: 100%;
-    overflow-x: hidden;
-  }
   html, body, button, input, select, textarea {
     font-family: 'Battambang', 'Khmer OS Battambang', 'Khmer Battambang', 'Kantumruy Pro', 'Siemreap', system-ui, sans-serif;
   }

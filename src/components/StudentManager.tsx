@@ -4,10 +4,10 @@ import {
   Search, Plus, FileSpreadsheet, Download, Upload, UserPlus, Users, Trash2, 
   Award, ShieldAlert, Sparkles, TrendingUp, HelpCircle, Pencil, ClipboardList,
   UserCheck, Trophy, Medal, Star, Flame, ArrowUpDown, RotateCcw, CheckCircle2, ChevronUp, ChevronDown,
-  Camera, ArrowUpAZ, Hash, UserX, Clock, FileText, Share2, BookOpen, Check, X, ExternalLink
+  Camera, ArrowUpAZ, Hash, UserX, Clock, FileText, Share2
 } from 'lucide-react';
 import { Student, ClassInfo, TeacherAccount, isStudentInClass, QuizSubject, DEFAULT_CLOUD_TEACHER } from '../types';
-import { KHMER_MONTHS, getStudentTotalScoreForSubject } from '../lib/scoreUtils';
+import { KHMER_MONTHS } from '../lib/scoreUtils';
 import * as XLSX from 'xlsx';
 import { StudentQuickEditModal } from './StudentQuickEditModal';
 import { StudentScoreTable, SortMode } from './StudentScoreTable';
@@ -16,15 +16,6 @@ import { GenderBadgePicker } from './GenderBadgePicker';
 import { AttendanceCategoryViews } from './AttendanceCategoryViews';
 import { db, doc, collection, safeSetDoc, safeOnSnapshot } from '../lib/firebase';
 import { safeSetJSON, safeSetItem } from '../lib/storageUtils';
-import { 
-  syncDataToGoogleSheets, 
-  getConnectedGoogleEmail,
-  getGoogleSheetsAccessToken,
-  requestGoogleSheetsAccess,
-  triggerDebouncedSheetsAutoSync,
-  subscribeSheetsConfigFromCloud,
-  DEFAULT_ATTENDANCE_SHEET_URL
-} from '../lib/googleSheetsService';
 
 interface StudentManagerProps {
   students: Student[];
@@ -43,9 +34,6 @@ interface StudentManagerProps {
   activeSubjectName?: string;
   subjects?: QuizSubject[];
   onSelectSubject?: (subjectId: string) => void;
-  onCreateSubject?: (name: string) => void;
-  onRenameSubject?: (subjectId: string, newName: string) => void;
-  onDeleteSubject?: (subjectId: string) => void;
 }
 
 export default function StudentManager({
@@ -64,91 +52,10 @@ export default function StudentManager({
   activeSubjectId,
   activeSubjectName,
   subjects,
-  onSelectSubject,
-  onCreateSubject,
-  onRenameSubject,
-  onDeleteSubject
+  onSelectSubject
 }: StudentManagerProps) {
   // Main Sub-Tab: 'status' (ស្ថានភាពសិស្ស) | 'score' (ពិន្ទុសិស្ស) | 'attendance' (វត្តមានសិស្ស)
   const [activeSubTab, setActiveSubTab] = useState<'status' | 'score' | 'attendance'>('status');
-
-  const safeSubjects = useMemo<QuizSubject[]>(() => {
-    if (subjects && subjects.length > 0) return subjects;
-    return [{
-      id: 'subj-physics',
-      name: 'រូបវិទ្យា',
-      chapters: [],
-      createdAt: Date.now()
-    }];
-  }, [subjects]);
-
-  const effectiveSubjectId = activeSubjectId || safeSubjects[0]?.id || 'subj-physics';
-  const effectiveSubject = safeSubjects.find(s => s.id === effectiveSubjectId) || safeSubjects[0];
-  const effectiveSubName = activeSubjectName || effectiveSubject?.name || 'រូបវិទ្យា';
-
-  // Modal / UI states for Subject Dropdown management (Add, Edit, Delete)
-  const [isAddSubjectModalOpen, setIsAddSubjectModalOpen] = useState(false);
-  const [newSubInputName, setNewSubInputName] = useState('');
-  const [isRenameSubjectModalOpen, setIsRenameSubjectModalOpen] = useState(false);
-  const [renameSubInputName, setRenameSubInputName] = useState('');
-  const [isDeleteSubjectModalOpen, setIsDeleteSubjectModalOpen] = useState(false);
-  const [subjectAlertMsg, setSubjectAlertMsg] = useState<string | null>(null);
-
-  // Smart teacher gender detection from teacher profile / settings
-  const isFemaleTeacher = useMemo(() => {
-    if (teacher?.gender === 'ស្រី') return true;
-    if (teacher?.gender === 'ប្រុស') return false;
-    const storedGender = localStorage.getItem('teacher_gender') || localStorage.getItem('khmer_teacher_gender');
-    if (storedGender === 'ស្រី') return true;
-    if (storedGender === 'ប្រុស') return false;
-    if (teacher?.title === 'អ្នកគ្រូ') return true;
-    if (teacher?.title === 'លោកគ្រូ') return false;
-    if (teacher?.name && (teacher.name.includes('អ្នកគ្រូ') || teacher.name.includes('ស្រី'))) return true;
-    if (teacher?.name && (teacher.name.includes('លោកគ្រូ') || teacher.name.includes('ប្រុស'))) return false;
-    return false; // Default to male
-  }, [teacher]);
-
-  const teacherTitle = isFemaleTeacher ? 'អ្នកគ្រូ' : 'លោកគ្រូ';
-  const confirmWord = isFemaleTeacher ? 'ចាស' : 'បាទ';
-
-  const handleConfirmAddSubject = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = newSubInputName.trim();
-    if (trimmed && onCreateSubject) {
-      onCreateSubject(trimmed);
-      setNewSubInputName('');
-      setIsAddSubjectModalOpen(false);
-    }
-  };
-
-  const handleOpenRenameSubject = () => {
-    setRenameSubInputName(effectiveSubName);
-    setIsRenameSubjectModalOpen(true);
-  };
-
-  const handleConfirmRenameSubject = (e: React.FormEvent) => {
-    e.preventDefault();
-    const trimmed = renameSubInputName.trim();
-    if (trimmed && onRenameSubject && effectiveSubjectId) {
-      onRenameSubject(effectiveSubjectId, trimmed);
-      setIsRenameSubjectModalOpen(false);
-    }
-  };
-
-  const handleOpenDeleteSubject = () => {
-    if (!effectiveSubjectId || !onDeleteSubject) return;
-    if (safeSubjects.length <= 1) {
-      setSubjectAlertMsg('មិនអាចលុបបានទេ! ត្រូវតែមានយ៉ាងហោចណាស់មុខវិជ្ជា 1 ក្នុងប្រព័ន្ធ។');
-      return;
-    }
-    setIsDeleteSubjectModalOpen(true);
-  };
-
-  const handleConfirmDeleteSubject = () => {
-    if (!effectiveSubjectId || !onDeleteSubject) return;
-    onDeleteSubject(effectiveSubjectId);
-    setIsDeleteSubjectModalOpen(false);
-  };
 
   const effectiveTeacher = useMemo<TeacherAccount>(() => {
     if (teacher && teacher.id) return teacher;
@@ -163,7 +70,7 @@ export default function StudentManager({
   const handleExportAttendanceExcel = () => {
     const classObj = classes.find(c => c.id === currentClassIdForAttendance);
     const className = classObj ? classObj.name : 'គ្រប់ថ្នាក់';
-    const subName = effectiveSubName;
+    const subName = activeSubjectName || 'ទូទៅ';
     const d = new Date(attendanceDate);
     const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : '';
 
@@ -211,8 +118,7 @@ export default function StudentManager({
   };
 
   // Attendance states
-  const now = new Date();
-  const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  const todayStr = new Date().toISOString().split('T')[0];
   const [attendanceDate, setAttendanceDate] = useState<string>(todayStr);
   const [attendanceMap, setAttendanceMap] = useState<Record<string, Record<string, 'present' | 'absent' | 'permission' | 'late'>>>({});
   // Optional reasons for 'permission' or 'late' students
@@ -256,16 +162,7 @@ export default function StudentManager({
   const effectiveClassObj = classes.find(c => c.id === effectiveClassId) || classes.find(c => c.id === activeClassId) || classes[0];
   const effectiveClassName = effectiveClassObj?.name?.trim() || effectiveClassId || 'ថ្នាក់រៀន';
   const currentClassIdForAttendance = effectiveClassId;
-
-  const classStudents = useMemo(() => {
-    return students.filter(student => {
-      const targetClassId = filterClassId === 'all' ? activeClassId : filterClassId;
-      const targetClassObj = classes.find(c => c.id === targetClassId);
-      return filterClassId === 'all' || isStudentInClass(student, targetClassId, targetClassObj?.name);
-    });
-  }, [students, filterClassId, activeClassId, classes]);
-
-  const subjectKey = effectiveSubjectId;
+  const subjectKey = activeSubjectId || 'general';
   const classAttendanceKey = `${currentClassIdForAttendance}_${subjectKey}_${attendanceDate}`;
   const legacyClassAttendanceKey = `${currentClassIdForAttendance}_${attendanceDate}`;
   const currentClassAttendance = attendanceMap[classAttendanceKey] || attendanceMap[legacyClassAttendanceKey] || {};
@@ -390,16 +287,11 @@ export default function StudentManager({
   }, [effectiveTeacher?.id, currentClassIdForAttendance, subjectKey]);
 
   const currentMonthIdx = useMemo(() => {
-    if (attendanceDate && attendanceDate.includes('-')) {
-      const parts = attendanceDate.split('-');
-      const m = parseInt(parts[1], 10) - 1;
-      if (!isNaN(m) && m >= 0 && m <= 11) return m;
-    }
     const d = new Date(attendanceDate);
     return !isNaN(d.getTime()) ? d.getMonth() : new Date().getMonth();
   }, [attendanceDate]);
 
-  const currentKhmerMonth = KHMER_MONTHS[currentMonthIdx] || 'តុលា';
+  const currentKhmerMonth = KHMER_MONTHS[currentMonthIdx] || 'កញ្ញា';
 
   const handleAttendanceMonthChange = (khmerMonth: string) => {
     const monthIdx = KHMER_MONTHS.indexOf(khmerMonth);
@@ -423,114 +315,6 @@ export default function StudentManager({
     safeSetJSON('edu_spin_attendance_reasons', newMap);
   };
 
-  // Live Auto-Sync Status state for Google Sheets
-  const [autoSyncState, setAutoSyncState] = useState<{
-    status: 'idle' | 'syncing' | 'synced' | 'error' | 'needs_auth';
-    time?: string;
-    url?: string;
-    error?: string;
-  }>(() => {
-    const lastTime = localStorage.getItem(`sheets_last_sync_time_${effectiveClassId}`);
-    const lastUrl = localStorage.getItem(`sheets_last_sync_url_${effectiveClassId}`) || DEFAULT_ATTENDANCE_SHEET_URL;
-    const hasToken = !!getGoogleSheetsAccessToken();
-    return {
-      status: hasToken ? (lastTime ? 'synced' : 'idle') : 'needs_auth',
-      time: lastTime || undefined,
-      url: lastUrl
-    };
-  });
-
-  useEffect(() => {
-    const handleStatusEvt = (e: any) => {
-      if (e.detail) {
-        setAutoSyncState(prev => ({
-          ...prev,
-          status: e.detail.status,
-          time: e.detail.time || prev.time,
-          url: e.detail.spreadsheetUrl || prev.url,
-          error: e.detail.error
-        }));
-      }
-    };
-    window.addEventListener('sheets-auto-sync-status', handleStatusEvt);
-    return () => window.removeEventListener('sheets-auto-sync-status', handleStatusEvt);
-  }, []);
-
-  // Cross-device Google Sheets configuration sync (Laptop <-> Phone <-> iPad)
-  useEffect(() => {
-    const teacherIdToUse = effectiveTeacher?.id || DEFAULT_CLOUD_TEACHER.id;
-    if (!teacherIdToUse || !currentClassIdForAttendance || currentClassIdForAttendance === 'default') return;
-
-    const unsub = subscribeSheetsConfigFromCloud(teacherIdToUse, currentClassIdForAttendance, (cfg) => {
-      if (cfg.attendanceUrl) {
-        setAutoSyncState(prev => ({ ...prev, url: cfg.attendanceUrl || prev.url }));
-      }
-    });
-
-    return () => unsub();
-  }, [effectiveTeacher?.id, currentClassIdForAttendance]);
-
-  // Auto-sync on page refresh, visibility change, or returning to tab
-  useEffect(() => {
-    const handleVisibilityOrFocus = () => {
-      if (document.visibilityState === 'visible') {
-        const token = getGoogleSheetsAccessToken();
-        if (token && currentClassIdForAttendance && classStudents.length > 0) {
-          const d = new Date(attendanceDate);
-          const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : 'តុលា';
-          triggerDebouncedSheetsAutoSync({
-            className: effectiveClassName,
-            classId: currentClassIdForAttendance,
-            students: classStudents,
-            selectedMonth: khMonth,
-            activeSubjectName: effectiveSubName,
-            activeSubjectId: subjectKey,
-            attendanceMap: currentClassAttendance,
-            attendanceReasons: currentClassReasons,
-            attendanceDate: attendanceDate,
-            syncScores: false,
-            syncAttendance: true,
-            syncStatus: false
-          }, 800);
-        }
-      }
-    };
-
-    document.addEventListener('visibilitychange', handleVisibilityOrFocus);
-    window.addEventListener('focus', handleVisibilityOrFocus);
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityOrFocus);
-      window.removeEventListener('focus', handleVisibilityOrFocus);
-    };
-  }, [effectiveClassName, currentClassIdForAttendance, classStudents, attendanceDate, effectiveSubName, subjectKey, currentClassAttendance, currentClassReasons]);
-
-  const handleConnectOrOpenGoogleSheets = async () => {
-    try {
-      const token = getGoogleSheetsAccessToken();
-      if (!token) {
-        await requestGoogleSheetsAccess(getConnectedGoogleEmail());
-      }
-      const d = new Date(attendanceDate);
-      const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : 'តុលា';
-      await triggerDebouncedSheetsAutoSync({
-        className: effectiveClassName,
-        classId: currentClassIdForAttendance,
-        students: classStudents,
-        selectedMonth: khMonth,
-        activeSubjectName: effectiveSubName,
-        activeSubjectId: subjectKey,
-        attendanceMap: currentClassAttendance,
-        attendanceReasons: currentClassReasons,
-        attendanceDate: attendanceDate,
-        syncScores: false,
-        syncAttendance: true,
-        syncStatus: false
-      }, 100);
-    } catch (e: any) {
-      console.error(e);
-    }
-  };
-
   const syncAttendanceDocToCloud = async (
     targetRecords = currentClassAttendance,
     targetReasons = currentClassReasons
@@ -539,7 +323,7 @@ export default function StudentManager({
     if (teacherIdToUse && currentClassIdForAttendance && currentClassIdForAttendance !== 'default') {
       try {
         const d = new Date(attendanceDate);
-        const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : 'កញ្ញា';
+        const khMonth = !isNaN(d.getTime()) ? KHMER_MONTHS[d.getMonth()] : '';
         const attDocRef = doc(
           db,
           'teachers',
@@ -552,29 +336,13 @@ export default function StudentManager({
         await safeSetDoc(attDocRef, {
           classId: currentClassIdForAttendance,
           subjectId: subjectKey,
-          subjectName: effectiveSubName,
+          subjectName: activeSubjectName || '',
           date: attendanceDate,
           month: khMonth,
           records: targetRecords,
           reasons: targetReasons,
           updatedAt: new Date().toISOString()
         }, { merge: true });
-
-        // Real-time debounced auto-sync to Google Sheets
-        triggerDebouncedSheetsAutoSync({
-          className: effectiveClassName,
-          classId: currentClassIdForAttendance,
-          students: classStudents,
-          selectedMonth: khMonth,
-          activeSubjectName: effectiveSubName,
-          activeSubjectId: subjectKey,
-          attendanceMap: targetRecords,
-          attendanceReasons: targetReasons,
-          attendanceDate: attendanceDate,
-          syncScores: false,
-          syncAttendance: true,
-          syncStatus: false
-        });
       } catch (err) {
         console.error('Failed to sync attendance to cloud:', err);
       }
@@ -797,108 +565,41 @@ export default function StudentManager({
 
   // Sort logic for score tab
   const sortedScoreStudents = [...filteredStudents].sort((a, b) => {
-    const scoreA = getStudentTotalScoreForSubject(a, effectiveSubjectId);
-    const scoreB = getStudentTotalScoreForSubject(b, effectiveSubjectId);
     if (scoreSortOrder === 'desc') {
-      return scoreB - scoreA;
+      return (b.score || 0) - (a.score || 0);
     }
     if (scoreSortOrder === 'asc') {
-      return scoreA - scoreB;
+      return (a.score || 0) - (b.score || 0);
     }
     return a.name.localeCompare(b.name, 'km');
   });
 
-  // Cycle student status for effective subject
-  const handleCycleStudentStatus = (student: Student) => {
-    if (!onUpdateStudentDetail) return;
-    const currentStatus = (effectiveSubjectId && student.subjectScores?.[effectiveSubjectId]?.status) || student.status || 'សកម្ម';
-    const statusOrder: ('ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ')[] = ['ឆ្នើម', 'សកម្ម', 'កំពុងរីកចម្រើន', 'គួរឲ្យបារម្ភ'];
-    const nextIdx = (statusOrder.indexOf(currentStatus) + 1) % statusOrder.length;
-    const nextStatus = statusOrder[nextIdx];
-
-    const currentSubScores = { ...(student.subjectScores || {}) };
-    if (effectiveSubjectId) {
-      currentSubScores[effectiveSubjectId] = {
-        ...(currentSubScores[effectiveSubjectId] || {}),
-        status: nextStatus
-      };
-    }
-
-    onUpdateStudentDetail(student.id, {
-      status: nextStatus,
-      subjectScores: currentSubScores
-    });
-  };
-
-  // Quick Score Stepper Helper scoped to effective subject
+  // Quick Score Stepper Helper
   const handleScoreChange = (studentId: string, currentScore: number, delta: number) => {
     if (!onUpdateStudentDetail) return;
     const newScore = Math.max(0, (currentScore || 0) + delta);
-    const targetStudent = students.find(s => s.id === studentId);
-    const currentSubScores = { ...(targetStudent?.subjectScores || {}) };
-    if (effectiveSubjectId) {
-      currentSubScores[effectiveSubjectId] = {
-        ...(currentSubScores[effectiveSubjectId] || {}),
-        score: newScore
-      };
-    }
-    onUpdateStudentDetail(studentId, {
-      score: newScore,
-      subjectScores: currentSubScores
-    });
+    onUpdateStudentDetail(studentId, { score: newScore });
   };
 
   const handleDirectScoreSet = (studentId: string, value: number) => {
     if (!onUpdateStudentDetail) return;
     const newScore = Math.max(0, isNaN(value) ? 0 : value);
-    const targetStudent = students.find(s => s.id === studentId);
-    const currentSubScores = { ...(targetStudent?.subjectScores || {}) };
-    if (effectiveSubjectId) {
-      currentSubScores[effectiveSubjectId] = {
-        ...(currentSubScores[effectiveSubjectId] || {}),
-        score: newScore
-      };
-    }
-    onUpdateStudentDetail(studentId, {
-      score: newScore,
-      subjectScores: currentSubScores
-    });
+    onUpdateStudentDetail(studentId, { score: newScore });
   };
 
   const handleAddPointsToAll = (points: number) => {
     if (!onUpdateStudentDetail || filteredStudents.length === 0) return;
     filteredStudents.forEach(s => {
-      const currentScore = getStudentTotalScoreForSubject(s, effectiveSubjectId);
-      const newScore = Math.max(0, currentScore + points);
-      const currentSubScores = { ...(s.subjectScores || {}) };
-      if (effectiveSubjectId) {
-        currentSubScores[effectiveSubjectId] = {
-          ...(currentSubScores[effectiveSubjectId] || {}),
-          score: newScore
-        };
-      }
-      onUpdateStudentDetail(s.id, {
-        score: newScore,
-        subjectScores: currentSubScores
-      });
+      const newScore = Math.max(0, (s.score || 0) + points);
+      onUpdateStudentDetail(s.id, { score: newScore });
     });
   };
 
   const handleResetAllScores = () => {
     if (!onUpdateStudentDetail || filteredStudents.length === 0) return;
-    if (window.confirm(`តើអ្នកពិតជាចង់កំណត់ពិន្ទុសិស្សទាំងអស់ក្នុងមុខវិជ្ជា «${effectiveSubName}» ទៅ 0 ឡើងវិញមែនទេ?`)) {
+    if (window.confirm('តើអ្នកពិតជាចង់កំណត់ពិន្ទុសិស្សទាំងអស់ក្នុងបញ្ជីនេះទៅ 0 ឡើងវិញមែនទេ?')) {
       filteredStudents.forEach(s => {
-        const currentSubScores = { ...(s.subjectScores || {}) };
-        if (effectiveSubjectId) {
-          currentSubScores[effectiveSubjectId] = {
-            ...(currentSubScores[effectiveSubjectId] || {}),
-            score: 0
-          };
-        }
-        onUpdateStudentDetail(s.id, {
-          score: 0,
-          subjectScores: currentSubScores
-        });
+        onUpdateStudentDetail(s.id, { score: 0 });
       });
     }
   };
@@ -909,13 +610,10 @@ export default function StudentManager({
     return name.trim().charAt(0);
   };
 
-  // Status Stats Counters for effective subject
+  // Status Stats Counters
   const totalStudentsCount = filteredStudents.length;
   const femaleCount = filteredStudents.filter(s => s.gender === 'ស្រី').length;
-  const outstandingCount = filteredStudents.filter(s => {
-    const st = (effectiveSubjectId && s.subjectScores?.[effectiveSubjectId]?.status) || s.status || 'សកម្ម';
-    return st === 'ឆ្នើម';
-  }).length;
+  const outstandingCount = filteredStudents.filter(s => s.status === 'ឆ្នើម').length;
   
   const selectedClassName = filterClassId === 'all' 
     ? (classes.find(c => c.id === activeClassId)?.name || 'ថ្នាក់រៀន')
@@ -926,32 +624,11 @@ export default function StudentManager({
     return isStudentInClass(s, targetClassId, targetClassObj?.name);
   }).length;
 
-  // Score Tab Stats for effective subject
-  const totalScoresSum = filteredStudents.reduce((acc, s) => acc + getStudentTotalScoreForSubject(s, effectiveSubjectId), 0);
+  // Score Tab Stats
+  const totalScoresSum = filteredStudents.reduce((acc, s) => acc + (s.score || 0), 0);
   const averageScore = totalStudentsCount > 0 ? (totalScoresSum / totalStudentsCount).toFixed(1) : '0';
-  const highestScore = filteredStudents.reduce((max, s) => Math.max(max, getStudentTotalScoreForSubject(s, effectiveSubjectId)), 0);
-  const topStudent = filteredStudents.find(s => getStudentTotalScoreForSubject(s, effectiveSubjectId) === highestScore && highestScore > 0);
-
-  // Real-time Attendance Counters for Active Class on current attendanceDate (អវត្តមាន + មានច្បាប់ សរុបចូលគ្នា)
-  const { currentClassAbsentCount, currentClassPermCount, currentClassCombinedAbsentee } = useMemo(() => {
-    const targetClassId = filterClassId === 'all' ? activeClassId : filterClassId;
-    const targetClassObj = classes.find(c => c.id === targetClassId);
-    const classStudentsList = students.filter(s => filterClassId === 'all' || isStudentInClass(s, targetClassId, targetClassObj?.name));
-
-    let abs = 0;
-    let perm = 0;
-    classStudentsList.forEach(s => {
-      const status = currentClassAttendance[s.id];
-      if (status === 'absent') abs++;
-      else if (status === 'permission') perm++;
-    });
-
-    return {
-      currentClassAbsentCount: abs,
-      currentClassPermCount: perm,
-      currentClassCombinedAbsentee: abs + perm,
-    };
-  }, [students, filterClassId, activeClassId, classes, currentClassAttendance]);
+  const highestScore = filteredStudents.reduce((max, s) => Math.max(max, s.score || 0), 0);
+  const topStudent = filteredStudents.find(s => (s.score || 0) === highestScore && highestScore > 0);
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -1100,6 +777,17 @@ export default function StudentManager({
               }>
                 បញ្ចូលពិន្ទុ & តារាងពិន្ទុ
               </span>
+              {totalScoresSum > 0 && (
+                <span className={`text-[10px] px-2 py-0.5 rounded-full font-black transition-colors ${
+                  activeSubTab === 'score'
+                    ? isDarkMode 
+                      ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-xs' 
+                      : 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
+                    : isDarkMode ? 'bg-slate-800 text-amber-400' : 'bg-amber-50 text-amber-600'
+                }`}>
+                  {totalScoresSum} pts
+                </span>
+              )}
             </motion.span>
           </button>
 
@@ -1162,102 +850,22 @@ export default function StudentManager({
               }>
                 វត្តមានសិស្ស
               </span>
-              <span 
-                title={`អវត្តមាន និងច្បាប់សរុប៖ ${currentClassCombinedAbsentee} នាក់ (ច្បាប់ ${currentClassPermCount}, អវត្តមាន ${currentClassAbsentCount})`}
-                className={`text-[10px] px-2 py-0.5 rounded-full font-black transition-colors ${
-                  currentClassCombinedAbsentee > 0
-                    ? activeSubTab === 'attendance'
-                      ? isDarkMode 
-                        ? 'bg-rose-500/20 text-rose-300 border border-rose-400/30 shadow-xs' 
-                        : 'bg-rose-50 text-rose-700 border border-rose-200 shadow-xs'
-                      : isDarkMode ? 'bg-rose-950/60 text-rose-400 border border-rose-800/40' : 'bg-rose-100 text-rose-700'
-                    : activeSubTab === 'attendance'
-                      ? isDarkMode 
-                        ? 'bg-blue-500/20 text-blue-300 border border-blue-400/30 shadow-xs' 
-                        : 'bg-blue-50 text-blue-700 border border-blue-200 shadow-xs'
-                      : isDarkMode ? 'bg-slate-800 text-slate-400' : 'bg-slate-200 text-slate-600'
-                }`}
-              >
-                {currentClassCombinedAbsentee}
-              </span>
             </motion.span>
           </button>
         </div>
 
-        {/* Right Search, Subject Dropdown, & Class Filter */}
-        <div className="flex flex-wrap items-center gap-2.5 w-full sm:w-auto justify-end">
+        {/* Right Search & Class Filter */}
+        <div className="flex items-center gap-3 w-full sm:w-auto">
           {/* Search Input */}
-          <div className="relative flex-1 sm:w-56 min-w-[160px]">
+          <div className="relative flex-1 sm:w-64">
             <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400 dark:text-slate-500" />
             <input
               type="text"
               placeholder="ស្វែងរកឈ្មោះសិស្ស..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-10 pr-3 py-2 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 placeholder-slate-400 focus:border-indigo-500 transition-all shadow-xs"
+              className="w-full pl-10 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 placeholder-slate-400 focus:border-indigo-500 transition-all shadow-xs"
             />
-          </div>
-
-          {/* មុខវិជ្ជា (Subject Dropdown with Edit, Delete, Add) - Positioned BEFORE Class Selector */}
-          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-1 shadow-xs">
-            <div className="flex items-center gap-1.5 pl-2 pr-1">
-              <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 hidden sm:inline">មុខវិជ្ជា៖</span>
-              <select
-                value={effectiveSubjectId}
-                onChange={(e) => {
-                  const val = e.target.value;
-                  if (onSelectSubject) {
-                    onSelectSubject(val);
-                  }
-                }}
-                className="bg-transparent text-slate-800 dark:text-slate-100 text-xs font-black cursor-pointer focus:outline-none py-1"
-                title="ជ្រើសរើសមុខវិជ្ជា (Subject)"
-              >
-                {safeSubjects.map(s => (
-                  <option key={s.id} value={s.id} className={isDarkMode ? 'bg-slate-900 text-white' : 'bg-white text-slate-800'}>
-                    {s.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            {/* Subject Action Buttons: Edit, Delete, Add */}
-            <div className="flex items-center gap-0.5 border-l border-slate-200 dark:border-slate-800 pl-1">
-              {/* Edit / Rename Subject */}
-              <button
-                type="button"
-                onClick={handleOpenRenameSubject}
-                className="p-1.5 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/40 rounded-lg transition-all cursor-pointer"
-                title={`កែឈ្មោះមុខវិជ្ជា «${effectiveSubName}»`}
-              >
-                <Pencil className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Delete Subject */}
-              <button
-                type="button"
-                onClick={handleOpenDeleteSubject}
-                className="p-1.5 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer"
-                title={`លុបមុខវិជ្ជា «${effectiveSubName}»`}
-              >
-                <Trash2 className="w-3.5 h-3.5" />
-              </button>
-
-              {/* Add New Subject */}
-              <button
-                type="button"
-                onClick={() => {
-                  setNewSubInputName('');
-                  setIsAddSubjectModalOpen(true);
-                }}
-                className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg text-xs font-black flex items-center gap-1 transition-all cursor-pointer shadow-xs active:scale-95 ml-0.5"
-                title="បង្កើតមុខវិជ្ជាថ្មី (Add Subject)"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                <span className="hidden sm:inline">បន្ថែម</span>
-              </button>
-            </div>
           </div>
 
           {/* Grade Selector Dropdown */}
@@ -1271,7 +879,6 @@ export default function StudentManager({
               }
             }}
             className="px-3.5 py-2.5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 text-slate-700 dark:text-slate-200 rounded-xl text-xs font-bold shadow-xs focus:outline-none focus:border-indigo-500 cursor-pointer"
-            title="ជ្រើសរើសថ្នាក់រៀន"
           >
             {classes.map(c => (
               <option key={c.id} value={c.id}>{c.name}</option>
@@ -1293,7 +900,7 @@ export default function StudentManager({
                   setShowAddForm(!showAddForm);
                   setShowBulkForm(false);
                 }}
-                className="px-4 py-2.5 bg-[#8B4513] text-white hover:bg-[#A0522D] rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer border-none active:scale-95"
+                className="px-4 py-2.5 bg-indigo-600 text-white hover:bg-indigo-700 rounded-xl text-xs font-bold flex items-center gap-2 shadow-sm transition-all cursor-pointer border-none active:scale-95"
               >
                 <UserPlus className="w-4 h-4" />
                 <span>+ បន្ថែមម្នាក់</span>
@@ -1327,34 +934,6 @@ export default function StudentManager({
               >
                 <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
                 <span>មើល & កែឈ្មោះទាំងអស់</span>
-              </button>
-
-              {/* Google Sheets Sync Button */}
-              <button
-                type="button"
-                onClick={() => {
-                  window.dispatchEvent(new CustomEvent('open-google-sheets-sync', {
-                    detail: {
-                      classId: effectiveClassId,
-                      className: effectiveClassName,
-                      subjectId: effectiveSubjectId,
-                      subjectName: effectiveSubName,
-                      selectedMonth: currentKhmerMonth,
-                      attendanceDate: attendanceDate,
-                      attendanceMap: currentClassAttendance,
-                      attendanceReasons: currentClassReasons,
-                      students: filteredStudents,
-                      syncScores: false,
-                      syncAttendance: false,
-                      syncStatus: true
-                    }
-                  }));
-                }}
-                className="px-4 py-2.5 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/25 flex items-center gap-1.5 border border-emerald-400/30 active:scale-95"
-                title="រក្សាទុកស្ថានភាពសិស្សទៅក្នុង Google Sheet តាមគណនី Gmail"
-              >
-                <FileSpreadsheet className="w-4 h-4" />
-                <span>Google Sheet</span>
               </button>
             </div>
 
@@ -1573,26 +1152,6 @@ export default function StudentManager({
             </form>
           )}
 
-          {/* Active Subject Banner for Tab 1 */}
-          <div className="flex items-center justify-between px-4 py-2.5 rounded-2xl bg-indigo-50/80 dark:bg-indigo-950/30 border border-indigo-100 dark:border-indigo-900/40 text-xs text-indigo-900 dark:text-indigo-200">
-            <div className="flex items-center gap-2 flex-wrap">
-              <BookOpen className="w-4 h-4 text-indigo-500 shrink-0" />
-              <span className="font-semibold text-slate-500 dark:text-slate-400">មុខវិជ្ជាសកម្ម៖</span>
-              <span className="font-black text-indigo-700 dark:text-indigo-300 bg-white dark:bg-slate-900 px-2.5 py-0.5 rounded-lg border border-indigo-200 dark:border-indigo-800 shadow-xs">
-                📚 {effectiveSubName}
-              </span>
-              <span className="text-[11px] text-slate-500 dark:text-slate-400 hidden md:inline">
-                (រាល់ការកែប្រែស្ថានភាព និងពិន្ទុ នឹងត្រូវកំណត់តាមមុខវិជ្ជានេះ)
-              </span>
-            </div>
-            <div className="flex items-center gap-1.5 text-[11px] font-bold text-indigo-600 dark:text-indigo-400">
-              <span>សិស្សឆ្នើមក្នុងមុខវិជ្ជានេះ៖</span>
-              <span className="font-black px-2 py-0.5 rounded-full bg-emerald-100 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300 border border-emerald-200/60 dark:border-emerald-800/40">
-                {outstandingCount} នាក់
-              </span>
-            </div>
-          </div>
-
           {/* Student Cards Listing Directory Grid (Sorted ក-អ, left column then right column) */}
           {(() => {
             // Strictly sort by Khmer alphabet (ក-អ)
@@ -1626,13 +1185,12 @@ export default function StudentManager({
               const studentClass = classes.find(c => c.id === (student.classId || activeClassId))?.name || 'ថ្នាក់ទី៧ក';
               
               let statusPillColor = 'bg-blue-50 text-blue-700 dark:bg-blue-950/30 dark:text-blue-300 border border-blue-200/50 dark:border-blue-800/40';
-              const statusKey = (effectiveSubjectId && student.subjectScores?.[effectiveSubjectId]?.status) || student.status || 'សកម្ម';
-              const studentSubScore = getStudentTotalScoreForSubject(student, effectiveSubjectId);
+              const statusKey = student.status || 'សកម្ម';
               if (statusKey === 'ឆ្នើម') statusPillColor = 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/30 dark:text-emerald-300 border border-emerald-200/50 dark:border-emerald-800/40';
               else if (statusKey === 'កំពុងរីកចម្រើន') statusPillColor = 'bg-purple-50 text-purple-700 dark:bg-purple-950/30 dark:text-purple-300 border border-purple-200/50 dark:border-purple-800/40';
               else if (statusKey === 'គួរឲ្យបារម្ភ') statusPillColor = 'bg-amber-50 text-amber-700 dark:bg-amber-950/30 dark:text-amber-300 border border-amber-200/50 dark:border-amber-800/40';
 
-              const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-[#474a4f]', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-[#474a4f]'];
+              const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-blue-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
               const badgeBg = colors[student.name.charCodeAt(0) % colors.length];
 
               return (
@@ -1640,7 +1198,7 @@ export default function StudentManager({
                   key={student.id}
                   className={`border rounded-2xl p-4.5 shadow-xs hover:shadow-md transition-all flex items-center justify-between group ${
                     isDarkMode 
-                      ? 'bg-[#272525] border-slate-800/80 hover:border-slate-700' 
+                      ? 'bg-[#0e1524] border-slate-800/80 hover:border-slate-700' 
                       : 'bg-white border-slate-200/80 hover:border-slate-300'
                   }`}
                 >
@@ -1707,19 +1265,8 @@ export default function StudentManager({
                           }}
                           isDarkMode={isDarkMode}
                         />
-                        <button
-                          type="button"
-                          onClick={() => handleCycleStudentStatus(student)}
-                          className={`text-[10px] font-black px-2.5 py-0.5 rounded-full cursor-pointer transition-all active:scale-95 hover:opacity-85 ${statusPillColor}`}
-                          title={`ចុចដើម្បីប្ដូរស្ថានភាព (មុខវិជ្ជា៖ ${effectiveSubName})`}
-                        >
+                        <span className={`text-[10px] font-bold px-2.5 py-0.5 rounded-full ${statusPillColor}`}>
                           {statusKey}
-                        </button>
-                        <span 
-                          className="text-[10px] font-black px-2 py-0.5 rounded-md bg-amber-50 dark:bg-amber-950/40 text-amber-700 dark:text-amber-300 border border-amber-200/60 dark:border-amber-800/50" 
-                          title={`ពិន្ទុសរុបមុខវិជ្ជា៖ ${effectiveSubName}`}
-                        >
-                          ⭐ {studentSubScore} ពិន្ទុ
                         </span>
                         {student.phoneNumber && (
                           <span className="text-[10px] font-medium text-slate-400 hidden sm:inline-block">
@@ -1774,7 +1321,7 @@ export default function StudentManager({
             isDarkMode ? 'border-slate-800' : 'border-slate-200'
           }`}>
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សសរុប</p>
@@ -1788,7 +1335,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>សិស្សស្រី</p>
@@ -1802,7 +1349,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>{selectedClassName}</p>
@@ -1816,7 +1363,7 @@ export default function StudentManager({
             </div>
 
             <div className={`border p-4 rounded-2xl shadow-xs flex items-center justify-between ${
-              isDarkMode ? 'bg-[#272525] border-slate-800/80' : 'bg-white border-slate-200/80'
+              isDarkMode ? 'bg-[#0e1524] border-slate-800/80' : 'bg-white border-slate-200/80'
             }`}>
               <div>
                 <p className={`text-[10px] font-bold uppercase ${isDarkMode ? 'text-slate-400' : 'text-slate-500'}`}>ឆ្នើម (Outstanding)</p>
@@ -1842,9 +1389,9 @@ export default function StudentManager({
           onUpdateStudentDetail={onUpdateStudentDetail}
           currentSortMode={studentSortMode}
           onSortModeChange={handleSortModeChange}
-          activeSubjectId={effectiveSubjectId}
-          activeSubjectName={effectiveSubName}
-          subjects={safeSubjects}
+          activeSubjectId={activeSubjectId}
+          activeSubjectName={activeSubjectName}
+          subjects={subjects}
           onSelectSubject={onSelectSubject}
         />
       )}
@@ -1880,7 +1427,7 @@ export default function StudentManager({
                       </select>
                     </div>
                   ) : activeSubjectName ? (
-                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-white border border-indigo-200 dark:border-indigo-800">
+                    <span className="px-2.5 py-0.5 rounded-full text-[11px] font-black bg-indigo-100 dark:bg-indigo-950/80 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
                       📚 {activeSubjectName}
                     </span>
                   ) : null}
@@ -1973,63 +1520,6 @@ export default function StudentManager({
                 >
                   <FileSpreadsheet className="w-4 h-4" />
                   <span>ទាញយក Excel</span>
-                </button>
-
-                {/* Live Real-Time Auto-Sync Status Badge */}
-                {autoSyncState.status === 'syncing' ? (
-                  <div className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-amber-50 dark:bg-amber-950/60 border border-amber-300 dark:border-amber-800 text-amber-800 dark:text-amber-300 text-xs font-black shadow-xs animate-pulse">
-                    <RotateCcw className="w-3.5 h-3.5 animate-spin text-amber-600" />
-                    <span>កំពុង Auto-Sync ទៅ Sheets...</span>
-                  </div>
-                ) : autoSyncState.status === 'synced' ? (
-                  <a
-                    href={autoSyncState.url || DEFAULT_ATTENDANCE_SHEET_URL}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-emerald-50 hover:bg-emerald-100 dark:bg-emerald-950/60 dark:hover:bg-emerald-900/60 border border-emerald-300 dark:border-emerald-800 text-emerald-800 dark:text-emerald-300 text-xs font-black shadow-xs transition-all cursor-pointer"
-                    title="ទិន្នន័យបានធ្វើសមកាលកម្មស្វ័យប្រវត្តិតាម Realtime — ចុចដើម្បីបើកមើលលើ Google Sheets"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                    <span>Auto-Synced {autoSyncState.time ? `(${autoSyncState.time})` : ''}</span>
-                    <ExternalLink className="w-3.5 h-3.5 text-emerald-600 dark:text-emerald-400" />
-                  </a>
-                ) : (
-                  <button
-                    type="button"
-                    onClick={handleConnectOrOpenGoogleSheets}
-                    className="inline-flex items-center gap-1.5 px-3 py-2 rounded-xl bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/60 border border-blue-300 dark:border-blue-800 text-blue-800 dark:text-blue-300 text-xs font-black shadow-xs cursor-pointer transition-all active:scale-95"
-                    title="ចុចដើម្បីភ្ជាប់ Google Sheets សម្រាប់ Auto-Sync គ្រប់ឧបករណ៍ (Laptop, Phone, iPad)"
-                  >
-                    <span className="w-2 h-2 rounded-full bg-blue-500" />
-                    <span>ភ្ជាប់ Auto-Sync</span>
-                  </button>
-                )}
-
-                <button
-                  type="button"
-                  onClick={() => {
-                    window.dispatchEvent(new CustomEvent('open-google-sheets-sync', {
-                      detail: {
-                        classId: currentClassIdForAttendance,
-                        className: effectiveClassName,
-                        subjectId: effectiveSubjectId,
-                        subjectName: effectiveSubName,
-                        selectedMonth: currentKhmerMonth,
-                        attendanceDate: attendanceDate,
-                        attendanceMap: currentClassAttendance,
-                        attendanceReasons: currentClassReasons,
-                        students: filteredStudents,
-                        syncScores: false,
-                        syncAttendance: true,
-                        syncStatus: false
-                      }
-                    }));
-                  }}
-                  className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-black text-xs transition-all cursor-pointer shadow-md shadow-emerald-600/25 flex items-center gap-1.5 border border-emerald-400/30 active:scale-95"
-                  title="រក្សាទុកវត្តមានទៅក្នុង Google Sheet តាមគណនី Gmail"
-                >
-                  <FileSpreadsheet className="w-4 h-4" />
-                  <span>Google Sheet</span>
                 </button>
               </div>
             </div>
@@ -2264,13 +1754,6 @@ export default function StudentManager({
                       }`}>
                         អវត្ត {absentCount}
                       </span>
-                      <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-black ${
-                        attendanceViewTab === 'permission_absent' || attendanceViewTab === 'absent' || attendanceViewTab === 'permission'
-                          ? 'bg-white/30 text-white'
-                          : 'bg-rose-100 text-rose-800 dark:bg-rose-950/60 dark:text-rose-300'
-                      }`} title="សរុបអវត្តមាន និងច្បាប់ចូលគ្នា">
-                        សរុប {combinedAbsentee}
-                      </span>
                     </div>
                   </button>
 
@@ -2322,25 +1805,18 @@ export default function StudentManager({
             <div className={`border rounded-3xl overflow-hidden shadow-sm ${
               isDarkMode ? 'bg-slate-900/60 border-slate-800' : 'bg-white border-slate-200'
             }`}>
-            <div className="overflow-x-auto relative">
-              <table className="w-full text-left border-separate border-spacing-0">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left border-collapse">
                 <thead>
-                  <tr className={`text-[11px] font-black uppercase tracking-wider ${
-                    isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
+                  <tr className={`border-b text-[11px] font-black uppercase tracking-wider ${
+                    isDarkMode ? 'bg-slate-950/80 border-slate-800 text-slate-400' : 'bg-slate-50 border-slate-200 text-slate-500'
                   }`}>
-                    {/* ល.រ (Pinned Left at 0: រូបទី៣ វត្តមាន សូមpin ល.រ និងឈ្មោះ) */}
-                    <th className={`p-3.5 w-[48px] min-w-[48px] max-w-[48px] text-center sticky top-0 left-0 z-30 border-r border-b border-slate-200 dark:border-slate-800 ${
-                      isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
-                    } shadow-2xs`}>
-                      ល.រ
-                    </th>
+                    <th className="p-4 w-14 text-center">ល.រ</th>
 
-                    {/* ID Column Sortable (NOT Pinned Horizontally: រូបទី២/៣ សូមកុំpin ID) */}
+                    {/* ID Column Sortable */}
                     <th 
                       onClick={() => handleSortModeChange(studentSortMode === 'id' ? 'name' : 'id')}
-                      className={`p-3.5 w-24 min-w-[96px] max-w-[96px] text-center cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group sticky top-0 z-10 border-r border-b border-slate-200 dark:border-slate-800 ${
-                        isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
-                      }`}
+                      className="p-4 w-28 text-center cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
                       title="ចុចដើម្បីតម្រៀបតាម ID (0-9 / A-Z) — ផ្លាស់ប្ដូរទាំងវត្តមាន និងពិន្ទុសិស្ស"
                     >
                       <div className="flex items-center justify-center gap-1.5">
@@ -2349,12 +1825,10 @@ export default function StudentManager({
                       </div>
                     </th>
 
-                    {/* Name Column Sortable (Pinned Left at 48px right after ល.រ: រូបទី៣ វត្តមាន សូមpin ល.រ និងឈ្មោះ) */}
+                    {/* Name Column Sortable */}
                     <th 
                       onClick={() => handleSortModeChange(studentSortMode === 'name' ? 'id' : 'name')}
-                      className={`p-3.5 min-w-[160px] max-w-[220px] cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group sticky top-0 left-[48px] z-30 border-r-2 border-b border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] ${
-                        isDarkMode ? 'bg-slate-950 text-slate-200' : 'bg-slate-50 text-slate-800'
-                      }`}
+                      className="p-4 cursor-pointer hover:bg-indigo-500/10 transition-colors select-none group"
                       title="ចុចដើម្បីតម្រៀបតាមអក្ខរក្រម (ក-អ) — ផ្លាស់ប្ដូរទាំងវត្តមាន និងពិន្ទុសិស្ស"
                     >
                       <div className="flex items-center gap-2">
@@ -2364,16 +1838,8 @@ export default function StudentManager({
                       </div>
                     </th>
 
-                    <th className={`p-3.5 w-24 min-w-[90px] text-center sticky top-0 z-10 border-r border-b border-slate-200 dark:border-slate-800 ${
-                      isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
-                    }`}>
-                      ភេទ
-                    </th>
-                    <th className={`p-3.5 text-center min-w-[320px] sticky top-0 z-10 border-b border-slate-200 dark:border-slate-800 ${
-                      isDarkMode ? 'bg-slate-950 text-slate-400' : 'bg-slate-50 text-slate-500'
-                    }`}>
-                      ស្ថានភាពវត្តមានប្រចាំថ្ងៃ
-                    </th>
+                    <th className="p-4 w-24 text-center">ភេទ</th>
+                    <th className="p-4 text-center">ស្ថានភាពវត្តមានប្រចាំថ្ងៃ</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y dark:divide-slate-800 text-xs font-bold">
@@ -2388,18 +1854,11 @@ export default function StudentManager({
                       const currentStatus = currentClassAttendance[student.id] || 'present';
                       const currentReason = currentClassReasons[student.id] || '';
                       return (
-                        <tr key={student.id} className={`group/att transition-colors ${
+                        <tr key={student.id} className={`transition-colors ${
                           isDarkMode ? 'hover:bg-slate-800/40' : 'hover:bg-slate-50/80'
                         }`}>
-                          {/* ល.រ (Pinned Left at 0) */}
-                          <td className={`p-3 text-center text-slate-400 font-mono font-bold w-[48px] min-w-[48px] max-w-[48px] sticky left-0 z-20 border-r border-b border-slate-200 dark:border-slate-800 ${
-                            isDarkMode ? 'bg-slate-950' : 'bg-white'
-                          } group-hover/att:bg-slate-100 dark:group-hover/att:bg-slate-900 transition-colors shadow-2xs`}>
-                            {index + 1}
-                          </td>
-
-                          {/* ID Column (NOT Pinned Horizontally: scrolls) */}
-                          <td className="p-2.5 text-center w-24 min-w-[96px] max-w-[96px] border-r border-b border-slate-200 dark:border-slate-800">
+                          <td className="p-4 text-center text-slate-400 font-mono font-bold">{index + 1}</td>
+                          <td className="p-3 text-center">
                             <input
                               type="text"
                               value={student.studentId || ''}
@@ -2409,17 +1868,13 @@ export default function StudentManager({
                                   onUpdateStudentDetail(student.id, { studentId: e.target.value });
                                 }
                               }}
-                              className="w-20 text-center py-1.5 px-2 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 rounded-xl font-mono font-black text-slate-800 dark:text-slate-100 text-xs border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-2xs"
+                              className="w-24 text-center py-1.5 px-2 bg-slate-100/90 dark:bg-slate-800/90 hover:bg-white dark:hover:bg-slate-800 focus:bg-white dark:focus:bg-slate-900 rounded-xl font-mono font-black text-slate-800 dark:text-slate-100 text-xs border border-slate-200 dark:border-slate-700 focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all shadow-2xs"
                               title="កែប្រែ ID សិស្ស (បញ្ចូលតែម្ដង ភ្ជាប់ទាំងពិន្ទុ និងវត្តមាន)"
                             />
                           </td>
-
-                          {/* ឈ្មោះសិស្ស (Pinned Left at 48px right after ល.រ) */}
-                          <td className={`p-3 min-w-[160px] max-w-[220px] sticky left-[48px] z-20 border-r-2 border-b border-slate-300 dark:border-slate-700 shadow-[4px_0_10px_-2px_rgba(0,0,0,0.12)] dark:shadow-[4px_0_10px_-2px_rgba(0,0,0,0.45)] ${
-                            isDarkMode ? 'bg-slate-950' : 'bg-white'
-                          } group-hover/att:bg-slate-100 dark:group-hover/att:bg-slate-900 transition-colors`}>
-                            <div className="flex items-center gap-2.5">
-                              <div className="w-8 h-8 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-xs shadow-xs shrink-0">
+                          <td className="p-4">
+                            <div className="flex items-center gap-3">
+                              <div className="w-9 h-9 rounded-xl bg-indigo-600/10 text-indigo-600 dark:text-indigo-400 font-black flex items-center justify-center text-sm shadow-xs shrink-0">
                                 {student.avatarUrl ? (
                                   <img src={student.avatarUrl} alt="" className="w-full h-full object-cover rounded-xl" />
                                 ) : student.emoji ? (
@@ -2428,14 +1883,12 @@ export default function StudentManager({
                                   <span>{student.name.charAt(0)}</span>
                                 )}
                               </div>
-                              <div className="truncate">
-                                <div className="font-extrabold text-sm truncate">{student.name}</div>
+                              <div>
+                                <div className="font-extrabold text-sm">{student.name}</div>
                               </div>
                             </div>
                           </td>
-
-                          {/* ភេទ */}
-                          <td className="p-3 text-center border-r border-b border-slate-200 dark:border-slate-800">
+                          <td className="p-3 text-center">
                             <GenderBadgePicker
                               gender={student.gender || 'ប្រុស'}
                               onChange={(newGender) => {
@@ -2446,9 +1899,7 @@ export default function StudentManager({
                               isDarkMode={isDarkMode}
                             />
                           </td>
-
-                          {/* ស្ថានភាពវត្តមានប្រចាំថ្ងៃ */}
-                          <td className="p-3 border-b border-slate-200 dark:border-slate-800">
+                          <td className="p-4">
                             <div className="flex items-center justify-center gap-2">
                               {/* រូបទី៣៖ ប៊ូតុងវត្តមានទាំង ៤ */}
                               <div className="flex items-center justify-center gap-1.5 shrink-0">
@@ -2707,20 +2158,7 @@ export default function StudentManager({
         isDarkMode={isDarkMode}
         onSaveStudent={async (id, updatedFields) => {
           if (onUpdateStudentDetail) {
-            const targetStudent = students.find(s => s.id === id);
-            const currentSubScores = { ...(targetStudent?.subjectScores || {}) };
-            if (effectiveSubjectId) {
-              const currentSubData = currentSubScores[effectiveSubjectId] || {};
-              currentSubScores[effectiveSubjectId] = {
-                ...currentSubData,
-                status: updatedFields.status || currentSubData.status || targetStudent?.status || 'សកម្ម',
-                score: updatedFields.score !== undefined ? updatedFields.score : (currentSubData.score !== undefined ? currentSubData.score : targetStudent?.score || 0)
-              };
-            }
-            await onUpdateStudentDetail(id, {
-              ...updatedFields,
-              subjectScores: currentSubScores
-            });
+            await onUpdateStudentDetail(id, updatedFields);
           }
           setProfileStudent(prev => (prev && prev.id === id ? { ...prev, ...updatedFields } : null));
         }}
@@ -2729,175 +2167,6 @@ export default function StudentManager({
           setProfileStudent(null);
         }}
       />
-
-      {/* Modal 1: Add New Subject Modal */}
-      {isAddSubjectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <BookOpen className="w-4 h-4 text-indigo-500" />
-                <span>+ បង្កើតមុខវិជ្ជាថ្មី (Add Subject)</span>
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setIsAddSubjectModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmAddSubject} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  ឈ្មោះមុខវិជ្ជាថ្មី៖
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="ឧ. គណិតវិទ្យា, ភាសាខ្មែរ, រូបវិទ្យា, គីមីវិទ្យា..."
-                  value={newSubInputName}
-                  onChange={(e) => setNewSubInputName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsAddSubjectModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                >
-                  បោះបង់
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                >
-                  បង្កើតមុខវិជ្ជា
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 2: Rename Subject Modal */}
-      {isRenameSubjectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-5 animate-in zoom-in-95 duration-200">
-            <div className="flex items-center justify-between border-b border-slate-100 dark:border-slate-800 pb-3">
-              <h3 className="text-sm font-black text-slate-800 dark:text-white flex items-center gap-2">
-                <Pencil className="w-4 h-4 text-indigo-500" />
-                <span>✏️ កែឈ្មោះមុខវិជ្ជា (Rename Subject)</span>
-              </h3>
-              <button 
-                type="button" 
-                onClick={() => setIsRenameSubjectModalOpen(false)}
-                className="text-slate-400 hover:text-slate-600 dark:hover:text-slate-200 text-sm font-bold p-1 cursor-pointer"
-              >
-                ✕
-              </button>
-            </div>
-
-            <form onSubmit={handleConfirmRenameSubject} className="space-y-4">
-              <div className="space-y-1.5">
-                <label className="text-xs font-bold text-slate-700 dark:text-slate-300">
-                  ឈ្មោះមុខវិជ្ជា៖
-                </label>
-                <input
-                  type="text"
-                  required
-                  autoFocus
-                  placeholder="បញ្ចូលឈ្មោះមុខវិជ្ជាថ្មី..."
-                  value={renameSubInputName}
-                  onChange={(e) => setRenameSubInputName(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
-                />
-              </div>
-
-              <div className="flex justify-end gap-2.5 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setIsRenameSubjectModalOpen(false)}
-                  className="px-4 py-2 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-                >
-                  បោះបង់
-                </button>
-                <button
-                  type="submit"
-                  className="px-5 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs font-bold transition-all shadow-md active:scale-95 cursor-pointer"
-                >
-                  រក្សាទុក
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 3: Delete Subject Confirmation Modal (with Male/Female Teacher Customization) */}
-      {isDeleteSubjectModalOpen && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-md space-y-5 animate-in zoom-in-95 duration-200 text-center">
-            {/* Soft Danger Icon */}
-            <div className="w-14 h-14 rounded-2xl bg-rose-50 dark:bg-rose-950/60 border border-rose-200/80 dark:border-rose-800/60 flex items-center justify-center text-rose-600 dark:text-rose-400 mx-auto shadow-xs">
-              <Trash2 className="w-7 h-7" />
-            </div>
-
-            {/* Question Text formatted exactly per user instruction */}
-            <div className="space-y-2">
-              <h3 className="text-base sm:text-lg font-black text-slate-800 dark:text-white leading-snug">
-                តើ{teacherTitle}ចង់លុបមុខវិជ្ជា «{effectiveSubName}» មែនទេ?
-              </h3>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium leading-relaxed">
-                រាល់ពិន្ទុ និងវត្តមានរបស់មុខវិជ្ជា «{effectiveSubName}» នេះនឹងត្រូវលុបចេញពីប្រព័ន្ធ។
-              </p>
-            </div>
-
-            {/* Action Buttons: 'ទេ' (No) and 'បាទ' (Yes for Male) / 'ចាស' (Yes for Female) */}
-            <div className="grid grid-cols-2 gap-3 pt-2">
-              <button
-                type="button"
-                onClick={() => setIsDeleteSubjectModalOpen(false)}
-                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
-              >
-                ទេ
-              </button>
-              <button
-                type="button"
-                onClick={handleConfirmDeleteSubject}
-                className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-rose-600 hover:bg-rose-700 text-white shadow-md shadow-rose-600/30 transition-all cursor-pointer active:scale-95"
-              >
-                {confirmWord}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Modal 4: Minimum Subject Alert Modal (replaces window.alert) */}
-      {subjectAlertMsg && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-in fade-in duration-200">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-3xl p-6 shadow-2xl w-full max-w-sm space-y-4 animate-in zoom-in-95 duration-200 text-center">
-            <div className="w-12 h-12 rounded-2xl bg-amber-50 dark:bg-amber-950/60 border border-amber-200 dark:border-amber-800 flex items-center justify-center text-amber-600 dark:text-amber-400 mx-auto">
-              <ShieldAlert className="w-6 h-6" />
-            </div>
-            <p className="text-xs font-bold text-slate-700 dark:text-slate-200 leading-relaxed">
-              {subjectAlertMsg}
-            </p>
-            <button
-              type="button"
-              onClick={() => setSubjectAlertMsg(null)}
-              className="w-full py-2.5 px-4 rounded-xl font-bold text-xs bg-indigo-600 hover:bg-indigo-700 text-white transition-all cursor-pointer"
-            >
-              យល់ព្រម
-            </button>
-          </div>
-        </div>
-      )}
     </div>
   );
 }

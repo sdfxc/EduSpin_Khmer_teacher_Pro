@@ -21,7 +21,6 @@ export interface MonthlyDetailedScore {
 export interface SubjectScoreData {
   score?: number;
   monthlyScores?: Record<string, MonthlyDetailedScore>;
-  status?: 'ឆ្នើម' | 'សកម្ម' | 'កំពុងរីកចម្រើន' | 'គួរឲ្យបារម្ភ';
 }
 
 export interface Student {
@@ -117,13 +116,11 @@ export interface TeacherAccount {
   authProvider?: 'username' | 'email' | 'google' | 'facebook' | 'telegram';
   telegramId?: string;
   telegramUsername?: string;
-  gender?: 'ប្រុស' | 'ស្រី';
-  title?: 'លោកគ្រូ' | 'អ្នកគ្រូ';
 }
 
 export const DEFAULT_CLOUD_TEACHER: TeacherAccount = {
   id: 'email_khengkhey835_gmail_com',
-  name: 'លោកគ្រូ/អ្នកគ្រូ',
+  name: 'បង្កើតគណនីគ្រូ',
   schoolName: 'សាលារៀនសុវណ្ណភូមិ',
   username: 'khengkhey835',
   email: 'khengkhey835@gmail.com',

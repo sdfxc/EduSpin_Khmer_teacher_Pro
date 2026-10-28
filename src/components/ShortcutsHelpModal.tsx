@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion } from 'motion/react';
-import { X, Keyboard, Play, RotateCcw, Maximize, Volume2 } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
+import { X, Keyboard, Play, RotateCcw, Maximize, Volume2, Sparkles } from 'lucide-react';
 
 interface ShortcutsHelpModalProps {
   isOpen: boolean;
@@ -14,50 +13,38 @@ export const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
   onClose,
   isDarkMode = false
 }) => {
-  const { language } = useLanguage();
-
   if (!isOpen) return null;
 
   const shortcuts = [
     {
       key: 'Space',
-      description: language === 'km' 
-        ? 'បង្វិលកង ឬចាប់ឈ្មោះសិស្សចៃដន្យ (Spin / Pick Student)' 
-        : 'Spin wheel or pick student randomly',
+      description: 'បង្វិលកង ឬចាប់ឈ្មោះសិស្សចៃដន្យ (Spin / Pick Student)',
       icon: Play,
-      category: language === 'km' ? 'ការចាប់ឈ្មោះ' : 'Spinning'
+      category: 'ការចាប់ឈ្មោះ'
     },
     {
       key: 'R',
-      description: language === 'km' 
-        ? 'កំណត់បញ្ជីឈ្មោះសិស្សដែលបានហៅឡើងវិញ (Reset Picked Pool)' 
-        : 'Reset called student list pool',
+      description: 'កំណត់បញ្ជីឈ្មោះសិស្សដែលបានហៅឡើងវិញ (Reset Picked Pool)',
       icon: RotateCcw,
-      category: language === 'km' ? 'ការគ្រប់គ្រង' : 'Management'
+      category: 'ការគ្រប់គ្រង'
     },
     {
       key: 'F',
-      description: language === 'km' 
-        ? 'ពង្រីកពេញអេក្រង់ / ចេញពីអេក្រង់ពេញ (Toggle Fullscreen)' 
-        : 'Toggle fullscreen mode',
+      description: 'ពង្រីកពេញអេក្រង់ / ចេញពីអេក្រង់ពេញ (Toggle Fullscreen)',
       icon: Maximize,
-      category: language === 'km' ? 'ការបង្ហាញ' : 'Display'
+      category: 'ការបង្ហាញ'
     },
     {
       key: 'M',
-      description: language === 'km' 
-        ? 'បិទ ឬបើកសំឡេងហ្គេម (Toggle Sound Mute)' 
-        : 'Toggle audio/sound mute',
+      description: 'បិទ ឬបើកសំឡេងហ្គេម (Toggle Sound Mute)',
       icon: Volume2,
-      category: language === 'km' ? 'សំឡេង' : 'Audio'
+      category: 'សំឡេង'
     },
     {
       key: 'Esc',
-      description: language === 'km' 
-        ? 'បិទផ្ទាំង Dialog ឬ Modal ណាមួយ (Close Modal)' 
-        : 'Close active modal / dialog',
+      description: 'បិទផ្ទាំង Dialog ឬ Modal ណាមួយ (Close Modal)',
       icon: X,
-      category: language === 'km' ? 'ទូទៅ' : 'General'
+      category: 'ទូទៅ'
     },
   ];
 
@@ -79,12 +66,8 @@ export const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
               <Keyboard className="w-5 h-5" />
             </div>
             <div>
-              <h2 className="text-base font-black">
-                {language === 'km' ? 'គ្រាប់ចុចកាត់ (Keyboard Shortcuts)' : 'Keyboard Shortcuts'}
-              </h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">
-                {language === 'km' ? 'សម្រាប់គ្រូប្រើប្រាស់រហ័សក្នុងថ្នាក់' : 'Quick control shortcuts for teaching in class'}
-              </p>
+              <h2 className="text-base font-black">គ្រាប់ចុចកាត់ (Keyboard Shortcuts)</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">សម្រាប់គ្រូប្រើប្រាស់រហ័សក្នុងថ្នាក់</p>
             </div>
           </div>
           <button
@@ -127,9 +110,9 @@ export const ShortcutsHelpModal: React.FC<ShortcutsHelpModalProps> = ({
         }`}>
           <button
             onClick={onClose}
-            className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors cursor-pointer"
+            className="px-4 py-2 rounded-xl text-xs font-bold bg-indigo-600 hover:bg-indigo-700 text-white transition-colors"
           >
-            {language === 'km' ? 'យល់ព្រម' : 'OK'}
+            យល់ព្រម
           </button>
         </div>
       </motion.div>

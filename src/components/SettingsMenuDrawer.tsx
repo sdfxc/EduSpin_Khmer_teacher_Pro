@@ -28,7 +28,6 @@ import {
 import { ClassInfo, Student, QuizSubject, QuizCard, QuizChapter, TeacherAccount } from '../types';
 import { GlassLiquidOverlay } from './GlassLiquidCapsule';
 import { AppLanguage, getSavedLanguage, saveLanguage, t } from '../lib/translations';
-import { calculateSystemStats } from '../lib/systemStats';
 
 interface SettingsMenuDrawerProps {
   isOpen: boolean;
@@ -93,18 +92,6 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
   const [isSuccess, setIsSuccess] = useState(false);
   const [activeSubTab, setActiveSubTab] = useState<'settings' | 'backup'>('settings');
 
-  const systemStats = React.useMemo(() => {
-    return calculateSystemStats({
-      classes,
-      activeClassId,
-      activeStudents: students,
-      activeSubjects: subjects,
-      activeCards: cards,
-      activeChapters: chapters,
-      teacher
-    });
-  }, [classes, activeClassId, students, subjects, cards, chapters, teacher]);
-
   const [internalLang, setInternalLang] = useState<AppLanguage>(() => language || getSavedLanguage());
   const currentLang = language || internalLang;
 
@@ -167,20 +154,18 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
           email: teacher.email
         } : null,
         activeClassId,
-        classes: systemStats.realClasses,
-        students: students,
-        allStudents: systemStats.allStudents,
-        subjects: systemStats.allSubjects,
-        cards: systemStats.allCards,
-        chapters: systemStats.allChapters,
+        classes,
+        students,
+        subjects,
+        cards,
+        chapters,
         storageDump: localStorageDump,
         metadata: {
-          totalClasses: systemStats.totalClassesCount,
-          totalStudents: systemStats.totalStudentsCount,
-          totalSubjects: systemStats.totalSubjectsCount,
-          totalCards: systemStats.totalQuestionsCount,
-          totalChapters: systemStats.totalChaptersCount,
-          classBreakdowns: systemStats.classBreakdowns
+          totalClasses: classes.length,
+          totalStudents: students.length,
+          totalSubjects: subjects.length,
+          totalCards: cards.length,
+          totalChapters: chapters.length
         }
       };
 
@@ -679,52 +664,22 @@ export const SettingsMenuDrawer: React.FC<SettingsMenuDrawerProps> = ({
                       <div className={`p-3 rounded-2xl border ${
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
                       }`}>
-                        <div className="text-xl font-black text-blue-600 dark:text-blue-400">
-                          {systemStats.totalClassesCount}
-                        </div>
-                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>
-                          {currentLang === 'km' ? 'ថ្នាក់រៀនជាក់ស្ដែង' : t('classrooms', currentLang)}
-                        </div>
+                        <div className="text-xl font-black text-blue-600 dark:text-blue-400">{classes.length}</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('classrooms', currentLang)}</div>
                       </div>
                       <div className={`p-3 rounded-2xl border ${
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
-                      }`} title={currentLang === 'km' ? 'ចំនួនសិស្សសរុបបូកបញ្ចូលគ្រប់ថ្នាក់ទាំងអស់' : 'Total students summed across all classes'}>
-                        <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">
-                          {systemStats.totalStudentsCount}
-                        </div>
-                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>
-                          {currentLang === 'km' ? 'សិស្សសរុប (គ្រប់ថ្នាក់)' : t('totalStudents', currentLang)}
-                        </div>
+                      }`}>
+                        <div className="text-xl font-black text-emerald-600 dark:text-emerald-400">{students.length}</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('totalStudents', currentLang)}</div>
                       </div>
                       <div className={`p-3 rounded-2xl border ${
                         isDarkMode ? 'bg-neutral-900/80 border-neutral-700/80' : 'bg-neutral-50 border-neutral-200/80'
-                      }`} title={currentLang === 'km' ? 'ចំនួនសំណួរបូកបញ្ចូលគ្រប់ថ្នាក់ និងគ្រប់មុខវិជ្ជាទាំងអស់' : 'Total questions across all classes and subjects'}>
-                        <div className="text-xl font-black text-amber-600 dark:text-amber-400">
-                          {systemStats.totalQuestionsCount}
-                        </div>
-                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>
-                          {currentLang === 'km' ? `សំណួរ (${systemStats.totalSubjectsCount} មុខវិជ្ជា)` : t('quizQuestions', currentLang)}
-                        </div>
+                      }`}>
+                        <div className="text-xl font-black text-amber-600 dark:text-amber-400">{cards.length || subjects.length}</div>
+                        <div className={`text-[10px] font-bold ${isDarkMode ? 'text-neutral-400' : 'text-neutral-500'} mt-0.5`}>{t('quizQuestions', currentLang)}</div>
                       </div>
                     </div>
-
-                    {/* Breakdown per real class */}
-                    {systemStats.classBreakdowns.length > 0 && (
-                      <div className={`mt-2.5 pt-2 border-t ${isDarkMode ? 'border-neutral-800' : 'border-neutral-200'} text-[10.5px] text-left space-y-1`}>
-                        <div className="flex items-center justify-between text-[10px] font-bold text-slate-400">
-                          <span>{currentLang === 'km' ? '📊 បញ្ជីថ្នាក់ និងទិន្នន័យជាក់ស្ដែង' : '📊 Real Class Breakdown'}</span>
-                          <span className="text-emerald-500 font-black">100% Verified</span>
-                        </div>
-                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-1 max-h-24 overflow-y-auto scrollbar-thin">
-                          {systemStats.classBreakdowns.map(cb => (
-                            <div key={cb.classId} className={`px-2 py-1 rounded-lg border text-[10px] flex items-center justify-between ${isDarkMode ? 'bg-neutral-800/60 border-neutral-700/60 text-neutral-300' : 'bg-neutral-100/80 border-neutral-200 text-neutral-700'}`}>
-                              <span className="font-bold truncate max-w-[90px]">{cb.className}</span>
-                              <span className="font-mono text-emerald-600 dark:text-emerald-400 font-bold">{cb.studentsCount} សិស្ស • {cb.questionsCount} សំណួរ</span>
-                            </div>
-                          ))}
-                        </div>
-                      </div>
-                    )}
                   </div>
 
                   {/* Section 1: Export Backup Card */}

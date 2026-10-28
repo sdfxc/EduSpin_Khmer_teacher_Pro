@@ -28,7 +28,6 @@ import { compressAndResizeImage } from '../lib/imageUtils';
 import { formatGoogleDriveImageUrl } from '../lib/driveUtils';
 import { useImageDropAndPaste } from '../lib/useImageDropAndPaste';
 import { useConfirm } from '../context/ConfirmContext.tsx';
-import { useLanguage } from '../context/LanguageContext';
 
 interface StudentProfileModalProps {
   isOpen: boolean;
@@ -51,7 +50,6 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   onSaveStudent,
   onDeleteStudent,
 }) => {
-  const { language } = useLanguage();
   const { confirmAction } = useConfirm();
   const [avatarUrl, setAvatarUrl] = useState<string>('');
   const [studentId, setStudentId] = useState<string>('');
@@ -119,27 +117,21 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     setLinkInput('');
     setStatusMsg({
       type: 'success',
-      text: language === 'km' 
-        ? 'បានភ្ជាប់រូបភាពពី Link / Google Drive ជោគជ័យ! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
-        : 'Image linked from URL / Google Drive! Please click "Save Changes"'
+      text: 'បានភ្ជាប់រូបភាពពី Link / Google Drive ជោគជ័យ! សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
     });
   };
 
   const handleRemovePhoto = () => {
     confirmAction({
-      title: language === 'km' ? 'លុបរូបភាព Profile សិស្ស' : 'Delete Student Profile Picture',
-      message: language === 'km' 
-        ? `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបរូបភាព Profile របស់សិស្ស «${name || 'នេះ'}» មែនទេ?`
-        : `Are you sure you want to remove the profile picture of student "${name || 'this student'}"?`,
-      confirmText: language === 'km' ? 'បាទ/ចាស លុបរូប' : 'Remove Photo',
+      title: 'លុបរូបភាព Profile សិស្ស',
+      message: `តើលោកគ្រូ អ្នកគ្រូ ពិតជាចង់លុបរូបភាព Profile របស់សិស្ស «${name || 'នេះ'}» មែនទេ?`,
+      confirmText: 'បាទ/ចាស លុបរូប',
       variant: 'danger',
       onConfirm: () => {
         setAvatarUrl('');
         setStatusMsg({
           type: 'success',
-          text: language === 'km' 
-            ? 'បានលុបរូបភាព Profile ចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
-            : 'Profile photo removed. Please click "Save Changes"'
+          text: 'បានលុបរូបភាព Profile ចេញ។ សូមចុច "រក្សាទុកការផ្លាស់ប្ដូរ"'
         });
       }
     });
@@ -148,10 +140,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!name.trim()) {
-      setStatusMsg({ 
-        type: 'error', 
-        text: language === 'km' ? 'សូមបញ្ចូលឈ្មោះសិស្ស!' : 'Please enter student name!' 
-      });
+      setStatusMsg({ type: 'error', text: 'សូមបញ្ចូលឈ្មោះសិស្ស!' });
       return;
     }
 
@@ -175,9 +164,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       await onSaveStudent(student.id, updatedFields);
       setStatusMsg({
         type: 'success',
-        text: language === 'km' 
-          ? 'បានរក្សាទុកព័ត៌មាន និងរូបភាព Profile សិស្សជោគជ័យ!' 
-          : 'Successfully saved student profile and details!'
+        text: 'បានរក្សាទុកព័ត៌មាន និងរូបភាព Profile សិស្សជោគជ័យ!'
       });
 
       setTimeout(() => {
@@ -187,16 +174,14 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
       console.error('Failed to update student profile:', err);
       setStatusMsg({
         type: 'error',
-        text: language === 'km' 
-          ? 'មានបញ្ហាក្នុងការរក្សាទុក សូមព្យាយាមម្តងទៀត!' 
-          : 'Failed to save student profile. Please try again!'
+        text: 'មានបញ្ហាក្នុងការរក្សាទុក សូមព្យាយាមម្តងទៀត!'
       });
     } finally {
       setIsSaving(false);
     }
   };
 
-  const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-[#474a4f]', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-[#474a4f]'];
+  const colors = ['bg-orange-500', 'bg-emerald-500', 'bg-blue-500', 'bg-pink-500', 'bg-purple-500', 'bg-cyan-500', 'bg-rose-500', 'bg-indigo-500'];
   const badgeBg = colors[name ? name.charCodeAt(0) % colors.length : 0];
 
   return (
@@ -214,13 +199,9 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
           {isDraggingOver && (
             <div className="absolute inset-0 z-50 rounded-3xl bg-indigo-600/90 backdrop-blur-xs flex flex-col items-center justify-center text-white font-black animate-pulse border-4 border-dashed border-white pointer-events-none p-6 text-center">
               <Upload className="w-14 h-14 mb-3 animate-bounce" />
-              <span className="text-lg font-black">
-                {language === 'km' ? 'ទម្លាក់រូបភាពនៅទីនេះ (Drop Image Here)' : 'Drop Image Anywhere Here'}
-              </span>
+              <span className="text-lg font-black">ទម្លាក់រូបភាពនៅទីនេះ (Drop Image Anywhere Here)</span>
               <span className="text-xs font-medium opacity-90 mt-1">
-                {language === 'km' 
-                  ? 'គាំទ្ររូបភាពពីកុំព្យូទ័រ (PNG, JPG, WebP) ឬរូបដែលទាញពីគេហទំព័រផ្សេងៗ' 
-                  : 'Supports PNG, JPG, WebP image formats or web URLs'}
+                គាំទ្ររូបភាពពីកុំព្យូទ័រ (PNG, JPG, WebP) ឬរូបដែលទាញពីគេហទំព័រផ្សេងៗ
               </span>
             </div>
           )}
@@ -233,10 +214,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               </div>
               <div>
                 <h3 className="text-base font-black text-slate-900 dark:text-white">
-                  {language === 'km' ? 'ព័ត៌មាន & រូបភាព Profile សិស្ស' : 'Student Profile & Information'}
+                  ព័ត៌មាន & រូបភាព Profile សិស្ស
                 </h3>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  {language === 'km' ? 'ផ្លាស់ប្ដូររូបថតពីទូរស័ព្ទ ឬកុំព្យូទ័របានយ៉ាងងាយស្រួល' : 'Easily manage student details and avatar image'}
+                  ផ្លាស់ប្ដូររូបថតពីទូរស័ព្ទ ឬកុំព្យូទ័របានយ៉ាងងាយស្រួល
                 </p>
               </div>
             </div>
@@ -289,7 +270,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       <span className="text-3xl sm:text-4xl font-black">
                         {name ? name.trim().charAt(0) : <User className="w-10 h-10" />}
                       </span>
-                      <span className="text-[9px] font-bold mt-0.5 opacity-90">{language === 'km' ? 'គ្មានរូប' : 'No Photo'}</span>
+                      <span className="text-[9px] font-bold mt-0.5 opacity-90">គ្មានរូប</span>
                     </div>
                   )}
 
@@ -305,7 +286,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="absolute bottom-0 right-0 p-2 rounded-full bg-indigo-600 hover:bg-indigo-700 text-white shadow-md border-2 border-white dark:border-slate-800 transition-transform active:scale-95 cursor-pointer"
-                  title={language === 'km' ? 'ជ្រើសរើសរូបថត' : 'Pick image'}
+                  title="ជ្រើសរើសរូបថត"
                 >
                   <Camera className="w-4 h-4" />
                 </button>
@@ -315,12 +296,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <div className="flex-1 text-center sm:text-left space-y-2.5 w-full">
                 <div>
                   <h4 className="text-sm font-black text-slate-900 dark:text-white">
-                    {language === 'km' ? 'រូបថតតំណាង (Profile Photo)' : 'Student Avatar (Profile Photo)'}
+                    រូបថតតំណាង (Profile Photo)
                   </h4>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {language === 'km' 
-                      ? 'គាំទ្ររូបភាពពីទូរស័ព្ទ (Camera/Gallery), កុំព្យូទ័រ (PNG/JPG) ឬ Link' 
-                      : 'Supports Camera/Gallery, Computer uploads (PNG/JPG), or URL links'}
+                    គាំទ្ររូបភាពពីទូរស័ព្ទ (Camera/Gallery), កុំព្យូទ័រ (PNG/JPG) ឬ Link
                   </p>
                 </div>
 
@@ -333,7 +312,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     className="px-3.5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
                   >
                     <Upload className="w-3.5 h-3.5" />
-                    <span>{language === 'km' ? 'ជ្រើសរើសរូប (Phone/PC)' : 'Upload Photo'}</span>
+                    <span>ជ្រើសរើសរូប (Phone/PC)</span>
                   </button>
 
                   {/* Direct Mobile Camera Capture */}
@@ -344,7 +323,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     className="sm:hidden px-3 py-2 rounded-xl bg-slate-200 dark:bg-slate-800 hover:bg-slate-300 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-200 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer active:scale-95"
                   >
                     <Camera className="w-3.5 h-3.5 text-indigo-500" />
-                    <span>{language === 'km' ? 'ថតរូប' : 'Take Photo'}</span>
+                    <span>ថតរូប</span>
                   </button>
 
                   {/* Paste from Clipboard Button */}
@@ -353,10 +332,10 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     onClick={pasteFromClipboard}
                     disabled={isProcessing}
                     className="px-3.5 py-2 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold flex items-center gap-1.5 shadow-xs transition-all cursor-pointer active:scale-95 disabled:opacity-50"
-                    title={language === 'km' ? 'បិទភ្ជាប់រូបភាពពី Clipboard ឬ Screenshot (Ctrl+V)' : 'Paste from clipboard (Ctrl+V)'}
+                    title="បិទភ្ជាប់រូបភាពពី Clipboard ឬ Screenshot (Ctrl+V)"
                   >
                     <ClipboardPaste className="w-3.5 h-3.5" />
-                    <span>{language === 'km' ? 'បិទភ្ជាប់រូប (Paste)' : 'Paste Image'}</span>
+                    <span>បិទភ្ជាប់រូប (Paste)</span>
                   </button>
 
                   {/* Remove photo */}
@@ -367,7 +346,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                       className="px-3 py-2 rounded-xl bg-red-50 dark:bg-red-950/40 text-red-600 dark:text-red-400 hover:bg-red-100 dark:hover:bg-red-900/40 border border-red-200 dark:border-red-900/50 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer"
                     >
                       <Trash2 className="w-3.5 h-3.5" />
-                      <span>{language === 'km' ? 'លុបរូប' : 'Remove'}</span>
+                      <span>លុបរូប</span>
                     </button>
                   )}
                 </div>
@@ -375,11 +354,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 {/* Helpful drag-and-drop & paste hint */}
                 <div className="text-[11px] font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 px-2.5 py-1.5 rounded-lg border border-indigo-200/50 dark:border-indigo-800/50 inline-flex items-center gap-1.5 mt-1">
                   <Sparkles className="w-3 h-3 shrink-0 text-indigo-500" />
-                  <span>
-                    {language === 'km' 
-                      ? 'អាចទាញទម្លាក់រូប (Drag & Drop) ឬចុច Ctrl+V ដើម្បី Paste រូបភាពពីគ្រប់ទីកន្លែង' 
-                      : 'Drag & Drop an image here or press Ctrl+V to paste from anywhere'}
-                  </span>
+                  <span>អាចទាញទម្លាក់រូប (Drag & Drop) ឬចុច Ctrl+V ដើម្បី Paste រូបភាពពីគ្រប់ទីកន្លែង</span>
                 </div>
 
                 {/* Hidden File Inputs */}
@@ -405,13 +380,13 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
             <div className="space-y-1.5">
               <label className="text-xs font-extrabold text-slate-600 dark:text-slate-400 flex items-center gap-1.5">
                 <LinkIcon className="w-3.5 h-3.5 text-indigo-500" />
-                <span>{language === 'km' ? 'ឬបិទភ្ជាប់ Google Drive Link / Web Image URL' : 'Or paste Google Drive Link / Image URL'}</span>
+                <span>ឬបិទភ្ជាប់ Google Drive Link / Web Image URL</span>
               </label>
               <div className="flex items-center gap-2">
                 <div className="relative flex-1">
                   <input
                     type="url"
-                    placeholder={language === 'km' ? 'https://drive.google.com/file/d/... ឬ Image URL' : 'https://drive.google.com/file/d/... or Image URL'}
+                    placeholder="https://drive.google.com/file/d/... ឬ Image URL"
                     value={linkInput}
                     onChange={(e) => setLinkInput(e.target.value)}
                     className="w-full pl-3.5 pr-3 py-2.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-medium focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -423,7 +398,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   disabled={!linkInput.trim()}
                   className="px-4 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 dark:bg-slate-800 dark:hover:bg-slate-700 text-white text-xs font-bold transition-all disabled:opacity-40 cursor-pointer shrink-0"
                 >
-                  {language === 'km' ? 'ភ្ជាប់រូប' : 'Attach'}
+                  ភ្ជាប់រូប
                 </button>
               </div>
             </div>
@@ -434,7 +409,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <div className="flex flex-col gap-1 sm:col-span-1">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <Hash className="w-3 h-3 text-indigo-500" />
-                    <span>{language === 'km' ? 'ID / អត្តលេខ' : 'Student ID'}</span>
+                    <span>ID / អត្តលេខ</span>
                   </label>
                   <input
                     type="text"
@@ -448,12 +423,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <div className="flex flex-col gap-1 sm:col-span-2">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <User className="w-3 h-3 text-indigo-500" />
-                    <span>{language === 'km' ? 'ឈ្មោះសិស្ស' : 'Student Name'} <strong className="text-red-500">*</strong></span>
+                    <span>ឈ្មោះសិស្ស <strong className="text-red-500">*</strong></span>
                   </label>
                   <input
                     type="text"
                     required
-                    placeholder={language === 'km' ? 'បញ្ចូលឈ្មោះសិស្ស...' : 'Enter student name...'}
+                    placeholder="បញ្ចូលឈ្មោះសិស្ស..."
                     value={name}
                     onChange={(e) => setName(e.target.value)}
                     className="px-3.5 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-bold focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
@@ -464,21 +439,21 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               {/* Row 2: Gender & Class & Status */}
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div className="flex flex-col gap-1">
-                  <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">{language === 'km' ? 'ភេទ' : 'Gender'}</label>
+                  <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase">ភេទ</label>
                   <select
                     value={gender}
                     onChange={(e) => setGender(e.target.value as 'ប្រុស' | 'ស្រី')}
                     className="px-3 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs font-bold cursor-pointer focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="ប្រុស">{language === 'km' ? 'ប្រុស (Male)' : 'Male'}</option>
-                    <option value="ស្រី">{language === 'km' ? 'ស្រី (Female)' : 'Female'}</option>
+                    <option value="ប្រុស">ប្រុស (Male)</option>
+                    <option value="ស្រី">ស្រី (Female)</option>
                   </select>
                 </div>
 
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <GraduationCap className="w-3 h-3 text-indigo-500" />
-                    <span>{language === 'km' ? 'ថ្នាក់រៀន' : 'Class'}</span>
+                    <span>ថ្នាក់រៀន</span>
                   </label>
                   <select
                     value={classId}
@@ -494,17 +469,17 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <Award className="w-3 h-3 text-amber-500" />
-                    <span>{language === 'km' ? 'ស្ថានភាព' : 'Status'}</span>
+                    <span>ស្ថានភាព</span>
                   </label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as any)}
                     className="px-3 py-2.5 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-200 text-xs font-bold cursor-pointer focus:outline-none focus:border-indigo-500"
                   >
-                    <option value="ឆ្នើម">{language === 'km' ? 'ឆ្នើម (Outstanding)' : 'Outstanding'}</option>
-                    <option value="សកម្ម">{language === 'km' ? 'សកម្ម (Active)' : 'Active'}</option>
-                    <option value="កំពុងរីកចម្រើន">{language === 'km' ? 'កំពុងរីកចម្រើន (Improving)' : 'Improving'}</option>
-                    <option value="គួរឲ្យបារម្ភ">{language === 'km' ? 'គួរឲ្យបារម្ភ (Needs Attention)' : 'Needs Attention'}</option>
+                    <option value="ឆ្នើម">ឆ្នើម (Outstanding)</option>
+                    <option value="សកម្ម">សកម្ម (Active)</option>
+                    <option value="កំពុងរីកចម្រើន">កំពុងរីកចម្រើន (Improving)</option>
+                    <option value="គួរឲ្យបារម្ភ">គួរឲ្យបារម្ភ (Needs Attention)</option>
                   </select>
                 </div>
               </div>
@@ -514,7 +489,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <Award className="w-3 h-3 text-yellow-500" />
-                    <span>{language === 'km' ? 'ពិន្ទុ (Points)' : 'Points'}</span>
+                    <span>ពិន្ទុ (Points)</span>
                   </label>
                   <input
                     type="number"
@@ -528,7 +503,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <Calendar className="w-3 h-3 text-indigo-500" />
-                    <span>{language === 'km' ? 'ថ្ងៃខែឆ្នាំកំណើត' : 'Date of Birth'}</span>
+                    <span>ថ្ងៃខែឆ្នាំកំណើត</span>
                   </label>
                   <input
                     type="date"
@@ -541,7 +516,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                 <div className="flex flex-col gap-1">
                   <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                     <Phone className="w-3 h-3 text-indigo-500" />
-                    <span>{language === 'km' ? 'លេខទូរស័ព្ទ / អាណាព្យាបាល' : 'Phone / Parent Contact'}</span>
+                    <span>លេខទូរស័ព្ទ / អាណាព្យាបាល</span>
                   </label>
                   <input
                     type="tel"
@@ -557,11 +532,11 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
               <div className="flex flex-col gap-1">
                 <label className="text-[11px] font-extrabold text-slate-500 dark:text-slate-400 uppercase flex items-center gap-1">
                   <FileText className="w-3 h-3 text-indigo-500" />
-                  <span>{language === 'km' ? 'កំណត់សម្គាល់បន្ថែម (Notes)' : 'Notes & Remarks'}</span>
+                  <span>កំណត់សម្គាល់បន្ថែម (Notes)</span>
                 </label>
                 <textarea
                   rows={2}
-                  placeholder={language === 'km' ? 'ព័ត៌មានលម្អិតបន្ថែមអំពីសិស្ស...' : 'Additional notes about this student...'}
+                  placeholder="ព័ត៌មានលម្អិតបន្ថែមអំពីសិស្ស..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
                   className="px-3.5 py-2 border border-slate-200 dark:border-slate-800 rounded-xl bg-slate-50 dark:bg-slate-950 text-slate-800 dark:text-slate-100 text-xs font-medium focus:outline-none focus:border-indigo-500"
@@ -582,7 +557,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                     className="px-3 py-2 text-xs font-bold text-red-500 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/30 rounded-xl transition-colors cursor-pointer flex items-center gap-1.5"
                   >
                     <Trash2 className="w-3.5 h-3.5" />
-                    <span>{language === 'km' ? 'លុបសិស្សនេះ' : 'Delete Student'}</span>
+                    <span>លុបសិស្សនេះ</span>
                   </button>
                 )}
               </div>
@@ -593,7 +568,7 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   onClick={onClose}
                   className="px-4 py-2.5 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 rounded-xl text-xs font-bold hover:bg-slate-100 dark:hover:bg-slate-800 transition-all cursor-pointer"
                 >
-                  {language === 'km' ? 'បោះបង់' : 'Cancel'}
+                  បោះបង់
                 </button>
                 <button
                   type="submit"
@@ -603,12 +578,12 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
                   {isSaving ? (
                     <>
                       <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>{language === 'km' ? 'កំពុងរក្សាទុក...' : 'Saving...'}</span>
+                      <span>កំពុងរក្សាទុក...</span>
                     </>
                   ) : (
                     <>
                       <Check className="w-4 h-4" />
-                      <span>{language === 'km' ? 'រក្សាទុកការផ្លាស់ប្ដូរ' : 'Save Changes'}</span>
+                      <span>រក្សាទុកការផ្លាស់ប្ដូរ</span>
                     </>
                   )}
                 </button>
@@ -620,4 +595,3 @@ export const StudentProfileModal: React.FC<StudentProfileModalProps> = ({
     </AnimatePresence>
   );
 };
-

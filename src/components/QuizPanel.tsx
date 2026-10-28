@@ -2327,10 +2327,11 @@ export default function QuizPanel({
               <button
                 type="button"
                 onClick={() => setIsSetTimerModalOpen(true)}
-                className="flex items-center justify-center p-2.5 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-600 hover:from-sky-600 hover:to-purple-700 text-white rounded-xl shadow-md shadow-indigo-500/20 cursor-pointer active:scale-95 transition-all shrink-0"
-                title={`កំណត់រយ:ពេលឆ្លើយសំណួរនីមួយៗ (${questionTimerLimit}វ)`}
+                className="flex items-center gap-1.5 px-3 py-2 bg-gradient-to-r from-sky-500 via-indigo-500 to-purple-600 hover:from-sky-600 hover:to-purple-700 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-500/20 cursor-pointer active:scale-95 transition-all shrink-0"
+                title="កំណត់រយ:ពេលឆ្លើយសំណួរនីមួយៗ (Set Question Time Limit)"
               >
-                <Timer className="w-4 h-4 text-sky-200 animate-pulse" />
+                <Timer className="w-3.5 h-3.5 text-sky-200 animate-pulse" />
+                <span>កំណត់ពេលនៅសល់ ({questionTimerLimit}វ)</span>
               </button>
 
               {cards.filter(c => c.question).length > 0 && (
@@ -2338,36 +2339,37 @@ export default function QuizPanel({
                   <button
                     type="button"
                     onClick={() => setIsEditQuestionsModalOpen(true)}
-                    className="flex items-center justify-center p-2.5 bg-amber-500 hover:bg-amber-600 text-white rounded-xl shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 transition-all"
-                    title="កែសម្រួលសំណួរ & ចម្លើយ"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-amber-500 hover:bg-amber-600 text-white rounded-xl font-bold text-xs shadow-md shadow-amber-500/10 cursor-pointer active:scale-95 transition-all"
                   >
-                    <Edit3 className="w-4 h-4" />
+                    <Edit3 className="w-3.5 h-3.5" />
+                    <span>កែសម្រួលសំណួរ & ចម្លើយ</span>
                   </button>
                   <button
                     type="button"
                     onClick={() => setIsExportModalOpen(true)}
-                    className="flex items-center justify-center p-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95 transition-all"
-                    title="នាំចេញ និងបោះពុម្ពវិញ្ញាសា (PDF/Word)"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-xs shadow-md shadow-emerald-500/10 cursor-pointer active:scale-95 transition-all"
                   >
-                    <Printer className="w-4 h-4" />
+                    <Printer className="w-3.5 h-3.5" />
+                    <span>នាំចេញវិញ្ញាសា (PDF/Word)</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleDeleteAllMainQuestions}
-                    className="flex items-center justify-center p-2.5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl shadow-md shadow-rose-600/10 cursor-pointer active:scale-95 transition-all"
+                    className="flex items-center gap-1.5 px-3 py-2 bg-rose-600 hover:bg-rose-700 text-white rounded-xl font-bold text-xs shadow-md shadow-rose-600/10 cursor-pointer active:scale-95 transition-all"
                     title="លុបសំណួរទាំងអស់ក្នុងមេរៀននេះ"
                   >
-                    <Trash2 className="w-4 h-4" />
+                    <Trash2 className="w-3.5 h-3.5" />
+                    <span>លុបសំណួរទាំងអស់</span>
                   </button>
                 </>
               )}
               <button
                 type="button"
                 onClick={enterManageMode}
-                className="flex items-center justify-center p-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl shadow-md shadow-indigo-600/10 cursor-pointer active:scale-95 transition-all"
-                title="រៀបចំជំពូក និងមេរៀន"
+                className="flex items-center gap-1.5 px-3 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/10 cursor-pointer active:scale-95 transition-all"
               >
-                <Layers className="w-4 h-4" />
+                <Layers className="w-3.5 h-3.5" />
+                <span>រៀបចំជំពូក និងមេរៀន</span>
               </button>
             </div>
           </div>
@@ -2487,8 +2489,8 @@ export default function QuizPanel({
               </button>
               <div className="h-5 w-[1px] bg-slate-300 dark:bg-slate-700 hidden sm:block" />
               <div className="flex items-center gap-2">
-                <Layers className="w-5 h-5 text-indigo-500" />
-                <h3 className="text-lg font-black tracking-wide text-slate-800 dark:text-white">
+                <Layers className="w-5 h-5 text-indigo-505" />
+                <h3 className="text-lg font-black tracking-wide text-slate-800 dark:text-slate-205">
                   ការរៀបចំជំពូក និងមេរៀន
                 </h3>
               </div>
@@ -2647,7 +2649,7 @@ export default function QuizPanel({
                           if (e.key === 'Escape') setEditingSubjectId(null);
                         }}
                         autoFocus
-                        className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-white font-bold w-32"
+                        className="px-2 py-1 text-xs bg-white dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-md focus:outline-none focus:ring-1 focus:ring-indigo-500 text-slate-900 dark:text-slate-105 font-bold w-32"
                       />
                       <button
                         type="button"
@@ -2685,11 +2687,11 @@ export default function QuizPanel({
                     }}
                     className={`group px-3.5 py-2.5 rounded-xl text-xs font-black transition-all cursor-pointer border flex items-center gap-2.5 hover:shadow-xs relative select-none ${
                       isActive
-                        ? 'bg-indigo-600/20 dark:bg-indigo-600/30 border-indigo-500 text-indigo-900 dark:text-white font-extrabold ring-1 ring-indigo-500/30 shadow-sm'
-                        : 'bg-slate-50 hover:bg-slate-100/80 dark:bg-slate-800 dark:hover:bg-slate-700 border-slate-200 dark:border-slate-800 text-slate-700 dark:text-white'
+                        ? 'bg-indigo-500/10 border-indigo-505 text-indigo-900 dark:text-indigo-305 font-extrabold ring-1 ring-indigo-500/20 shadow-sm'
+                        : 'bg-slate-50 hover:bg-slate-100/80 dark:bg-slate-850 dark:hover:bg-slate-800/80 border-slate-200 dark:border-slate-800 text-slate-600 dark:text-slate-400'
                     }`}
                   >
-                    <span className="text-slate-900 dark:text-white">{subEmoji} {sub.name}</span>
+                    <span>{subEmoji} {sub.name}</span>
                     
                     {/* Tiny action block inside pills */}
                     <span className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity ml-1 pl-1 border-l border-slate-300 dark:border-slate-700">
@@ -3214,7 +3216,7 @@ export default function QuizPanel({
                             onClick={() => handleUpdateLocalQuestionType('pisa')}
                             className={`px-4 py-3 rounded-2xl text-xs font-black transition-all cursor-pointer border flex flex-col items-center gap-1 text-center justify-center ${
                               localEditCards[selectedEditIndex].question?.questionType === 'pisa'
-                                ? 'bg-indigo-500/10 border-indigo-500 text-indigo-900 dark:text-white font-black'
+                                ? 'bg-indigo-500/10 border-indigo-505 border-indigo-500 text-indigo-900 dark:text-indigo-300 font-black'
                                 : 'bg-slate-50 dark:bg-slate-800/40 border-slate-200 dark:border-slate-800/60 text-slate-500 dark:text-slate-400 hover:bg-slate-100 dark:hover:bg-slate-800'
                             }`}
                           >

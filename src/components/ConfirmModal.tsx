@@ -1,7 +1,6 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AlertTriangle, Trash2, X } from 'lucide-react';
-import { useLanguage } from '../context/LanguageContext';
 
 export interface ConfirmModalProps {
   isOpen: boolean;
@@ -19,19 +18,14 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
   isOpen,
   onClose,
   onConfirm,
-  title,
+  title = 'តើអ្នកពិតជាចង់លុបមែនឬទេ?',
   message,
-  confirmText,
-  cancelText,
+  confirmText = 'លុប',
+  cancelText = 'ទេ',
   variant = 'danger',
   isDarkMode = false
 }) => {
-  const { language, t } = useLanguage();
   if (!isOpen) return null;
-
-  const displayTitle = title || t('confirmDeleteTitle', 'តើអ្នកពិតជាចង់លុបមែនឬទេ?');
-  const displayConfirm = confirmText || t('delete', 'លុប');
-  const displayCancel = cancelText || t('cancel', 'ទេ');
 
   const isDark = isDarkMode || (typeof document !== 'undefined' && document.documentElement.classList.contains('dark'));
 
@@ -81,10 +75,10 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
             </div>
             <div className="pt-0.5">
               <h3 className="text-base font-black tracking-tight leading-snug">
-                {displayTitle}
+                {title}
               </h3>
               <p className="text-[11px] font-semibold text-slate-400 dark:text-slate-500 mt-0.5">
-                {language === 'km' ? 'ការបញ្ជាក់ដើម្បីសុវត្ថិភាពទិន្នន័យ' : 'Data safety confirmation'}
+                ការបញ្ជាក់ដើម្បីសុវត្ថិភាពទិន្នន័យ
               </p>
             </div>
           </div>
@@ -109,7 +103,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
                   : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border-slate-200'
               }`}
             >
-              {displayCancel}
+              {cancelText}
             </button>
             <button
               type="button"
@@ -121,7 +115,7 @@ export const ConfirmModal: React.FC<ConfirmModalProps> = ({
               }`}
             >
               <Trash2 className="w-3.5 h-3.5" />
-              <span>{displayConfirm}</span>
+              <span>{confirmText}</span>
             </button>
           </div>
         </motion.div>

@@ -9,10 +9,10 @@ import './index.css';
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
-    <LanguageProvider>
-      <ConfirmProvider>
+    <ConfirmProvider>
+      <LanguageProvider>
         <App />
-      </ConfirmProvider>
-    </LanguageProvider>
+      </LanguageProvider>
+    </ConfirmProvider>
   </StrictMode>,
 );

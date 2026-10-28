@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList, Timer, Table, ChevronLeft, RotateCcw, Sparkles, GraduationCap } from 'lucide-react';
+import { Users, Plus, Minus, Shuffle, Download, FileSpreadsheet, Award, Check, TrendingUp, Trophy, Loader2, Cloud, ClipboardList, Timer, Table, ChevronLeft, RotateCcw, Sparkles } from 'lucide-react';
 import { Student, TeacherAccount, ClassInfo } from '../types';
 import * as XLSX from 'xlsx';
 import { db, handleFirestoreError, OperationType, safeSetDoc, safeGetDoc, safeOnSnapshot } from '../lib/firebase';
@@ -8,7 +8,6 @@ import { StudentQuickEditModal } from './StudentQuickEditModal';
 import StopwatchPanel from './StopwatchPanel';
 import { StudentScoreTable } from './StudentScoreTable';
 import { SpinWheelGroupModal } from './SpinWheelGroupModal';
-import { useLanguage } from '../context/LanguageContext';
 
 interface GroupDividerProps {
   students: Student[];
@@ -46,7 +45,6 @@ export default function GroupDivider({
   onAwardGroupWorkPoints,
   onUpdateStudentDetail
 }: GroupDividerProps) {
-  const { language, t } = useLanguage();
   const [activeSubTab, setActiveSubTab] = useState<'groups' | 'scores' | 'stopwatch'>('groups');
   const [numGroups, setNumGroups] = useState(4);
   const [groups, setGroups] = useState<Group[]>([]);
@@ -561,57 +559,55 @@ export default function GroupDivider({
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Sub-Tabs Switcher */}
-      <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-full overflow-x-auto no-scrollbar shadow-xs ${
-        isDarkMode ? 'bg-[#272525] border-slate-800/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
+      <div className={`p-1.5 rounded-2xl border flex items-center gap-2 max-w-fit shadow-xs ${
+        isDarkMode ? 'bg-[#0e1524] border-slate-800/80 shadow-[inset_0_1px_2px_rgba(0,0,0,0.4)]' : 'bg-slate-100/90 border-slate-200'
       }`}>
         <button
           type="button"
           onClick={() => setActiveSubTab('groups')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === 'groups'
               ? 'bg-indigo-600 text-white shadow-md shadow-indigo-600/25'
               : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
           }`}
         >
           <Users className="w-4 h-4" />
-          <span>{language === 'km' ? 'បែងចែកក្រុម (Groups)' : 'Divide Groups'}</span>
+          <span>បែងចែកក្រុម (Groups)</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveSubTab('scores')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === 'scores'
               ? 'bg-gradient-to-r from-emerald-600 to-teal-600 text-white shadow-md shadow-emerald-600/25'
               : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
           }`}
         >
           <Table className="w-4 h-4 text-emerald-400" />
-          <span>{language === 'km' ? 'បញ្ចូលពិន្ទុ & តារាងពិន្ទុ' : 'Score Sheet'}</span>
+          <span>បញ្ចូលពិន្ទុ & តារាងពិន្ទុ</span>
         </button>
 
         <button
           type="button"
           onClick={() => setActiveSubTab('stopwatch')}
-          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer shrink-0 ${
+          className={`px-4 py-2 rounded-xl text-xs font-black transition-all flex items-center gap-2 cursor-pointer ${
             activeSubTab === 'stopwatch'
               ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-md shadow-indigo-600/25'
               : isDarkMode ? 'text-slate-300 hover:text-white hover:bg-slate-800/60' : 'text-slate-600 hover:text-slate-900 hover:bg-white/80'
           }`}
         >
           <Timer className="w-4 h-4 text-cyan-400 animate-pulse" />
-          <span>Stopwatch & Timer</span>
+          <span>Stopwatch & Timer ក្នុងក្រុម</span>
         </button>
       </div>
 
       {activeSubTab === 'stopwatch' ? (
         <StopwatchPanel
           isDarkMode={isDarkMode}
-          teacher={teacher}
           activeClassId={activeClassId}
           className={activeClassName}
           onNavigateTab={onNavigateTab}
-          initialWidget="stopwatch"
         />
       ) : activeSubTab === 'scores' ? (
         <div className="space-y-4">
@@ -623,7 +619,7 @@ export default function GroupDivider({
               }`}
             >
               <ChevronLeft className="w-4 h-4" />
-              <span>{language === 'km' ? 'ត្រឡប់ទៅបែងចែកក្រុមវិញ' : 'Back to Groups'}</span>
+              <span>ត្រឡប់ទៅបែងចែកក្រុមវិញ</span>
             </button>
           </div>
           <StudentScoreTable
@@ -638,7 +634,7 @@ export default function GroupDivider({
         <>
           {/* Set Number of Teams Panel */}
           <div className={`p-6 rounded-3xl shadow-sm flex flex-col lg:flex-row lg:items-center justify-between gap-6 border transition-all duration-300 ${
-            isDarkMode ? 'bg-[#272525] border-slate-800/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
+            isDarkMode ? 'bg-[#0e1524] border-slate-800/80 shadow-md' : 'bg-white border-slate-200 shadow-sm'
           }`}>
             <div className="flex items-center gap-4">
               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center transition-all duration-305 duration-300 ${
@@ -649,15 +645,13 @@ export default function GroupDivider({
               <div>
                 <h2 className={`text-xl font-extrabold leading-tight transition-all duration-300 ${
                   isDarkMode ? 'text-white' : 'text-slate-800'
-                }`}>
-                  {language === 'km' ? 'កំណត់ការបែងចែកក្រុមស្មើគ្នា' : 'Balanced Group Divider'}
-                </h2>
+                }`}>កំណត់ការបែងចែកក្រុមស្មើគ្នា</h2>
                 <p className={`text-xs mt-1 font-semibold flex items-center gap-2 flex-wrap transition-all duration-300 ${
                   isDarkMode ? 'text-slate-400' : 'text-slate-500'
                 }`}>
-                  <span>{language === 'km' ? 'ថ្នាក់៖' : 'Class:'} <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{activeClassName}</span></span>
+                  <span>ថ្នាក់៖ <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{activeClassName}</span></span>
                   <span>•</span>
-                  <span>{language === 'km' ? 'សិស្សសរុប៖' : 'Total Students:'} <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{students.length} {language === 'km' ? 'នាក់' : 'students'}</span></span>
+                  <span>សិស្សសរុប៖ <span className={`font-bold ${isDarkMode ? 'text-indigo-400' : 'text-indigo-600'}`}>{students.length} នាក់</span></span>
                 </p>
               </div>
             </div>
@@ -668,51 +662,54 @@ export default function GroupDivider({
               <button
                 type="button"
                 onClick={() => setActiveSubTab('scores')}
-                className={`p-2.5 rounded-2xl font-bold flex items-center justify-center border transition-all cursor-pointer shadow-sm active:scale-95 ${
+                className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
                   isDarkMode 
                     ? 'bg-emerald-950/40 border-emerald-900/50 text-emerald-300 hover:bg-emerald-900/60' 
                     : 'bg-emerald-50 border-emerald-200 text-emerald-700 hover:bg-emerald-100'
                 }`}
-                title={language === 'km' ? 'បញ្ចូលពិន្ទុ' : 'Enter Scores'}
+                title="បើកតារាងបញ្ចូលពិន្ទុសិស្សប្រចាំខែ"
               >
                 <Table className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>បញ្ចូលពិន្ទុ</span>
               </button>
 
               {/* Quick View, Copy, Paste, & Edit All Students */}
               <button
                 type="button"
                 onClick={() => setShowQuickEditModal(true)}
-                className={`p-2.5 rounded-2xl font-bold flex items-center justify-center border transition-all cursor-pointer shadow-sm active:scale-95 ${
+                className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
                   isDarkMode 
                     ? 'bg-purple-950/40 border-purple-900/50 text-purple-300 hover:bg-purple-900/60' 
                     : 'bg-purple-50 border-purple-200 text-purple-700 hover:bg-purple-100'
                 }`}
-                title={language === 'km' ? 'បញ្ជី & កែឈ្មោះសិស្ស' : 'Edit Names'}
+                title="មើល ចម្លង (Copy) បិទភ្ជាប់ (Paste) និងកែសម្រួលឈ្មោះសិស្សទាំងអស់"
               >
                 <ClipboardList className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                <span>បញ្ជី & កែឈ្មោះសិស្ស</span>
               </button>
 
               {/* Stopwatch direct shortcut button */}
               <button
                 type="button"
                 onClick={() => setActiveSubTab('stopwatch')}
-                className={`p-2.5 rounded-2xl font-bold flex items-center justify-center border transition-all cursor-pointer shadow-sm active:scale-95 ${
+                className={`px-4 py-2.5 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
                   isDarkMode 
                     ? 'bg-blue-950/40 border-blue-900/50 text-blue-300 hover:bg-blue-900/60' 
                     : 'bg-blue-50 border-blue-200 text-blue-700 hover:bg-blue-100'
                 }`}
-                title={language === 'km' ? 'Stopwatch & នាឡិកាកំណត់ម៉ោង' : 'Stopwatch'}
+                title="បើក Stopwatch & នាឡិកាកំណត់ម៉ោងសម្រាប់ក្រុម"
               >
                 <Timer className="w-4 h-4 text-blue-600 dark:text-blue-400 animate-pulse" />
+                <span>Stopwatch</span>
               </button>
 
               {groups.length > 0 && (
                 <button
                   onClick={exportGroupsToExcel}
-                  className="p-2.5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold flex items-center justify-center shadow-md shadow-green-500/10 cursor-pointer"
-                  title={language === 'km' ? 'ទាញយករបាយការណ៍ពិន្ទុ (Excel)' : 'Export Excel'}
+                  className="px-4 py-2.5 bg-green-500 hover:bg-green-600 text-white rounded-2xl font-bold flex items-center gap-2 shadow-md shadow-green-500/10 cursor-pointer text-xs"
                 >
                   <FileSpreadsheet className="w-4 h-4" />
+                  <span>ទាញយករបាយការណ៍ពិន្ទុ (Excel)</span>
                 </button>
               )}
 
@@ -727,7 +724,6 @@ export default function GroupDivider({
                       ? 'text-slate-400 bg-slate-905 bg-slate-900 border-slate-800 hover:bg-slate-800' 
                       : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
                   }`}
-                  title="ថយចុះចំនួនក្រុម"
                 >
                   <Minus className="w-4 h-4" />
                 </button>
@@ -742,7 +738,6 @@ export default function GroupDivider({
                       ? 'text-slate-400 bg-slate-905 bg-slate-900 border-slate-800 hover:bg-slate-800' 
                       : 'text-slate-600 bg-white border-slate-200 hover:bg-slate-50'
                   }`}
-                  title="បន្ថែមចំនួនក្រុម"
                 >
                   <Plus className="w-4 h-4" />
                 </button>
@@ -751,10 +746,10 @@ export default function GroupDivider({
               <button
                 onClick={splitGroups}
                 disabled={students.length === 0}
-                className="p-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center shadow-lg shadow-indigo-600/15 cursor-pointer active:scale-95 transition-all"
-                title={language === 'km' ? 'បែងចែកក្រុមតម្រូវនេះ' : 'Divide Groups Now'}
+                className="px-6 py-3 bg-indigo-600 hover:bg-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/15 cursor-pointer active:scale-95 transition-all text-xs"
               >
                 <Shuffle className="w-4 h-4" />
+                <span>បែងចែកក្រុមឥឡូវនេះ</span>
               </button>
 
               {/* Dynamic Delete / Redivide Button */}
@@ -763,24 +758,26 @@ export default function GroupDivider({
                   type="button"
                   onClick={handleClearAllGroups}
                   disabled={students.length === 0}
-                  className={`p-3 rounded-2xl font-bold flex items-center justify-center border transition-all cursor-pointer shadow-sm active:scale-95 ${
+                  className={`px-5 py-3 rounded-2xl font-bold flex items-center gap-2 border transition-all cursor-pointer text-xs shadow-sm active:scale-95 ${
                     isDarkMode 
                       ? 'bg-rose-950/40 border-rose-900/50 text-rose-300 hover:bg-rose-900/60 hover:text-white' 
                       : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-800'
                   }`}
-                  title={language === 'km' ? 'លុប/បែងចែកឡើងវិញ' : 'Clear/Reset'}
+                  title="លុបឈ្មោះសិស្សចេញពីគ្រប់ក្រុមទាំងអស់"
                 >
                   <RotateCcw className="w-4 h-4 text-rose-500" />
+                  <span>លុប/បែងចែកឡើងវិញ</span>
                 </button>
               ) : (
                 <button
                   type="button"
                   onClick={() => setIsSpinWheelOpen(true)}
                   disabled={students.length === 0}
-                  className="p-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center justify-center shadow-lg shadow-purple-600/20 cursor-pointer active:scale-95 transition-all"
-                  title={language === 'km' ? 'បែងចែកក្រុមឡើងវិញ' : 'Re-divide Groups'}
+                  className="px-5 py-3 bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-700 hover:to-indigo-700 disabled:opacity-50 text-white rounded-2xl font-bold flex items-center gap-2 shadow-lg shadow-purple-600/20 cursor-pointer active:scale-95 transition-all text-xs"
+                  title="បើកផ្ទាំងបង្វិលកង់សំណាងដើម្បីបែងចែកក្រុមឡើងវិញ"
                 >
                   <Sparkles className="w-4 h-4 text-amber-300 animate-pulse" />
+                  <span>បែងចែកក្រុមឡើងវិញ</span>
                 </button>
               )}
             </div>
@@ -794,23 +791,20 @@ export default function GroupDivider({
             <span className="text-xl shrink-0">✨</span>
             <div className="text-left">
               <p className="text-xs font-bold font-sans">
-                {language === 'km' 
-                  ? <>វិភាគជម្រើសចម្លាស់៖ <span className="font-extrabold text-indigo-550 dark:text-indigo-400">{shuffleStats.combinationsTested.toLocaleString()} របៀប</span> • ប្រភេទចម្លាស់ស្មើភាពខ្ពស់រកឃើញ៖ <span className="font-extrabold text-indigo-600 dark:text-indigo-300">{shuffleStats.fairPermutationsCount} ជម្រើសផ្សេងគ្នា</span></>
-                  : <>Permutations tested: <span className="font-extrabold text-indigo-550 dark:text-indigo-400">{shuffleStats.combinationsTested.toLocaleString()}</span> • Balanced sets found: <span className="font-extrabold text-indigo-600 dark:text-indigo-300">{shuffleStats.fairPermutationsCount}</span></>}
+                វិភាគជម្រើសចម្លាស់៖ <span className="font-extrabold text-indigo-550 dark:text-indigo-400">{shuffleStats.combinationsTested.toLocaleString()} របៀប</span> • 
+                ប្រភេទចម្លាស់ស្មើភាពខ្ពស់រកឃើញ៖ <span className="font-extrabold text-indigo-600 dark:text-indigo-300">{shuffleStats.fairPermutationsCount} ជម្រើសផ្សេងគ្នា</span>
               </p>
               <p className="text-[11px] mt-0.5 opacity-80 leading-relaxed font-semibold">
-                {language === 'km' 
-                  ? 'ប្រព័ន្ធលាយឡំសិទ្ធសកម្ម/ខ្សោយ និងជម្រើសប្រុស-ស្រីឱ្យមានតុល្យភាពស្មើភាពគ្នាល្អបំផុត ដើម្បីលុបបំបាត់ភាពលម្អៀង។'
-                  : 'Fairly distributes male/female ratio and academic levels across all groups to eliminate bias.'}
+                ប្រព័ន្ធលាយឡំសិទ្ធសកម្ម/ខ្សោយ និងជម្រើសប្រុស-ស្រីឱ្យមានតុល្យភាពស្មើភាពគ្នាល្អបំផុត ដើម្បីលុបបំបាត់ភាពលម្អៀង។
               </p>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 shrink-0">
             <span className="text-[10px] font-extrabold font-mono px-2.5 py-1 rounded-xl bg-indigo-500/10 text-indigo-600 dark:text-indigo-400">
-              {language === 'km' ? `ប្រុសក្នុងក្រុម៖ ${shuffleStats.boysRange} នាក់` : `Boys/Group: ${shuffleStats.boysRange}`}
+              ប្រុសក្នុងក្រុម៖ {shuffleStats.boysRange} នាក់
             </span>
             <span className="text-[10px] font-extrabold font-mono px-2.5 py-1 rounded-xl bg-pink-500/10 text-pink-600 dark:text-pink-400">
-              {language === 'km' ? `ស្រីក្នុងក្រុម៖ ${shuffleStats.girlsRange} នាក់` : `Girls/Group: ${shuffleStats.girlsRange}`}
+              ស្រីក្នុងក្រុម៖ {shuffleStats.girlsRange} នាក់
             </span>
           </div>
         </div>
@@ -838,9 +832,7 @@ export default function GroupDivider({
                   </div>
                   <h3 className={`font-extrabold font-sans text-base transition-all duration-300 ${
                     isDarkMode ? 'text-indigo-400' : 'text-indigo-600'
-                  }`}>
-                    {language === 'km' ? group.name : `Group ${group.id}`}
-                  </h3>
+                  }`}>{group.name}</h3>
                 </div>
 
                 <div className="flex items-center gap-2">
@@ -853,16 +845,16 @@ export default function GroupDivider({
                         ? 'bg-rose-950/40 border-rose-900/50 text-rose-300 hover:bg-rose-900/60 hover:text-white' 
                         : 'bg-rose-50 border-rose-200 text-rose-700 hover:bg-rose-100 hover:text-rose-800'
                     }`}
-                    title={language === 'km' ? 'កំណត់ពិន្ទុឡើងវិញសម្រាប់ក្រុមនេះ' : 'Reset score for this group'}
+                    title="កំណត់ពិន្ទុឡើងវិញសម្រាប់ក្រុមនេះ"
                   >
                     <RotateCcw className="w-3 h-3 text-rose-500" />
-                    <span>{language === 'km' ? 'ដាក់ពិន្ទុឡើងវិញ' : 'Reset Score'}</span>
+                    <span>ដាក់ពិន្ទុឡើងវិញ</span>
                   </button>
 
                   <span className={`text-[11px] font-black px-2.5 py-1 rounded-xl uppercase transition-all duration-300 ${
                     isDarkMode ? 'bg-indigo-950/40 text-indigo-300' : 'bg-indigo-50 text-indigo-650'
                   }`}>
-                    {group.members.length} {language === 'km' ? 'នាក់' : 'members'}
+                    {group.members.length} នាក់
                   </span>
                 </div>
               </div>
@@ -870,9 +862,9 @@ export default function GroupDivider({
               {/* Group Metrics Bar (Genders Ratio) */}
               <div className="flex items-center justify-between mb-4 text-[11px] font-extrabold">
                 <div className="flex items-center gap-2 bg-slate-50 dark:bg-slate-900/50 px-2.5 py-1 rounded-xl border border-slate-100 dark:border-slate-800/40">
-                  <span className="text-blue-500 flex items-center gap-0.5">♂ {group.members.filter(m => m.gender === 'ប្រុស').length} {language === 'km' ? 'នាក់' : 'B'}</span>
+                  <span className="text-blue-500 flex items-center gap-0.5">♂ {group.members.filter(m => m.gender === 'ប្រុស').length} នាក់</span>
                   <span className="text-slate-300 dark:text-slate-800">|</span>
-                  <span className="text-pink-500 flex items-center gap-0.5">♀ {group.members.filter(m => m.gender === 'ស្រី').length} {language === 'km' ? 'នាក់' : 'G'}</span>
+                  <span className="text-pink-500 flex items-center gap-0.5">♀ {group.members.filter(m => m.gender === 'ស្រី').length} នាក់</span>
                 </div>
               </div>
 
@@ -883,34 +875,34 @@ export default function GroupDivider({
                 <span className={`block text-[11px] font-black uppercase tracking-wider transition-all duration-300 ${
                   isDarkMode ? 'text-indigo-400' : 'text-indigo-700'
                 }`}>
-                  🎯 {language === 'km' ? 'ដាក់ពិន្ទុឲ្យក្រុម' : 'Award Group Score'}
+                  🎯 ដាក់ពិន្ទុឲ្យក្រុម
                 </span>
                 <div className="flex items-center gap-1.5">
                   <button
                     onClick={() => handleAddGroupScore(group.id, 1)}
                     className="flex-1 py-1 px-1 bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold rounded-lg text-xs transition-colors active:scale-95 cursor-pointer"
-                    title={language === 'km' ? 'បន្ថែម 1 ពិន្ទុគ្រប់គ្នា' : '+1 to all members'}
+                    title="បន្ថែម 1 ពិន្ទុគ្រប់គ្នា"
                   >
                     +1
                   </button>
                   <button
                     onClick={() => handleAddGroupScore(group.id, 5)}
                     className="flex-1 py-1 px-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold rounded-lg text-xs transition-colors active:scale-95 cursor-pointer"
-                    title={language === 'km' ? 'បន្ថែម 5 ពិន្ទុគ្រប់គ្នា' : '+5 to all members'}
+                    title="បន្ថែម 5 ពិន្ទុគ្រប់គ្នា"
                   >
                     +5
                   </button>
                   <button
                     onClick={() => handleAddGroupScore(group.id, -1)}
                     className="flex-1 py-1 px-1 bg-rose-500 hover:bg-rose-600 text-white font-extrabold rounded-lg text-xs transition-colors active:scale-95 cursor-pointer"
-                    title={language === 'km' ? 'ដក 1 ពិន្ទុគ្រប់គ្នា' : '-1 from all members'}
+                    title="ដក 1 ពិន្ទុគ្រប់គ្នា"
                   >
                     -1
                   </button>
                   <button
                     onClick={() => handleAddGroupScore(group.id, -5)}
                     className="flex-1 py-1 px-1 bg-rose-600 hover:bg-rose-700 text-white font-extrabold rounded-lg text-xs transition-colors active:scale-95 cursor-pointer"
-                    title={language === 'km' ? 'ដក 5 ពិន្ទុគ្រប់គ្នា' : '-5 from all members'}
+                    title="ដក 5 ពិន្ទុគ្រប់គ្នា"
                   >
                     -5
                   </button>
@@ -922,7 +914,7 @@ export default function GroupDivider({
                   <div className="flex items-center gap-1 shrink-0">
                     <input
                       type="number"
-                      placeholder={language === 'km' ? 'ពិន្ទុ' : 'Pts'}
+                      placeholder="ពិន្ទុ"
                       value={groupScoreInputs[group.id] || ''}
                       onChange={(e) => setGroupScoreInputs(prev => ({ ...prev, [group.id]: e.target.value }))}
                       className={`w-12 text-center text-xs font-black rounded-lg py-1 focus:outline-none focus:ring-1 focus:ring-indigo-500 border transition-all duration-300 ${
@@ -932,7 +924,7 @@ export default function GroupDivider({
                     <button
                       onClick={() => handleAddGroupScore(group.id)}
                       className="p-1 min-w-[28px] h-7 bg-indigo-600 hover:bg-indigo-700 text-white rounded-lg flex items-center justify-center transition-all cursor-pointer active:scale-95"
-                      title={language === 'km' ? 'បញ្ចូលពិន្ទុពិសេស' : 'Apply Score'}
+                      title="បញ្ចូលពិន្ទុពិសេស"
                     >
                       <Check className="w-3.5 h-3.5" />
                     </button>
